@@ -1,6 +1,6 @@
 ---
 name: engineering-discovery-workflow
-description: Shorthand: eng-discovery. Investigate an existing software system before implementation. Use for repository discovery, current-state audits, capability inventories, gap analysis, cross-layer tracing, and evidence-backed engineering investigation where the system must not be changed.
+description: Shorthand: eng-discovery. Investigate an existing software system before implementation. Use for repository discovery, current-state audits, capability inventories, gap analysis, cross-layer tracing, and evidence-backed engineering investigation where the system must not be changed. Discovery is complete only after the report is durably documented in the originating GitHub issue or in an accessible durable artifact directly linked from that issue.
 ---
 
 # Engineering Discovery Workflow
@@ -24,6 +24,8 @@ discover #1482 using eng-discovery
 ```
 
 Resolve `eng-discovery` to this canonical skill, retrieve/read the governing issue or request, and investigate the current repository state.
+
+When the governing request is an originating GitHub discovery issue, that issue is also the durable workflow record for discovery completion. The invocation prompt does not need a separate instruction telling the agent to update the issue; this skill owns that requirement.
 
 ## Applicability
 
@@ -245,6 +247,39 @@ The report should be concise enough to use operationally but detailed enough tha
 
 ---
 
+# Durable discovery documentation
+
+**Discovery is not complete until its findings are durably documented from the originating GitHub discovery issue and that documentation has been verified as accessible.**
+
+After producing the discovery report, the agent must update the originating GitHub discovery issue before declaring completion.
+
+The issue must contain either:
+
+1. the complete discovery report; or
+2. a direct link to a durable, accessible artifact containing the complete report.
+
+When the report is stored outside the issue, the issue must clearly identify the report and include enough context for subsequent engineering workflows to locate and consume it without reconstructing the discovery from the agent conversation.
+
+Do not duplicate the complete report in multiple places when one durable canonical artifact is already accessible from the issue.
+
+The agent must verify both:
+
+- that the GitHub issue was successfully updated; and
+- that the complete report is accessible through the issue or its direct durable link.
+
+An agent's final conversational response does not satisfy this requirement. The final response may summarize discovery status only after the durable record has been successfully written and verified.
+
+If the originating issue cannot be updated, or a linked report cannot be verified as accessible, return a **MATERIAL BLOCKER** identifying the failed documentation step. Do not declare discovery complete.
+
+Persisting the report does not:
+
+- authorize implementation;
+- approve discovery recommendations;
+- automatically create implementation issues;
+- change the separation between discovery, readiness, implementation, and independent review.
+
+---
+
 # Follow-up issue discipline
 
 Discovery may identify implementation work, but it must not perform that work.
@@ -295,4 +330,24 @@ A discovery follows this skill only when:
 - relevant risks and dependencies are captured;
 - no implementation changes were made;
 - follow-up work is expressed as recommendations or implementation issues;
-- the final report is usable by the next engineering phase without requiring the same discovery to be repeated.
+- the final report is usable by the next engineering phase without requiring the same discovery to be repeated;
+- the complete discovery report is present in the originating GitHub issue or in a durable accessible artifact directly linked from that issue;
+- when an external artifact is used, the issue clearly identifies it and provides enough context for subsequent engineering workflows to consume it;
+- the issue update and report accessibility were verified before completion was declared;
+- a conversational response alone is never treated as the durable discovery record;
+- failure to persist or verify the discovery record is returned as a `MATERIAL BLOCKER`, not as completed discovery.
+
+## Completion sequence
+
+```text
+investigate
+  ↓
+produce discovery report
+  ↓
+persist report in originating issue
+—or link one durable accessible canonical artifact from that issue
+  ↓
+verify issue update + report accessibility
+  ├── failure → MATERIAL BLOCKER
+  └── success → DISCOVERY COMPLETE
+```
