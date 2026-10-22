@@ -1,4 +1,6 @@
-# agentic-builder-engineering-system
+# Builder Garage
+
+**An Agentic Engineering System for Builders**
 
 A system of engineering practices, standards, architecture, roles, contracts, and workflows for responsible software construction with AI agents.
 
@@ -13,6 +15,19 @@ This is **working engineering material, not a finished framework or a claim that
 The central question is not simply how to generate software faster with AI. It is **how builders can retain engineering judgment, accountability, and reliable control of the software they construct while working with AI agents**.
 
 The repository contains reusable engineering skills, operating contracts, documented standards, and discovery notes. Those artifacts are shared to make the reasoning and evolution of the practices inspectable and useful to other builders. They are not a substitute for evaluating the needs, constraints, and risks of a particular system.
+
+## Inside the Garage
+
+Builder Garage is the home for an evolving, builder-centered engineering system. Its shop vocabulary organizes responsibilities without replacing precise technical terminology or existing engineering contracts.
+
+| Shop area | Responsibility |
+| --- | --- |
+| **Workbench** | Reusable engineering skills, workflows, procedures, and tools. |
+| **Crew** | Distinct engineering agents with explicit responsibilities and handoff boundaries. |
+| **Inspection** | Independent reviews, tests, acceptance verification, and quality gates. |
+| **Shipping** | Pull request integration, release readiness, deployment requirements, and promotion. |
+
+This is a **conceptual map**, not a required directory hierarchy or a new orchestration mechanism. Existing skill names, paths, invocation aliases, role boundaries, durable Issue/PR records, review contracts, and approval gates remain authoritative. The Garage can adopt automation selectively as practical needs and resources allow.
 
 ## Operating model
 
