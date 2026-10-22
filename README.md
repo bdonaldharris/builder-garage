@@ -22,10 +22,10 @@ Builder Garage is the home for an evolving, builder-centered engineering system.
 
 | Shop area | Responsibility |
 | --- | --- |
-| **Workbench** | Reusable engineering skills, workflows, procedures, and tools. |
-| **Crew** | Distinct engineering agents with explicit responsibilities and handoff boundaries. |
-| **Inspection** | Independent reviews, tests, acceptance verification, and quality gates. |
-| **Shipping** | Pull request integration, release readiness, deployment requirements, and promotion. |
+| **[Workbench](workbench/)** | Reusable engineering skills, workflows, procedures, and tools. |
+| **[Crew](crew/)** | Distinct engineering agents with explicit responsibilities and handoff boundaries. |
+| **[Inspection](inspection/)** | Independent reviews, tests, acceptance verification, and quality gates. |
+| **[Shipping](shipping/)** | Pull request integration, release readiness, deployment requirements, and promotion. |
 
 This is a **conceptual map**, not a required directory hierarchy or a new orchestration mechanism. Existing skill names, paths, invocation aliases, role boundaries, durable Issue/PR records, review contracts, and approval gates remain authoritative. The Garage can adopt automation selectively as practical needs and resources allow.
 
