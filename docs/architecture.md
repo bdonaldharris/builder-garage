@@ -40,7 +40,7 @@ Manuals are guidance that a project adopts explicitly. They are not configuratio
 | [`skills/`](../skills/) | The canonical engineering skills. They remain at this path to preserve existing installation paths, references, and invocation contracts. |
 | [`workbench/`](../workbench/), [`crew/`](../crew/), [`inspection/`](../inspection/), [`shipping/`](../shipping/) | Documentation of each conceptual component's responsibility and its governing skills. |
 | [`manuals/`](../manuals/) | Documentation of the Manuals component, and the Garage-maintained baseline manuals, beginning with the [Go Manual](../manuals/go.md). |
-| [`docs/`](./) | Architectural direction, [engineering principles](principles.md), [project history](history.md), Builder Garage's [Go Manual profile](go-manual.md), and repository configuration notes. |
+| [`docs/`](./) | Architectural direction, [engineering principles](principles.md), [project history](history.md), Builder Garage's adoption profiles for the [canonical skills](skill-adoption.md) and the [Go Manual](go-manual.md), and repository configuration notes. |
 | [`cmd/garage/`](../cmd/garage/) | Entry point for the `garage` executable and its build-time version value. |
 | [`internal/cli/`](../internal/cli/) | Cobra command wiring and project initialization behavior. It does not implement the conceptual components. |
 | [`docs/adr/`](adr/) | Accepted architectural decision records, beginning with the [Go and Cobra CLI foundation](adr/0001-go-cobra-cli-foundation.md). |
