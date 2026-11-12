@@ -8,7 +8,7 @@ Builder Garage is an open-source, project-embedded, extensible agentic engineeri
 
 Builder Garage is at its foundation stage.
 
-**What exists today** is the initial `garage` command-line foundation and the project's engineering documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, [discovery notes](docs/excavation/), and governance and contribution process.
+**What exists today** is the initial `garage` command-line foundation and the project's engineering documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, the [engineering principles](docs/principles.md) and [history](docs/history.md) behind them, and governance and contribution process.
 
 The CLI can display help and version information and initialize a minimal `.garage/config.yaml` in an existing project. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, release automation, or runtime for the conceptual components has been implemented.
 
@@ -114,7 +114,7 @@ This is **working engineering material, not a finished framework or a claim that
 
 The central question is not simply how to generate software faster with AI. It is **how builders can retain engineering judgment, accountability, and reliable control of the software they construct while working with AI agents**.
 
-The repository contains reusable engineering skills, operating contracts, documented standards, and discovery notes. Those artifacts are shared to make the reasoning and evolution of the practices inspectable and useful to other builders. They are not a substitute for evaluating the needs, constraints, and risks of a particular system.
+The repository contains reusable engineering skills, operating contracts, documented standards, [engineering principles](docs/principles.md), and [project history](docs/history.md). Those artifacts are shared to make the reasoning and evolution of the practices inspectable and useful to other builders. They are not a substitute for evaluating the needs, constraints, and risks of a particular system.
 
 ## Inside the Garage
 
@@ -247,11 +247,11 @@ Canonical reusable engineering procedures live under `skills/`.
 - [`independent-implementation-review`](skills/independent-implementation-review/SKILL.md) (`indep-review`) — Executes as **Agent #2 — Independent Review Agent** and defines the narrow three-question review contract, complete-artifact review, required verified durable Issue/PR disposition comments, bounded sibling-state review, and auditable independent disposition of every material Codex finding. Agent #2 never performs implementation/correction work, and its invocation is not complete until the governing Issue/PR record has been successfully written and verified.
 - [`integration-pr-review`](skills/integration-pr-review/SKILL.md) (`pr-review`) — Executes as **Agent #1 — Implementation Agent** for PR-side integration/finalization responsibilities. It governs durable PR workflow-state comments, one substantive Codex review on the initial production-bound PR artifact, hard Agent #2 disposition boundaries, required verified Agent #2 disposition on the PR itself, Agent #2-owned final correction approval, artifact-equivalent finalization, Environment / Deployment Requirements gating, and merge convergence without a post-correction Codex loop.
 
-## Current candidate standards
+## Engineering principles
 
-[Visible UI Metadata and Mechanism-Specific Evidence](docs/excavation/2026-10-06-visible-ui-metadata-and-evidence.md) records two candidate standards: keep agent collaboration context out of customer UI, and verify the specific mechanism asserted by any source-backed claim before adopting it.
+[docs/principles.md](docs/principles.md) separates the principles the skills and governance already require from evidence-backed candidate principles, which are not requirements, and from unresolved hypotheses. [docs/history.md](docs/history.md) records the engineering lineage those principles came from.
 
-### Review contract
+## Review contract
 
 Application implementation review asks:
 
