@@ -1,0 +1,39 @@
+name: Bug report
+description: Report something in this repository that is incorrect, contradictory, or does not work as documented.
+labels: ["bug"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thank you for reporting a problem.
+
+        **Do not report security vulnerabilities here.** Follow the [security policy](https://github.com/bdonaldharris/builder-garage/blob/main/SECURITY.md) instead.
+  - type: textarea
+    id: problem
+    attributes:
+      label: What is wrong?
+      description: Describe the problem and what you observed.
+    validations:
+      required: true
+  - type: input
+    id: location
+    attributes:
+      label: Where?
+      description: The file, skill, or section affected.
+      placeholder: skills/engineering-discovery-workflow/SKILL.md, "Core invariant"
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What did you expect instead?
+      description: This becomes the basis for the acceptance criteria of the correction.
+    validations:
+      required: true
+  - type: textarea
+    id: evidence
+    attributes:
+      label: Evidence
+      description: Steps to reproduce, quotations, links, or anything else that demonstrates the problem.
+    validations:
+      required: false
