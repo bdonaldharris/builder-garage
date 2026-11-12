@@ -40,6 +40,13 @@ body:
     validations:
       required: true
   - type: textarea
+    id: intended-outcome
+    attributes:
+      label: Intended outcome
+      description: Optional. What the result should be like for the person who uses it and, where useful, how it will be observed, for example the rendered page or the command output. This supplements the acceptance criteria below; it does not replace them.
+    validations:
+      required: false
+  - type: textarea
     id: acceptance-criteria
     attributes:
       label: Acceptance criteria

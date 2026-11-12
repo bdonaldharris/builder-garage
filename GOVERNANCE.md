@@ -22,6 +22,14 @@ Current maintainers:
 
 - B Donald Harris ([@bdonaldharris](https://github.com/bdonaldharris)) — lead maintainer
 
+### Workflow Owner
+
+The Workflow Owner is the human authority for workflow decisions that belong to a person rather than to an agent. The canonical skills call this role the workflow owner. For Builder Garage, the Workflow Owner is currently the lead maintainer.
+
+The Workflow Owner is the human authority that accepts product intent for Builder Garage. See [Product-intent acceptance](#product-intent-acceptance).
+
+Until Builder Garage's project configuration records its human authorities ([#35](https://github.com/bdonaldharris/builder-garage/issues/35)), this section is the record of that mapping. Once it does, the configured value is authoritative, and this section explains it.
+
 ### Contributors
 
 Anyone who opens an issue, takes part in a discussion, performs a review, or submits a change is a contributor. No prior standing is required.
@@ -51,6 +59,14 @@ A substantive change passes two distinct gates. They answer different questions,
 - The record on the originating issue is the authoritative record of the independent engineering review. A review of the pull request, where one is required, supplements it and never replaces it. Review authority comes from the reviewer's independence and role, not from the tool used, and no GitHub-hosted agent reviewer or vendor integration is required.
 
 The independent review procedure and its review contract are defined by the [independent-implementation-review](skills/independent-implementation-review/SKILL.md) skill. This document does not restate them.
+
+### Product-intent acceptance
+
+Independent engineering review checks a change against its written issue. Whether the result is what was intended for its user is a human judgment, made as part of the project's acceptance of the change. For Builder Garage, the [Workflow Owner](#workflow-owner) is the human authority that accepts product intent.
+
+This adds no gate and changes no skill. The review contract is unchanged. Intent that the issue states is checked by independent review. Intent that the issue does not state is the Workflow Owner's to judge, not the reviewer's.
+
+When a change affects something a user sees or uses, and inspecting it is practical, the Workflow Owner inspects the result in that form before accepting it. Examples are the rendered page rather than its Markdown source, or a command's actual output. This applies only when that condition holds. It is not a step every change must complete.
 
 ### Pull requests authored by a sole maintainer
 
