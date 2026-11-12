@@ -1,5 +1,9 @@
 # Builder Garage
 
+<p align="center">
+  <img src="assets/branding/builder-garage-logo.png" alt="Builder Garage logo: a multitool badge" width="900">
+</p>
+
 **An Agentic Engineering System for Builders**
 
 Builder Garage is an open-source, project-embedded, extensible agentic engineering framework: a system of engineering practices, standards, architecture, roles, contracts, and workflows for responsible software construction with AI agents.
