@@ -32,6 +32,8 @@ Substantive changes are issue-driven. [Open an issue](https://github.com/bdonald
 
 The issue is the durable record of the change: what is wanted, its acceptance criteria, its scope, and later its discovery findings and review results. Write acceptance criteria that a reviewer can check.
 
+The change-proposal template also has an optional **Intended outcome** field. Use it to describe what the result should be like for its user and, where useful, how it will be observed. It supplements the acceptance criteria and does not replace them.
+
 Before investing in implementation, give a maintainer the chance to respond on the issue. This avoids work on a change the project would not accept.
 
 ### 2. Discover when warranted
@@ -82,6 +84,8 @@ If the change is modified after approval, it returns to independent review.
 A maintainer reviews the pull request. It merges only after maintainer approval and after all required checks pass. No one pushes to `main` directly.
 
 Maintainer approval is normally recorded as a GitHub approving review on the pull request.
+
+Product intent is accepted at this stage. The Workflow Owner, currently the lead maintainer, is the human authority that accepts whether the result is what was intended for its user. When a change affects something a user sees or uses, and inspecting it is practical, the Workflow Owner inspects the result in that form before accepting it. Examples are the rendered page or a command's actual output. This is not a step every change must complete, and it does not change the independent review contract. [GOVERNANCE.md](GOVERNANCE.md#product-intent-acceptance) is the authority for this policy.
 
 #### Pull requests authored by a sole maintainer
 
