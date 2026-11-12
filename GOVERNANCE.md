@@ -48,6 +48,7 @@ A substantive change passes two distinct gates. They answer different questions,
 - The implementer of a change never performs its independent engineering review. Corrections made in response to review findings are independently re-reviewed before the change proceeds.
 - Independent approval permits a change to be committed and proposed as a pull request. It does not authorize merge.
 - Maintainer approval does not stand in for a missing independent engineering review.
+- The record on the originating issue is the authoritative record of the independent engineering review. A review of the pull request, where one is required, supplements it and never replaces it. Review authority comes from the reviewer's independence and role, not from the tool used, and no GitHub-hosted agent reviewer or vendor integration is required.
 
 The independent review procedure and its review contract are defined by the [independent-implementation-review](skills/independent-implementation-review/SKILL.md) skill. This document does not restate them.
 

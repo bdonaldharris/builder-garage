@@ -169,10 +169,10 @@ Structured workflow-state comments use recognizable markers so agents can identi
 
 Agents should read the governing Issue/PR, identify the latest relevant workflow-state comment for the current phase, inspect the current artifact, perform the skill-defined work, and write the resulting state back to the governing artifact.
 
-For Agent #2 review, the durable record is mandatory:
+For Agent #2 review, the durable record is mandatory. Agent #2 performs two distinct review sequences:
 
-- implementation-stage review → write `[AGENT #2 — INDEPENDENT REVIEW]` to the **Issue**;
-- production-bound review → write `[AGENT #2 — INDEPENDENT REVIEW]` to the **PR itself**.
+- **Implementation review** → write `[AGENT #2 — INDEPENDENT REVIEW]` to the **originating Issue**. Agent #2 reviews the complete implementation before it is committed. The issue record is the authoritative record of that review, and it governs whether the implementation may advance.
+- **PR review**, when the project's configured PR conditions require one → write `[AGENT #2 — INDEPENDENT REVIEW]` to the **PR itself**. The PR record is supplemental. It never replaces the issue-recorded implementation review.
 
 The Agent #2 invocation is not complete until that durable comment has been successfully written and verified. A review returned only in the agent response does not satisfy the workflow. If the durable write fails, Agent #2 must report the failure rather than claim the review state was recorded.
 
@@ -187,7 +187,7 @@ A skill invocation establishes the executing agent's identity for that execution
 - **Agent #1 — Implementation Agent** owns implementation, correction, implementation validation, artifact preparation, PR creation/finalization, and other implementation-side production-bound work assigned by the workflow.
 - **Agent #2 — Independent Review Agent** owns independent complete-artifact review, disposition of implementation findings, disposition of Codex findings, and approval/rejection under the governing three-question contract.
 
-A transition between Agent #1 and Agent #2 requires a separate agent invocation.
+A transition between Agent #1 and Agent #2 requires a separate agent invocation. Agent #2 runs in its own execution context, such as a separate session or thread. It may use the same tool or model as Agent #1, but it never shares Agent #1's implementation context.
 
 Reaching another agent's responsibility is a **terminal handoff boundary**, not permission for the current agent to assume that role. The current invocation ends at that boundary; it must not wait, poll, monitor, sleep/retry, or autonomously continue when the future state appears.
 
@@ -221,6 +221,8 @@ separate Agent #1 invocation
 → READY FOR AGENT #2 RE-REVIEW
 → STOP
 ```
+
+Review authority comes from the Agent #2 role and its durable record, not from tool choice. Codex or any other automated reviewer is optional review input where a project uses one. Implementation review requires no GitHub-hosted agent reviewer and no particular vendor integration.
 
 Codex is a review input, not Agent #2. A Codex review does not constitute independent Agent #2 review, Codex severity does not control disposition, and Codex returning no findings does not authorize Agent #1 to declare approval. Posting the canonical Codex review request is itself a terminal Agent #1 handoff: Agent #1 stops immediately and does not wait or poll for the result. Only a separately invoked Agent #2 using `independent-implementation-review` may produce the Agent #2 independent-review disposition.
 

@@ -301,7 +301,11 @@ A separately invoked Agent #2 must perform the independent review. Agent #1 resu
 
 An Agent #2 response shown only in the agent conversation is not a durable disposition. Agent #1 must not treat review as complete or advance the workflow unless the corresponding Agent #2 workflow-state comment has been successfully recorded on the governing artifact.
 
-The requirement is a real workflow handoff, not merely a different persona.
+The authoritative record of Agent #2's implementation review is its `[AGENT #2 — INDEPENDENT REVIEW]` disposition on the **originating Issue**. That disposition, not any PR-side activity, determines whether the implementation may be committed and advanced. A later Agent #2 PR review, when the project's configured PR conditions require one, is a separate sequence governed by `integration-pr-review`. Its PR record is supplemental and never replaces the issue-recorded implementation review.
+
+Review authority comes from the Agent #2 role, performed by a separately invoked agent in its own execution context, and from its durable record. It never comes from tool choice. Codex or any other automated reviewer is optional review input where a project uses one. Its findings, silence, or absence do not establish, replace, or withhold Agent #2 review authority. Implementation review requires no GitHub-hosted agent reviewer and no particular vendor integration.
+
+The requirement is a real workflow handoff, not merely a different persona. Agent #2 runs in its own execution context, such as a separate session or thread, and may use the same tool or model as Agent #1.
 
 ---
 # Phase 1 — Agent #1 implementation
@@ -741,6 +745,7 @@ An implementation follows this skill only when:
 - Agent #1 returns for independent Agent #2 review/re-review only after the applicable ready state is reached;
 - Agent #2 is separately invoked;
 - Agent #1 advances only from an Agent #2 disposition that is durably recorded on the governing Issue/PR; an agent-response-only review does not satisfy the handoff;
+- the issue-recorded Agent #2 implementation review is authoritative for advancing the implementation; a PR record is supplemental, and no tool or vendor integration establishes review authority;
 - review is governed by the three questions;
 - only original-acceptance failures, implementation-introduced regressions, or non-working behavior require correction;
 - validated corrections address the coherent issue-scoped behavior boundary rather than only the reported permutation;

@@ -55,7 +55,7 @@ Implement the change within the scope of its issue. **Do not commit yet.**
 
 Before anything is committed, the complete change is reviewed by someone independent of its implementation. The implementer never reviews their own work.
 
-The review result is recorded on the originating issue.
+The review result is recorded on the originating issue. That issue record is the authoritative record of the independent review, and it governs whether the change may be committed. A review of the pull request, where one is required, supplements it and never replaces it.
 
 - Procedure and review contract: [independent-implementation-review](skills/independent-implementation-review/SKILL.md)
 
@@ -103,8 +103,8 @@ A maintainer decides whether a change is substantive and may ask for an issue fi
 
 The linked skills define how AI agents carry out this process, including the separation between the implementing agent and the independently invoked review agent. See [Agent identity and role boundaries](README.md#agent-identity-and-role-boundaries) and the skill shorthand in the [README](README.md#skill-shorthand).
 
-- Implementation and independent review are separate agent invocations. An agent never reviews work it implemented.
-- Output from automated review tools is an input to independent review, not a substitute for it.
+- Implementation and independent review are separate agent invocations, in separate execution contexts such as separate sessions. An agent never reviews work it implemented.
+- Output from automated review tools is optional input to independent review, not a substitute for it. Review authority comes from the reviewer's role and the recorded review, not from the tool used. Contributors are not required to enable a GitHub-hosted agent reviewer or any particular vendor integration.
 
 The same sequence applies when people do the work without agents: someone other than the implementer performs the independent review and records the result on the issue.
 
