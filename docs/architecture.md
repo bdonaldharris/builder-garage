@@ -1,6 +1,6 @@
 # Architectural Direction
 
-**Status:** Approved direction. Nothing described here as planned or possible has been implemented.
+**Status:** Approved direction. The initial CLI foundation described below is implemented; everything explicitly described as planned or possible remains unimplemented.
 
 This document records the architectural direction approved for Builder Garage. It states direction, not design. It deliberately leaves detailed questions open so that they are answered with evidence, within the lifecycle of the change that needs the answer.
 
@@ -11,7 +11,7 @@ Builder Garage is an open-source, project-embedded, extensible agentic engineeri
 ## Direction
 
 - **Project-embedded.** Builder Garage is meant to operate from inside the project it serves, alongside that project's repository, issues, and pull requests, rather than as a separate hosted service. The current operating model already works this way: skills are used in the project's workspace, and the project's GitHub issues and pull requests hold the durable workflow record.
-- **CLI-first.** A command-line interface is the planned primary interface. It does not exist yet.
+- **CLI-first.** The `garage` command-line interface is the primary interface. Its initial foundation provides help, version reporting, and project initialization; broader capabilities remain future work.
 - **Extensible.** Projects that adopt Builder Garage are expected to adapt and extend it. The extension mechanisms have not been designed.
 - **Room to grow.** Libraries, adapters, and potentially independent or distributed execution may be supported in the future. These are possibilities the direction keeps open, not commitments.
 - **Single repository.** The project lives in one repository initially.
@@ -37,23 +37,26 @@ These are conceptual boundaries. Whether they later become package, module, or c
 | [`skills/`](../skills/) | The canonical engineering skills. They remain at this path to preserve existing installation paths, references, and invocation contracts. |
 | [`workbench/`](../workbench/), [`crew/`](../crew/), [`inspection/`](../inspection/), [`shipping/`](../shipping/) | Documentation of each conceptual component's responsibility and its governing skills. |
 | [`docs/`](./) | Architectural direction, repository configuration notes, and [discovery notes](excavation/). |
-| [`.github/`](../.github/) | Issue and pull request templates. |
+| [`cmd/garage/`](../cmd/garage/) | Entry point for the `garage` executable and its build-time version value. |
+| [`internal/cli/`](../internal/cli/) | Cobra command wiring and project initialization behavior. It does not implement the conceptual components. |
+| [`docs/adr/`](adr/) | Accepted architectural decision records, beginning with the [Go and Cobra CLI foundation](adr/0001-go-cobra-cli-foundation.md). |
+| [`.github/`](../.github/) | Issue and pull request templates and pull-request validation workflow. |
 | Repository root | README, license, governance, contribution, conduct, and security documents. |
 
-The repository contains documentation only. There is no source code, build, or runtime.
+The repository now contains the initial Go CLI source, tests, build commands, and pull-request validation alongside its documentation. The Workbench, Crew, Inspection, and Shipping directories remain documentation of conceptual boundaries, not implemented packages or runtime components.
 
 ## Deliberately undecided
 
-The following have not been decided, and this document does not decide them:
+The following remain deliberately undecided:
 
-- the technology stack, including implementation language and distribution format;
-- the CLI's commands and behavior;
-- how Builder Garage is installed into, or embedded within, a project;
-- package and module layout;
+- commands and behavior beyond `garage --help`, `garage version`, and `garage init`;
+- configuration beyond the schema version;
+- installation and release channels for compiled executables;
+- package and module layout for future conceptual-component implementations;
 - adapter and extension interfaces;
 - the execution model for independent or distributed execution.
 
-No technology is introduced until an established requirement calls for it.
+Go, Cobra, Go modules, YAML, standard-library testing, standalone executables, GitHub Actions, and future GoReleaser use are decided in [ADR 0001](adr/0001-go-cobra-cli-foundation.md). No additional technology is introduced until an established requirement calls for it.
 
 ## How the architecture evolves
 
