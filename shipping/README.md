@@ -1,6 +1,6 @@
 # Shipping
 
-Shipping covers integration, pull requests, production-bound review, release readiness, deployment requirements, and promotion.
+Shipping covers integration, pull requests, the supplemental Agent #2 PR review, release readiness, deployment requirements, and promotion.
 
 Changes must satisfy the governing implementation and integration skills, including any environment, secrets, webhooks, migrations, seeds, and deployment prerequisites. Human approval and CI requirements remain applicable where required.
 

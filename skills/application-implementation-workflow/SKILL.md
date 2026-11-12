@@ -1,6 +1,6 @@
 ---
 name: application-implementation-workflow
-description: Shorthand: implement-workflow. Govern the application implementation lifecycle with scoped Agent #1 implementation, independent Agent #2 review, coherent issue-bound corrections, one substantive Codex review on the initial production-bound PR artifact, Agent #2-owned correction approval, and boring promotion. Inspect existing architecture before inventing new structures, ask when material requirements are ambiguous, and use the three-question review contract without expanding work into unrelated application auditing.
+description: Shorthand: implement-workflow. Govern the application implementation lifecycle with scoped Agent #1 implementation, independent Agent #2 review, coherent issue-bound corrections, issue-recorded Agent #2 implementation review as the authoritative review record, a supplemental role-based Agent #2 PR review only when its triggers apply, optional automated review input, Agent #2-owned correction approval, and boring promotion. Inspect existing architecture before inventing new structures, ask when material requirements are ambiguous, and use the three-question review contract without expanding work into unrelated application auditing.
 ---
 
 # Application Implementation Workflow
@@ -19,7 +19,7 @@ As Agent #1, you own:
 - correction;
 - implementation validation;
 - preparing artifacts for independent review;
-- PR creation/finalization and other implementation-side production-bound work assigned to Agent #1.
+- PR creation/finalization and other implementation-side integration work assigned to Agent #1.
 
 You may write only Agent #1 workflow-state markers:
 
@@ -89,7 +89,7 @@ Yes -> No -> Yes = MERGE
 
 GitHub Issues and PRs are the durable record of implementation/review execution state.
 
-Use recognizable workflow-state markers so agents can identify the latest relevant execution state without assuming the absolute newest comment is relevant. Human comments, Codex comments, inline review comments, and other activity may appear after a workflow-state comment.
+Use recognizable workflow-state markers so agents can identify the latest relevant execution state without assuming the absolute newest comment is relevant. Human comments, automated-review comments, inline review comments, and other activity may appear after a workflow-state comment.
 
 These markers are owned by Agent #1. Agent #1 must never create an Agent #2 workflow-state comment.
 
@@ -206,7 +206,7 @@ This invariant applies anywhere Agent #1 owns executable implementation or corre
 - implementation resumed after a material blocker is resolved;
 - Agent #2 correction cycles;
 - Agent #2 re-review correction cycles;
-- automated/Codex review corrections owned by Agent #1.
+- corrections required by an Agent #2 PR review, including dispositions of automated-review findings.
 
 **Agent #1 must not voluntarily return control while executable issue-scoped implementation or validated correction work remains and no material blocker exists.**
 
@@ -301,7 +301,7 @@ A separately invoked Agent #2 must perform the independent review. Agent #1 resu
 
 An Agent #2 response shown only in the agent conversation is not a durable disposition. Agent #1 must not treat review as complete or advance the workflow unless the corresponding Agent #2 workflow-state comment has been successfully recorded on the governing artifact.
 
-The authoritative record of Agent #2's implementation review is its `[AGENT #2 — INDEPENDENT REVIEW]` disposition on the **originating Issue**. That disposition, not any PR-side activity, determines whether the implementation may be committed and advanced. A later Agent #2 PR review, when the project's configured PR conditions require one, is a separate sequence governed by `integration-pr-review`. Its PR record is supplemental and never replaces the issue-recorded implementation review.
+The authoritative record of Agent #2's implementation review is its `[AGENT #2 — INDEPENDENT REVIEW]` disposition on the **originating Issue**. That disposition, not any PR-side activity, determines whether the implementation may be committed and advanced. A later Agent #2 PR review, when a PR-review trigger defined by `integration-pr-review` applies, is a separate sequence governed by `integration-pr-review`. Its PR record is supplemental and never replaces the issue-recorded implementation review.
 
 Review authority comes from the Agent #2 role, performed by a separately invoked agent in its own execution context, and from its durable record. It never comes from tool choice. Codex or any other automated reviewer is optional review input where a project uses one. Its findings, silence, or absence do not establish, replace, or withhold Agent #2 review authority. Implementation review requires no GitHub-hosted agent reviewer and no particular vendor integration.
 
@@ -500,7 +500,7 @@ After Agent #2 returns `APPROVED`, Agent #1 may:
 3. commit;
 4. push the issue branch;
 5. open the integration PR;
-6. post the current `[AGENT #1 — IMPLEMENTATION]` workflow-state comment on the PR so production-bound review state is durable on the PR itself.
+6. post the current `[AGENT #1 — IMPLEMENTATION]` workflow-state comment on the PR, so the PR's workflow state is durable on the PR itself.
 
 The PR should accurately describe:
 
@@ -518,34 +518,35 @@ Do not turn the PR description into a catalog of unrelated application problems.
 
 Use `integration-pr-review`.
 
-The intended production-bound PR flow is:
+The intended PR flow is:
 
-1. Agent #1 posts the complete canonical Codex Integration Review Request on the stable initial PR head;
-2. posting that Codex request is a terminal handoff for the current Agent #1 invocation — Agent #1 stops immediately and does not wait/poll for Codex;
-3. after Codex returns, a separately invoked Agent #2 independently reviews the complete current artifact and dispositions every material Codex finding against the three governing questions;
-4. findings that do not require current correction are recorded as non-blocking/informational, invalid, or follow-up/out-of-scope as applicable;
-5. if no validated blocker remains, merge may proceed when CI, human approval, Environment / Deployment Requirements, and other existing gates are satisfied;
+1. Agent #1 records artifact-equivalence evidence for the pushed head against the change Agent #2 approved on the originating issue: the resulting SHA, the approving disposition, and matching changed files and content. Agent #1 then evaluates the two minimum PR-review triggers defined by `integration-pr-review`, equivalence not shown and automated findings on the current head, together with any additional triggers the project has recorded;
+2. if no trigger applies, no Agent #2 PR review is required, and merge may proceed when CI, human approval, Environment / Deployment Requirements, and other existing gates are satisfied;
+3. if a trigger applies, Agent #1 posts the Agent #2 PR Review Request defined by `integration-pr-review`. Posting it is a terminal handoff: Agent #1 stops immediately and does not wait or poll;
+4. a separately invoked Agent #2, in its own harness, reviews the complete current PR artifact under `independent-implementation-review`, dispositions every automated finding against the three governing questions, and records its supplemental disposition on the PR;
+5. findings that do not require current correction are recorded as non-blocking/informational, invalid, or follow-up/out-of-scope as applicable;
 6. if Agent #2 returns `CHANGES REQUIRED`, correction begins only through a new Agent #1 invocation;
 7. every Agent #1 correction remains governed by the global Agent #1 execution invariant, coherent correction boundary, churn trigger when applicable, and universal pre-return completion gate;
 8. after `READY FOR AGENT #2 RE-REVIEW`, Agent #1 stops; a separate Agent #2 invocation performs complete-artifact correction re-review;
-9. if Agent #2 returns `APPROVED — MERGE`, Agent #2 owns final substantive correction approval. Agent #1 may then commit/push exactly the artifact Agent #2 reviewed, verify artifact equivalence, and proceed to merge when the remaining gates are satisfied;
-10. do **not** trigger another Codex review after an Agent #2-approved correction.
+9. if Agent #2 returns `APPROVED — MERGE`, Agent #2 owns final substantive correction approval. Agent #1 may then commit/push exactly the artifact Agent #2 reviewed, verify artifact equivalence, and proceed to merge when the remaining gates are satisfied.
 
-## Post-correction approval invariant
+An automated reviewer, such as Codex, is optional input only. No GitHub-hosted agent reviewer or vendor integration is required, and none establishes review authority.
 
-**Codex reviews the initial production-bound PR artifact once. After a validated Codex blocker is corrected, Agent #2 owns final correction approval. `Yes -> No -> Yes` on the corrected artifact authorizes merge. No additional Codex review is performed unless the artifact changes after Agent #2 approval.**
+## Post-approval artifact equivalence invariant
 
-After Agent #2 returns `APPROVED — MERGE`:
+**After any Agent #2 approval, Agent #1 may commit/push only the exact reviewed artifact. `Yes -> No -> Yes` on a corrected artifact authorizes merge. No further review is requested unless the artifact changes after Agent #2 approval.**
 
-- Agent #1 may commit/push only the exact reviewed correction;
+After Agent #2 returns `APPROVED` or `APPROVED — MERGE`:
+
+- Agent #1 may commit/push only the exact reviewed artifact;
 - no implementation code changes may be made after that approval;
 - Agent #1 must verify that the pushed artifact matches the artifact Agent #2 approved;
 - non-code merge-finalization activity already permitted by the workflow may continue;
-- no further Codex review is part of the normal path.
+- no further review is part of the normal path.
 
 If the pushed artifact does not match what Agent #2 reviewed, or implementation code changes after approval, the Agent #2 approval is no longer sufficient. The changed artifact must return to Agent #2 review.
 
-Do not use Codex to repair artifact-equivalence uncertainty.
+Do not use an automated reviewer to repair artifact-equivalence uncertainty.
 
 ---
 
@@ -643,7 +644,7 @@ In particular:
 - correction prompts address only demonstrated current-implementation blockers;
 - suggestions do not expand implementation scope;
 - integration PR prompts invoke `integration-pr-review`;
-- correction-finalization prompts require Agent #1 to commit/push exactly the Agent #2-approved correction, verify artifact equivalence, make no implementation changes after approval, and proceed without another Codex review unless the artifact changes after Agent #2 approval; a changed artifact returns to Agent #2 review.
+- correction-finalization prompts require Agent #1 to commit/push exactly the Agent #2-approved correction, verify artifact equivalence, make no implementation changes after approval, and proceed without another review unless the artifact changes after Agent #2 approval; a changed artifact returns to Agent #2 review.
 
 ---
 
@@ -684,17 +685,19 @@ universal pre-return completion gate
                                ↓
                     commit / push / integration PR
                                ↓
-                    post canonical Codex review request
+                    verify artifact equivalence; evaluate PR-review triggers
                                ↓
-                              STOP
-                               ↓
-                    separate Agent #2 Codex-disposition review
-                               ↓
-                    validated current-PR blocker?
-                      ├── Yes → CHANGES REQUIRED → STOP → separate Agent #1 correction invocation
-                      └── No → later Agent #1 merge/finalization invocation when all gates are satisfied
+                    any trigger applies?
+                      ├── No → later Agent #1 merge/finalization invocation when all gates are satisfied
+                      └── Yes → post Agent #2 PR Review Request → STOP
+                                   ↓
+                         separate Agent #2 PR review (supplemental, recorded on the PR)
+                                   ↓
+                         validated current-PR blocker?
+                           ├── Yes → CHANGES REQUIRED → STOP → separate Agent #1 correction invocation
+                           └── No → later Agent #1 merge/finalization invocation when all gates are satisfied
 
-After any validated Codex blocker:
+After any validated PR-review blocker:
 Agent #1 correction
   ↓
 READY FOR AGENT #2 RE-REVIEW → STOP
@@ -707,7 +710,7 @@ APPROVED — MERGE?
                 ↓
              verify artifact equivalence
                 ↓
-             no further Codex review
+             no further review
                 ↓
              merge after remaining required gates
                 ↓
@@ -756,9 +759,10 @@ An implementation follows this skill only when:
 - automated findings are independently evaluated as evidence, not authority;
 - correction re-review evaluates the complete current artifact;
 - `Yes -> No -> Yes` yields approval;
-- after a validated Codex blocker correction, `Yes -> No -> Yes` from Agent #2 authorizes merge for the corrected artifact;
+- an Agent #2 PR review is requested through the role-based Agent #2 PR Review Request when a PR-review trigger applies, and not otherwise; no automated reviewer is required;
+- after a validated PR-review blocker correction, `Yes -> No -> Yes` from Agent #2 authorizes merge for the corrected artifact;
 - Agent #1 may commit/push only the exact Agent #2-approved correction and must verify the pushed artifact matches it;
-- no additional Codex review is performed after Agent #2 correction approval unless implementation code changes after approval;
+- no further review is requested after Agent #2 correction approval unless implementation code changes after approval;
 - if the artifact changes after Agent #2 approval, that approval is no longer sufficient and the changed artifact returns to Agent #2 review;
 - required CI and human approval remain in force;
 - promotion remains intentionally boring.
