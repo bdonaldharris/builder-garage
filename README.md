@@ -103,7 +103,7 @@ make check
 
 - There are no published releases or installation packages yet.
 - GoReleaser is an approved future direction, but it is not configured.
-- The CLI initializes configuration only; it does not implement Workbench, Crew, Inspection, or Shipping capabilities.
+- The CLI initializes configuration only; it does not implement Workbench, Crew, Inspection, Shipping, or Manuals capabilities.
 - `.garage/config.yaml` currently contains only `schema_version`; no workflow, agent, policy, plugin, provider, or remote-service configuration exists.
 
 ## An engineering discovery journey, built in public
@@ -120,7 +120,7 @@ The repository contains reusable engineering skills, operating contracts, docume
 
 ## Inside the Garage
 
-Builder Garage is the home for an evolving, builder-centered engineering system. Its shop vocabulary organizes responsibilities without replacing precise technical terminology or existing engineering contracts. The four shop areas are the framework's conceptual components.
+Builder Garage is the home for an evolving, builder-centered engineering system. Its shop vocabulary organizes responsibilities without replacing precise technical terminology or existing engineering contracts. The five shop areas are the framework's conceptual components.
 
 | Shop area | Responsibility |
 | --- | --- |
@@ -128,10 +128,11 @@ Builder Garage is the home for an evolving, builder-centered engineering system.
 | **[Crew](crew/)** | Distinct engineering agents with explicit responsibilities and handoff boundaries. |
 | **[Inspection](inspection/)** | Independent reviews, tests, acceptance verification, and quality gates. |
 | **[Shipping](shipping/)** | Pull request integration, release readiness, deployment requirements, and promotion. |
+| **[Manuals](manuals/)** | Maintained technical guidance for designing and building with a particular technology, beginning with the [Go Manual](manuals/go.md). |
 
 This is a **conceptual map**, not a required directory hierarchy or a new orchestration mechanism. Existing skill names, paths, invocation aliases, role boundaries, durable Issue/PR records, review contracts, and approval gates remain authoritative. The Garage can adopt automation selectively as practical needs and resources allow.
 
-Each shop area's directory currently contains documentation of its responsibility and boundary; none contains an implementation.
+Each shop area's directory currently contains documentation of its responsibility and boundary; none contains an implementation. The Manuals directory also contains the baseline manuals themselves, which are guidance, not configuration. Builder Garage's own adoption of the Go Manual is recorded in [docs/go-manual.md](docs/go-manual.md).
 
 ## Operating model
 

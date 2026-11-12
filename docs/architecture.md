@@ -19,7 +19,7 @@ Builder Garage is an open-source, project-embedded, extensible agentic engineeri
 
 ## Conceptual components
 
-Builder Garage is organized around four conceptual components. Each has a directory that documents its responsibility.
+Builder Garage is organized around five conceptual components. Each has a directory that documents its responsibility.
 
 | Component | Responsibility | Question it answers |
 | --- | --- | --- |
@@ -27,8 +27,11 @@ Builder Garage is organized around four conceptual components. Each has a direct
 | [Crew](../crew/) | Distinct engineering agents with explicit responsibilities and handoff boundaries | Who does the work, and where does each role stop? |
 | [Inspection](../inspection/) | Independent reviews, tests, acceptance verification, and quality gates | Is the work correct? |
 | [Shipping](../shipping/) | Pull request integration, release readiness, deployment requirements, and promotion | How does accepted work reach its destination? |
+| [Manuals](../manuals/) | Maintained technical guidance for designing and building with a particular technology | How should this technology be designed and built? |
 
 These are conceptual boundaries. Whether they later become package, module, or command boundaries is undecided.
+
+Manuals are guidance that a project adopts explicitly. They are not configuration, and adopting one does not make it a requirement; see [Manuals](../manuals/README.md#how-manuals-are-used). How projects select manuals and record extensions is deferred to [#16](https://github.com/bdonaldharris/builder-garage/issues/16).
 
 ## Current repository organization
 
@@ -36,14 +39,15 @@ These are conceptual boundaries. Whether they later become package, module, or c
 | --- | --- |
 | [`skills/`](../skills/) | The canonical engineering skills. They remain at this path to preserve existing installation paths, references, and invocation contracts. |
 | [`workbench/`](../workbench/), [`crew/`](../crew/), [`inspection/`](../inspection/), [`shipping/`](../shipping/) | Documentation of each conceptual component's responsibility and its governing skills. |
-| [`docs/`](./) | Architectural direction, [engineering principles](principles.md), [project history](history.md), and repository configuration notes. |
+| [`manuals/`](../manuals/) | Documentation of the Manuals component, and the Garage-maintained baseline manuals, beginning with the [Go Manual](../manuals/go.md). |
+| [`docs/`](./) | Architectural direction, [engineering principles](principles.md), [project history](history.md), Builder Garage's [Go Manual profile](go-manual.md), and repository configuration notes. |
 | [`cmd/garage/`](../cmd/garage/) | Entry point for the `garage` executable and its build-time version value. |
 | [`internal/cli/`](../internal/cli/) | Cobra command wiring and project initialization behavior. It does not implement the conceptual components. |
 | [`docs/adr/`](adr/) | Accepted architectural decision records, beginning with the [Go and Cobra CLI foundation](adr/0001-go-cobra-cli-foundation.md). |
 | [`.github/`](../.github/) | Issue and pull request templates and pull-request validation workflow. |
 | Repository root | README, license, governance, contribution, conduct, and security documents. |
 
-The repository now contains the initial Go CLI source, tests, build commands, and pull-request validation alongside its documentation. The Workbench, Crew, Inspection, and Shipping directories remain documentation of conceptual boundaries, not implemented packages or runtime components.
+The repository now contains the initial Go CLI source, tests, build commands, and pull-request validation alongside its documentation. The Workbench, Crew, Inspection, Shipping, and Manuals directories remain documentation of conceptual boundaries, not implemented packages or runtime components.
 
 ## Deliberately undecided
 
