@@ -16,13 +16,18 @@ This document defines how a workflow record identifies the exact artifact it cov
 
 An artifact is a change: the difference between a **base commit** `B` and a **result tree** `T`.
 
-| Input | Issue stage: uncommitted working tree | PR stage: a committed head `H` |
+| Input | Working-tree artifact: an uncommitted change | Committed artifact: a pushed head `H` |
 | --- | --- | --- |
 | Integration reference `I` | The project's configured integration branch tip, as fetched. Builder Garage: `origin/main`. | Same |
 | Base `B` | `git merge-base I HEAD` | `git merge-base I H` while the PR is open. After merge, `git merge-base M^1 M^2`, where `M` is the merge commit. |
 | Result tree `T` | The working tree, staged into a **temporary** index (procedure below) | `H^{tree}` |
 
-The working tree is the artifact at the issue stage, because the working tree is what the reviewer inspects. The developer's real index is never read or changed.
+An artifact's **stage** is either `working-tree` or `commit`. The stage is set by what the reviewer inspects, not by where the record is posted:
+
+- **Working tree.** An implementation reviewed on the issue before commit. Also a correction that Agent #2 re-reviews on the PR before Agent #1 commits it ([integration-pr-review: Artifact equivalence](../skills/integration-pr-review/SKILL.md#artifact-equivalence)).
+- **Commit.** A pushed PR head, such as one reviewed in a triggered PR review.
+
+For a working-tree artifact, the working tree is the artifact, because it is what the reviewer inspects. The developer's real index is never read or changed.
 
 ### Recorded values
 
@@ -79,8 +84,8 @@ This POSIX shell procedure is the reference definition. A Garage implementation 
 ```sh
 #!/bin/sh
 # garage-artifact-v1
-#   artifact-v1.sh <integration-ref>            working-tree (issue-stage) artifact
-#   artifact-v1.sh <integration-ref> <commit>   committed (PR-stage) artifact
+#   artifact-v1.sh <integration-ref>            working-tree artifact (stage: working-tree)
+#   artifact-v1.sh <integration-ref> <commit>   committed artifact (stage: commit)
 set -eu
 ref=$1
 rev=${2:-}
@@ -116,11 +121,23 @@ Against the real #18 change, reconstructed in a throwaway clone:
 | PR stage: head `ae2adf6` | `b8713248…` | `b731c035…` | `sha256:45532f9d…` (identical) |
 | After merge: base from the parents of merge commit `9837e3e` | `b8713248…` | `b731c035…` | `sha256:45532f9d…` (identical) |
 
-A synthetic throwaway repository exercised every case in [Edge cases](#edge-cases) that is marked as shown. The issue-stage and PR-stage values matched. The changeset survived an unrelated rebase and a merge of the integration branch. A one-byte edit, a mode-only edit, an added file, and an integration change to a path the artifact also changes were each detected.
+A synthetic throwaway repository exercised every case in [Edge cases](#edge-cases) that is marked as shown. The working-tree and committed values matched. The changeset survived an unrelated rebase and a merge of the integration branch. A one-byte edit, a mode-only edit, an added file, and an integration change to a path the artifact also changes were each detected.
 
 ## Evidence block: `garage-evidence` v1
 
 A workflow record carries one fenced YAML block. The block separates values a verifier can recompute or confirm (`checkable`) from claims no verifier can confirm (`asserted`). The surrounding Markdown comment keeps its existing marker and human-readable sections.
+
+### Where each record lives
+
+Location and links depend on the record type, as the canonical skills place each record. The location says nothing about the artifact's stage.
+
+| `record` | Posted on | `responds_to` | Other required links |
+| --- | --- | --- | --- |
+| `implementation` | The governing issue | — | — |
+| `correction` | The governing issue, after an implementation review; or the PR, after a PR review ([integration-pr-review: Current-PR correction](../skills/integration-pr-review/SKILL.md#phase-4--current-pr-correction)) | — | — |
+| `review` | The governing issue | An earlier Agent #1 `implementation` or `correction` record on the governing issue | — |
+| `pr-review` | The PR | An earlier record on the same PR for the reviewed artifact: the Agent #1 PR state record or Agent #2 PR Review Request for a triggered review, or the Agent #1 `correction` record for a correction re-review | `supplements`: an earlier approving `review` record on the governing issue. A `pr-review` without one is invalid, because the issue review stays authoritative. |
+| `equivalence` | The PR | — | `equivalent_to`: the approving `review` on the governing issue, or the approving `pr-review` on the PR, that the pushed head is equivalent to |
 
 ### Agent #1 completion record
 
@@ -158,19 +175,19 @@ asserted:
 garage_evidence: 1
 record: review               # review | pr-review
 issue: 34
-responds_to: "<URL of the Agent #1 record reviewed>"
-supplements: "<PR review only: URL of the approving issue review>"
+responds_to: "<URL of the record reviewed; see Where each record lives>"
+supplements: "<pr-review only: URL of the approving review on the governing issue>"
 checkable:
   artifact:                  # recomputed by the reviewer from the artifact it inspected
     method: garage-artifact-v1
     object_format: sha1
-    stage: working-tree
+    stage: working-tree      # working-tree | commit, by what was inspected, not by record type
     integration_ref: main
     base: <full object name>
     tree: <full object name>
     changeset: sha256:<64 hex>
     paths: 1
-    commit: "<PR review only: the head reviewed>"
+    commit: "<present only when stage is commit: the head reviewed>"
   matches_responds_to: true  # this artifact equals the one in responds_to
 asserted:
   execution_context: separate-from-implementation
@@ -184,17 +201,17 @@ asserted:
 
 ### Equivalence record on a PR
 
-The [artifact-equivalence record](../skills/integration-pr-review/SKILL.md#artifact-equivalence) that Agent #1 posts for each pushed head carries the same block, with `record: equivalence`. Its `checkable.artifact` is computed at `stage: commit` for the pushed head, and `equivalent_to` links the approving disposition.
+The [artifact-equivalence record](../skills/integration-pr-review/SKILL.md#artifact-equivalence) that Agent #1 posts for each pushed head carries the same block, with `record: equivalence`. Its `checkable.artifact` is computed at `stage: commit` for the pushed head. `equivalent_to` links the approving disposition: the issue review, or a `pr-review` that approved a PR-side correction.
 
 ## What can be checked, and what remains asserted
 
 | Element | Classification | How a verifier treats it |
 | --- | --- | --- |
 | A record exists, its location (issue or PR), its author account, and its time | **Checked** from GitHub | Read from the API |
-| Record order (`responds_to` is earlier and on the governing issue) | **Checked** from GitHub | Compare timestamps and URLs |
+| Record location and order, by record type ([Where each record lives](#where-each-record-lives)): the record is where its type belongs; `responds_to` is earlier and in the location its type requires; a `pr-review`'s `supplements` is an earlier approving `review` on the governing issue | **Checked** from GitHub | Compare locations, timestamps, and URLs |
 | Block present and well formed | **Checked** | Parse the YAML |
-| PR-stage `artifact` | **Checked** | Recompute from the repository at `commit` |
-| Issue-stage `artifact` | **Checkable only by a holder of the working tree** at the time, such as Agent #2 recomputing it during review. Later it is **checked transitively**: the pushed head's PR-stage changeset must equal it. | Compare with the equivalence record and the head |
+| Committed artifact (`stage: commit`), on any record | **Checked** | Recompute from the repository at `commit` |
+| Working-tree artifact (`stage: working-tree`), whether recorded on the issue or on the PR | **Checkable only by a holder of the working tree** at the time, such as Agent #2 recomputing it during review. Later it is **checked transitively**: the changeset of the pushed head whose equivalence record links the approval must equal it. | Compare with the equivalence record and the head |
 | `matches_responds_to` | **Checked** by comparing the two records' changesets | Compare values; do not trust the boolean |
 | CI results, maintainer approving review | **Checked** from GitHub | Read from the API |
 | Role (Agent #1 or Agent #2) | **Asserted.** The marker is self-declared, and the author account may be shared. | Report as asserted |
