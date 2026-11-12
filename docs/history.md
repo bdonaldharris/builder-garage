@@ -76,7 +76,7 @@ Destinations: **Established** means already required (see [principles.md](princi
 | 2 | Architecture before implementation | Established. Proportional depth: Issue [#7](https://github.com/bdonaldharris/builder-garage/issues/7) |
 | 3 | PRs are not the first serious review | Established |
 | 4 | Independent implementation and review authority | Established |
-| 5 | Correction followed by independent re-review | Established. Abbreviated re-review: Issue [#7](https://github.com/bdonaldharris/builder-garage/issues/7) |
+| 5 | Correction followed by independent re-review | Established. Abbreviated re-review: resolved, not permitted. Current canon requires complete, bounded re-review of the corrected artifact ([#7 decision](https://github.com/bdonaldharris/builder-garage/issues/7#issuecomment-6817635061), item 8) |
 | 6 | Staging as the deep implementation gate | Established. No literal `staging` branch required |
 | 7 | Promotion should be intentionally boring | Established. The skills define "boring" |
 | 8 | Progressive uncertainty reduction | Candidate |
