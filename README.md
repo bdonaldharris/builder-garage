@@ -2,7 +2,25 @@
 
 **An Agentic Engineering System for Builders**
 
-A system of engineering practices, standards, architecture, roles, contracts, and workflows for responsible software construction with AI agents.
+Builder Garage is an open-source, project-embedded, extensible agentic engineering framework: a system of engineering practices, standards, architecture, roles, contracts, and workflows for responsible software construction with AI agents.
+
+## Project status
+
+Builder Garage is at its foundation stage.
+
+**What exists today** is documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, [discovery notes](docs/excavation/), and the project's governance and contribution process.
+
+**What does not exist yet** is software. No CLI, library, adapter, SDK, or runtime has been implemented, and no technology stack has been selected. The [architectural direction](#architectural-direction) below describes where the project is headed, not functionality that is available.
+
+## Architectural direction
+
+The approved direction is recorded in [docs/architecture.md](docs/architecture.md). In summary:
+
+- **Project-embedded.** Builder Garage is meant to operate from inside the project it serves, alongside that project's repository, issues, and pull requests, rather than as a separate hosted service.
+- **CLI-first.** A command-line interface is the planned primary interface. Libraries, adapters, and potentially independent or distributed execution may follow.
+- **Extensible.** Projects that adopt it are expected to adapt and extend it.
+- **Single repository**, initially.
+- **Evolutionary.** Detailed design decisions are made through discovery within the lifecycle of the change that needs them, not in advance.
 
 ## An engineering discovery journey, built in public
 
@@ -18,7 +36,7 @@ The repository contains reusable engineering skills, operating contracts, docume
 
 ## Inside the Garage
 
-Builder Garage is the home for an evolving, builder-centered engineering system. Its shop vocabulary organizes responsibilities without replacing precise technical terminology or existing engineering contracts.
+Builder Garage is the home for an evolving, builder-centered engineering system. Its shop vocabulary organizes responsibilities without replacing precise technical terminology or existing engineering contracts. The four shop areas are the framework's conceptual components.
 
 | Shop area | Responsibility |
 | --- | --- |
@@ -28,6 +46,8 @@ Builder Garage is the home for an evolving, builder-centered engineering system.
 | **[Shipping](shipping/)** | Pull request integration, release readiness, deployment requirements, and promotion. |
 
 This is a **conceptual map**, not a required directory hierarchy or a new orchestration mechanism. Existing skill names, paths, invocation aliases, role boundaries, durable Issue/PR records, review contracts, and approval gates remain authoritative. The Garage can adopt automation selectively as practical needs and resources allow.
+
+Each shop area's directory currently contains documentation of its responsibility and boundary; none contains an implementation.
 
 ## Operating model
 
@@ -162,3 +182,23 @@ Application implementation review asks:
 Non-blocking review observations belong in the application repository's persistent `Application Improvement Suggestions` backlog rather than automatically becoming standalone issues.
 
 Application engineering should follow the relevant skill and durable GitHub workflow-state record rather than relying on conversational memory or ad hoc prompt reconstruction.
+
+## Contributing
+
+Builder Garage is maintainer-led and community-contributed. Contributions are welcome.
+
+- **[CONTRIBUTING.md](CONTRIBUTING.md)** — how a change is proposed, reviewed, and merged.
+- **[Open an issue](https://github.com/bdonaldharris/builder-garage/issues/new/choose)** — report a problem, propose a change, or request discovery. Substantive changes start from an issue.
+- **[GOVERNANCE.md](GOVERNANCE.md)** — maintainer authority and how decisions are made.
+- **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — expected conduct.
+- **[SECURITY.md](SECURITY.md)** — how to report a vulnerability privately.
+
+A substantive change passes two distinct gates: **independent engineering review** before it is committed, and **maintainer approval** of the pull request before it is merged. Neither replaces the other.
+
+## Contributors
+
+Builder Garage was founded by B Donald Harris and is built with its community. Everyone whose contribution is merged is a contributor and is recognized in the repository's [contributors list](https://github.com/bdonaldharris/builder-garage/graphs/contributors).
+
+## License
+
+Builder Garage is released under the [MIT License](LICENSE), copyright © 2026 B Donald Harris. The license permits use, modification, and redistribution, including in proprietary derivative works.

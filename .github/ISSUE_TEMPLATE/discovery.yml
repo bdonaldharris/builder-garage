@@ -1,0 +1,38 @@
+name: Discovery request
+description: Ask a question that needs evidence-based investigation before any change is implemented.
+title: "[Discovery] "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Discovery investigates; it does not implement. Findings are documented in this issue, and discovery is not complete until they are recorded here.
+
+        The procedure is defined by the [engineering-discovery-workflow](https://github.com/bdonaldharris/builder-garage/blob/main/skills/engineering-discovery-workflow/SKILL.md) skill.
+  - type: textarea
+    id: question
+    attributes:
+      label: Question to answer
+      description: State the question precisely enough that a reader can tell when it has been answered.
+    validations:
+      required: true
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Why it matters
+      description: What decision or change depends on the answer?
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and exclusions
+      description: What should be investigated, and what is explicitly out of scope?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Known context
+      description: Existing evidence, related issues, or prior findings.
+    validations:
+      required: false

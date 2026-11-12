@@ -1,0 +1,75 @@
+name: Change proposal
+description: Propose a substantive addition or change to Builder Garage.
+labels: ["enhancement"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Substantive changes start from an issue. This issue becomes the durable record of the change: its requirements, acceptance criteria, discovery findings, and review results.
+
+        See [CONTRIBUTING.md](https://github.com/bdonaldharris/builder-garage/blob/main/CONTRIBUTING.md) for how a change proceeds from here.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem or motivation
+      description: What need does this address? Describe the problem before the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed change
+      description: What should change?
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Affected area
+      description: Select all that apply.
+      multiple: true
+      options:
+        - Workbench (skills, workflows, procedures, tools)
+        - Crew (agent roles and handoff boundaries)
+        - Inspection (review, verification, quality gates)
+        - Shipping (integration, release readiness, promotion)
+        - Architecture
+        - Governance or contribution process
+        - Documentation
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance criteria
+      description: The observable conditions that must hold for this change to be complete. Independent review checks the implementation against these.
+      placeholder: |
+        - ...
+        - ...
+    validations:
+      required: true
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope and exclusions
+      description: What is deliberately out of scope?
+    validations:
+      required: false
+  - type: dropdown
+    id: discovery
+    attributes:
+      label: Is discovery needed before implementation?
+      description: If questions must be answered before this can be implemented responsibly, discovery comes first and its findings are documented in this issue.
+      options:
+        - "No - the change is sufficiently understood"
+        - "Yes - open questions must be investigated first"
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: Additional context
+    validations:
+      required: false
