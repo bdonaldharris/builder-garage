@@ -12,7 +12,7 @@ Builder Garage is at its foundation stage.
 
 **What exists today** is the initial `garage` command-line foundation and the project's engineering documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, the [engineering principles](docs/principles.md) and [history](docs/history.md) behind them, and governance and contribution process.
 
-The CLI can display help and version information and initialize a minimal `.garage/config.yaml` in an existing project. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, release automation, or runtime for the conceptual components has been implemented.
+The CLI can display help and version information, initialize a minimal `.garage/config.yaml` in an existing project, and record private developer-local workflow events. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, release automation, or runtime for the conceptual components has been implemented.
 
 ## Architectural direction
 
@@ -28,13 +28,14 @@ The approved direction is recorded in [docs/architecture.md](docs/architecture.m
 
 ### Capabilities
 
-The initial executable provides three entry points:
+The initial executable provides four entry points:
 
 | Command | Behavior |
 | --- | --- |
 | `garage --help` | Describes Builder Garage and lists the available commands. |
 | `garage version` | Reports the build version. Source builds report `dev` unless a version is supplied at link time. |
 | `garage init` | Creates `.garage/config.yaml` in the current project directory. |
+| `garage record` | Records a private workflow event, such as an implementation handoff or a review verdict, in this developer's local history. See [Local workflow history](#local-workflow-history). |
 
 The generated YAML contains only the configuration schema version:
 
@@ -43,6 +44,23 @@ schema_version: 1
 ```
 
 `garage init` does not replace an existing configuration. Use `garage init --force` only when you explicitly intend to overwrite `.garage/config.yaml`; other files in `.garage/` and the project are left alone.
+
+### Local workflow history
+
+`garage record` keeps a private, best-effort annotation of what a developer's agents did:
+
+```sh
+garage record --issue 39 --type implementation --outcome ready \
+  --url https://github.com/OWNER/REPO/issues/39#issuecomment-123
+```
+
+- **Private and local.** Events are stored in the user cache directory, keyed to the repository, and are never written inside the repository or sent anywhere. The command works without GitHub access.
+- **Bounded.** At most 500 events are kept per repository.
+- **Minimal.** Only a timestamp, the repository key, the issue or pull request number, the event type, the outcome, an optional link to the durable GitHub record, and an optional artifact identity are stored. Branch names, prompts, conversation text, diffs, file contents, environment values, and tokens are not.
+- **Not evidence.** GitHub Issue and pull request records are authoritative. Local history never authorizes, blocks, or advances work, and losing it loses nothing that matters.
+- **Best effort.** If an event cannot be recorded, `garage record` prints a warning and still exits successfully.
+
+Run `garage record --help` for the accepted event types and outcomes. The design is recorded in the [#19 decision](https://github.com/bdonaldharris/builder-garage/issues/19#issuecomment-6837362562).
 
 ### Build from source
 
@@ -103,7 +121,7 @@ make check
 
 - There are no published releases or installation packages yet.
 - GoReleaser is an approved future direction, but it is not configured.
-- The CLI initializes configuration only; it does not implement Workbench, Crew, Inspection, Shipping, or Manuals capabilities.
+- The CLI initializes configuration and records local workflow history only; it does not implement Workbench, Crew, Inspection, Shipping, or Manuals capabilities.
 - `.garage/config.yaml` currently contains only `schema_version`; no workflow, agent, policy, plugin, provider, or remote-service configuration exists.
 
 ## An engineering discovery journey, built in public

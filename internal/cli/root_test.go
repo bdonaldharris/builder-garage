@@ -37,6 +37,7 @@ func TestHelpDescribesPurposeAndCommands(t *testing.T) {
 				"garage [command]",
 				"Available Commands:",
 				"init ",
+				"record ",
 				"version ",
 				"Flags:",
 				"-h, --help",
@@ -60,7 +61,7 @@ func TestRegisteredCommands(t *testing.T) {
 	}
 	slices.Sort(got)
 
-	want := []string{"init", "version"}
+	want := []string{"init", "record", "version"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("registered commands = %v, want %v", got, want)
 	}

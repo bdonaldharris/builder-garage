@@ -53,7 +53,7 @@ The repository now contains the initial Go CLI source, tests, build commands, an
 
 The following remain deliberately undecided:
 
-- commands and behavior beyond `garage --help`, `garage version`, and `garage init`;
+- commands and behavior beyond `garage --help`, `garage version`, `garage init`, and `garage record`;
 - configuration beyond the schema version;
 - installation and release channels for compiled executables;
 - package and module layout for future conceptual-component implementations;
