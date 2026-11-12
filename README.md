@@ -1,5 +1,3 @@
-# Builder Garage
-
 <p align="center">
   <img src="assets/branding/builder-garage-logo.png" alt="Builder Garage logo: a multitool badge" width="900">
 </p>
