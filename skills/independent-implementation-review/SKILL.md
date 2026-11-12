@@ -88,10 +88,10 @@ Before reviewing, Agent #2 must:
 6. write a new structured `[AGENT #2 — INDEPENDENT REVIEW]` comment to the governing artifact;
 7. verify that the durable comment was successfully recorded before terminating the invocation.
 
-The governing artifact for the durable review record is:
+Agent #2 performs two distinct review sequences. Each has its own durable record:
 
-- the **Issue itself** for an implementation-stage Issue review;
-- the **PR itself** for a production-bound PR review, including Codex disposition and correction re-review.
+- **Implementation review.** Agent #2 independently reviews the complete implementation before it is committed, and records the disposition on the **originating Issue**. That issue record is the authoritative durable record of Agent #2's implementation review, and it governs whether the implementation may advance.
+- **PR review.** When the project's configured PR conditions require one, Agent #2 separately reviews the pull-request or integration artifact, and records that disposition on the **PR itself**. The PR-review sequence is governed by `integration-pr-review`, which Agent #1 executes. Agent #2 performs its PR disposition under this skill, never under `integration-pr-review`. A PR record is supplemental. It never replaces, substitutes for, or retroactively satisfies the issue-recorded implementation review.
 
 The structured Agent #2 comment is part of workflow execution, not merely a report to the human. Producing the same review text in the agent response does not satisfy the durable-state requirement.
 
@@ -162,6 +162,8 @@ Anything that does not cause one of those three answers to fail is not a blocker
 
 ## Codex finding disposition
 
+Review authority comes from the Agent #2 role, performed by a separately invoked agent in its own execution context, and from its durable record. It never comes from tool choice. Codex or any other automated reviewer is optional review input where a project uses one. Its findings, silence, or absence do not establish, replace, or withhold Agent #2 review authority. Implementation review requires no GitHub-hosted agent reviewer and no particular vendor integration.
+
 When Codex review findings are present, Agent #2 treats them as review inputs, not authoritative dispositions.
 
 Agent #2 must independently review the complete current artifact and evaluate each Codex finding against the governing three questions:
@@ -224,7 +226,7 @@ Agent #2 must be invoked separately after Agent #1 stops and returns control to 
 
 Agent #2's identity remains fixed for the full invocation. Agent #2 must not cross into implementation/correction work. If review determines correction is required, Agent #2 posts the disposition and stops for a separate Agent #1 invocation.
 
-The requirement is procedural independence, not model diversity.
+The requirement is procedural independence, not model diversity. Agent #2 runs in an execution context separate from Agent #1's, such as a separate session or thread. It may use the same tool or model, but it must not share Agent #1's implementation execution context.
 
 Agent #2 reviews the actual implementation artifact, not merely Agent #1's summary.
 
@@ -564,7 +566,8 @@ A review follows this skill only when:
 - Agent #2 is independently invoked;
 - Agent #2 reads the governing Issue/PR and latest relevant Agent #1 workflow-state comment for the current phase;
 - prior workflow-state comments are treated as durable history, not as authority over the current artifact;
-- Agent #2 writes each review/disposition to the governing artifact using `[AGENT #2 — INDEPENDENT REVIEW]`: Issue for implementation-stage review, PR for production-bound review;
+- Agent #2 writes each review/disposition to the governing artifact using `[AGENT #2 — INDEPENDENT REVIEW]`: the originating Issue for implementation review, which is the authoritative record, and the PR for a PR review, which is supplemental;
+- review authority comes from the Agent #2 role in a separate execution context and its durable record, not from Codex or any other tool, and implementation review requires no GitHub-hosted reviewer or vendor integration;
 - the Agent #2 invocation is not complete until that durable write has been successfully verified;
 - a final agent response does not substitute for the durable GitHub record;
 - if the durable write fails, Agent #2 reports the failure and does not claim that workflow state was recorded;

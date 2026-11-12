@@ -186,6 +186,10 @@ The normal flow is:
 
 Agent #2 remains independent from Agent #1.
 
+The authoritative record of Agent #2's implementation review is its disposition on the originating issue, made before commit under `independent-implementation-review`. That record determines whether the implementation may advance. This skill governs a separate PR-review sequence, executed by Agent #1. When an Agent #2 PR review is part of that sequence, Agent #2 performs it under `independent-implementation-review`, never under this skill. Its PR record is supplemental and never replaces, or substitutes for, the issue-recorded implementation review.
+
+Review authority comes from the Agent #2 role and its durable record, not from tool choice.
+
 Automated-review findings are review inputs, not authoritative dispositions. **Codex is a review input, not Agent #2.** Codex review does not constitute Agent #2 review.
 
 Codex identifies findings; separately invoked Agent #2 determines their disposition under `independent-implementation-review` using the same three-question contract.

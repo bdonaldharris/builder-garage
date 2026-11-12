@@ -19,7 +19,7 @@ Completed BEFORE this change was committed, by a reviewer independent of the imp
 Not required for a small correction; write "Not applicable - small correction".
 -->
 
-- Review record (link to the approving comment on the issue):
+- Review record (link to the approving comment on the issue, which is the authoritative record of the review):
 - Reviewer:
 
 - [ ] The reviewer did not implement this change.
