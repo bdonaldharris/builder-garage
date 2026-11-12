@@ -12,7 +12,7 @@ Builder Garage is an open-source, project-embedded, extensible agentic engineeri
 
 - **Project-embedded.** Builder Garage is meant to operate from inside the project it serves, alongside that project's repository, issues, and pull requests, rather than as a separate hosted service. The current operating model already works this way: skills are used in the project's workspace, and the project's GitHub issues and pull requests hold the durable workflow record.
 - **CLI-first.** The `garage` command-line interface is the primary interface. Its initial foundation provides help, version reporting, and project initialization; broader capabilities remain future work.
-- **Extensible.** Projects that adopt Builder Garage are expected to adapt and extend it. The extension mechanisms have not been designed.
+- **Extensible.** Projects that adopt Builder Garage are expected to adapt and extend it. They may adapt it only at the extension points declared in the [extension-point registry](extension-points.md), and never below the [responsibility floor](responsibility-floor.md). The configuration that carries those choices is not implemented yet ([#35](https://github.com/bdonaldharris/builder-garage/issues/35)).
 - **Room to grow.** Libraries, adapters, and potentially independent or distributed execution may be supported in the future. These are possibilities the direction keeps open, not commitments.
 - **Single repository.** The project lives in one repository initially.
 - **Evolutionary.** The architecture is expected to change as the project learns. See [How the architecture evolves](#how-the-architecture-evolves).
@@ -31,7 +31,7 @@ Builder Garage is organized around five conceptual components. Each has a direct
 
 These are conceptual boundaries. Whether they later become package, module, or command boundaries is undecided.
 
-Manuals are guidance that a project adopts explicitly. They are not configuration, and adopting one does not make it a requirement; see [Manuals](../manuals/README.md#how-manuals-are-used). How projects select manuals and record extensions is deferred to [#16](https://github.com/bdonaldharris/builder-garage/issues/16).
+Manuals are guidance that a project adopts explicitly. They are not configuration, and adopting one does not make it a requirement; see [Manuals](../manuals/README.md#how-manuals-are-used). A project selects manuals at extension point [E10](extension-points.md#e10-manuals-and-conditional-stack-or-provider-guidance) of the extension-point registry.
 
 ## Current repository organization
 
@@ -40,7 +40,7 @@ Manuals are guidance that a project adopts explicitly. They are not configuratio
 | [`skills/`](../skills/) | The canonical engineering skills. They remain at this path to preserve existing installation paths, references, and invocation contracts. |
 | [`workbench/`](../workbench/), [`crew/`](../crew/), [`inspection/`](../inspection/), [`shipping/`](../shipping/) | Documentation of each conceptual component's responsibility and its governing skills. |
 | [`manuals/`](../manuals/) | Documentation of the Manuals component, and the Garage-maintained baseline manuals, beginning with the [Go Manual](../manuals/go.md). |
-| [`docs/`](./) | Architectural direction, [engineering principles](principles.md), [project history](history.md), Builder Garage's adoption profiles for the [canonical skills](skill-adoption.md) and the [Go Manual](go-manual.md), and repository configuration notes. |
+| [`docs/`](./) | Architectural direction, the [responsibility floor](responsibility-floor.md) and [extension-point registry](extension-points.md), [engineering principles](principles.md), [project history](history.md), Builder Garage's adoption profiles for the [canonical skills](skill-adoption.md) and the [Go Manual](go-manual.md), and repository configuration notes. |
 | [`cmd/garage/`](../cmd/garage/) | Entry point for the `garage` executable and its build-time version value. |
 | [`internal/cli/`](../internal/cli/) | Cobra command wiring and project initialization behavior. It does not implement the conceptual components. |
 | [`docs/adr/`](adr/) | Accepted architectural decision records, beginning with the [Go and Cobra CLI foundation](adr/0001-go-cobra-cli-foundation.md). |
@@ -54,7 +54,7 @@ The repository now contains the initial Go CLI source, tests, build commands, an
 The following remain deliberately undecided:
 
 - commands and behavior beyond `garage --help`, `garage version`, `garage init`, and `garage record`;
-- configuration beyond the schema version;
+- configuration format and content beyond the schema version, within what the [extension-point registry](extension-points.md) declares ([#35](https://github.com/bdonaldharris/builder-garage/issues/35));
 - installation and release channels for compiled executables;
 - package and module layout for future conceptual-component implementations;
 - adapter and extension interfaces;
