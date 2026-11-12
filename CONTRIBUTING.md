@@ -4,7 +4,7 @@ Builder Garage is maintainer-led and community-contributed, and contributions ar
 
 ## Before you start
 
-- **Current state.** The repository currently contains documentation: engineering skills, standards, discovery notes, and governance. No CLI, library, or runtime exists yet. See the [project status](README.md#project-status) and the [architectural direction](docs/architecture.md).
+- **Current state.** The repository contains the initial Go CLI foundation and its tests and build validation, alongside engineering skills, standards, discovery notes, and governance. See the [project status](README.md#project-status), [CLI development commands](README.md#develop-and-validate), and [architectural direction](docs/architecture.md).
 - **Conduct.** Participation is governed by the [Code of Conduct](CODE_OF_CONDUCT.md).
 - **Security.** Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), never in a public issue.
 - **License.** Builder Garage is released under the [MIT License](LICENSE). Contributions you submit are licensed under the same terms.

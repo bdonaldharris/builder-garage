@@ -2,9 +2,9 @@
 
 ## Scope
 
-Builder Garage currently consists of documentation: engineering skills, standards, and workflow definitions that AI agents and people follow. It does not yet ship executable software or releases.
+Builder Garage contains an initial command-line application alongside engineering skills, standards, and workflow definitions that AI agents and people follow. It does not yet publish releases.
 
-A security issue in this repository is therefore most likely to be content that could lead an agent or a person following it to expose credentials or other secrets, or to take unsafe or destructive actions. Reports about any other security-relevant weakness are also welcome.
+A security issue may affect the CLI, its generated project configuration, or content that could lead an agent or a person following it to expose credentials or other secrets, or to take unsafe or destructive actions. Reports about any other security-relevant weakness are also welcome.
 
 ## Supported versions
 

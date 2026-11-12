@@ -8,19 +8,101 @@ Builder Garage is an open-source, project-embedded, extensible agentic engineeri
 
 Builder Garage is at its foundation stage.
 
-**What exists today** is documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, [discovery notes](docs/excavation/), and the project's governance and contribution process.
+**What exists today** is the initial `garage` command-line foundation and the project's engineering documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, [discovery notes](docs/excavation/), and governance and contribution process.
 
-**What does not exist yet** is software. No CLI, library, adapter, SDK, or runtime has been implemented, and no technology stack has been selected. The [architectural direction](#architectural-direction) below describes where the project is headed, not functionality that is available.
+The CLI can display help and version information and initialize a minimal `.garage/config.yaml` in an existing project. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, release automation, or runtime for the conceptual components has been implemented.
 
 ## Architectural direction
 
 The approved direction is recorded in [docs/architecture.md](docs/architecture.md). In summary:
 
 - **Project-embedded.** Builder Garage is meant to operate from inside the project it serves, alongside that project's repository, issues, and pull requests, rather than as a separate hosted service.
-- **CLI-first.** A command-line interface is the planned primary interface. Libraries, adapters, and potentially independent or distributed execution may follow.
+- **CLI-first.** The `garage` command-line interface is the primary interface. Libraries, adapters, and potentially independent or distributed execution may follow.
 - **Extensible.** Projects that adopt it are expected to adapt and extend it.
 - **Single repository**, initially.
 - **Evolutionary.** Detailed design decisions are made through discovery within the lifecycle of the change that needs them, not in advance.
+
+## The `garage` CLI
+
+### Capabilities
+
+The initial executable provides three entry points:
+
+| Command | Behavior |
+| --- | --- |
+| `garage --help` | Describes Builder Garage and lists the available commands. |
+| `garage version` | Reports the build version. Source builds report `dev` unless a version is supplied at link time. |
+| `garage init` | Creates `.garage/config.yaml` in the current project directory. |
+
+The generated YAML contains only the configuration schema version:
+
+```yaml
+schema_version: 1
+```
+
+`garage init` does not replace an existing configuration. Use `garage init --force` only when you explicitly intend to overwrite `.garage/config.yaml`; other files in `.garage/` and the project are left alone.
+
+### Build from source
+
+Source builds require **Go 1.27.4**, the version declared in [`go.mod`](go.mod). Compiled executables are standalone and do not require a Go installation at run time.
+
+Clone the repository, then build from its root:
+
+```sh
+go build ./cmd/garage
+./garage --help
+./garage version
+```
+
+The default version is `dev`. To supply a release-style version without adding a metadata framework:
+
+```sh
+go build -ldflags "-X main.version=1.2.3" ./cmd/garage
+./garage version
+```
+
+The `Makefile` provides equivalent commands:
+
+```sh
+make build
+make build VERSION=1.2.3
+```
+
+### Initialize another project
+
+Run the compiled executable from the root of the project you want to initialize:
+
+```sh
+cd /path/to/project
+/path/to/garage init
+```
+
+This creates `/path/to/project/.garage/config.yaml`. Running the command again returns an error and leaves the existing configuration unchanged.
+
+### Develop and validate
+
+The repository uses Go's standard testing package. The focused checks are:
+
+```sh
+go test ./...
+go vet ./...
+make fmt-check
+```
+
+Run the full local validation, including a native build and cross-compilation:
+
+```sh
+make check
+```
+
+`make cross` writes executables for macOS, Linux, and Windows on amd64 and arm64 to `dist/`. On environments without `make`, the underlying commands are standard `go test`, `go vet`, `gofmt`, and `go build` commands; see [`Makefile`](Makefile) for the exact cross-compilation matrix. Pull requests run the same categories of validation in [GitHub Actions](.github/workflows/ci.yml), with tests on Linux, macOS, and Windows.
+
+### Current limitations
+
+- There are no published releases or installation packages yet.
+- GoReleaser is an approved future direction, but it is not configured.
+- The CLI initializes configuration only; it does not implement Workbench, Crew, Inspection, or Shipping capabilities.
+- `.garage/config.yaml` currently contains only `schema_version`; no workflow, agent, policy, plugin, provider, or remote-service configuration exists.
 
 ## An engineering discovery journey, built in public
 
