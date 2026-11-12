@@ -2,7 +2,7 @@
 
 This document records the reusable engineering principles behind Builder Garage and how mature each one is. **It adds no requirements.**
 
-What Builder Garage requires is defined by the canonical [skills](../skills/), [GOVERNANCE.md](../GOVERNANCE.md), [CONTRIBUTING.md](../CONTRIBUTING.md), the [architectural direction](architecture.md), and accepted [ADRs](adr/). Where this document and one of those sources differ, the source is authoritative.
+What Builder Garage requires is defined by the canonical [skills](../skills/), the [responsibility floor](responsibility-floor.md) and [extension-point registry](extension-points.md), [GOVERNANCE.md](../GOVERNANCE.md), [CONTRIBUTING.md](../CONTRIBUTING.md), the [architectural direction](architecture.md), and accepted [ADRs](adr/). Where this document and one of those sources differ, the source is authoritative.
 
 The principles come from engineering practice described in [history.md](history.md).
 
@@ -31,6 +31,7 @@ A candidate becomes a requirement only through the normal [contribution process]
 | In discovery and readiness, "Unknown" is a legitimate result. Do not convert it into an assumption. | [engineering-discovery-workflow](../skills/engineering-discovery-workflow/SKILL.md), [implementation-readiness-workflow](../skills/implementation-readiness-workflow/SKILL.md) |
 | Refuse unnecessary engineering: no speculative abstraction, and no technology without an established requirement. | [implementation-readiness-workflow](../skills/implementation-readiness-workflow/SKILL.md), [architecture: Deliberately undecided](architecture.md#deliberately-undecided) |
 | People and agents follow the same engineering discipline. | [CONTRIBUTING: Working with agents](../CONTRIBUTING.md#working-with-agents) |
+| A project adapts the framework only at declared extension points, and no configuration may weaken the responsibility floor. | [Responsibility floor](responsibility-floor.md), [Extension-point registry](extension-points.md) |
 
 ## Candidates
 

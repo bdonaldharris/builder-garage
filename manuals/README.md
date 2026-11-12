@@ -19,7 +19,7 @@ Manuals are maintained technical guidance on how software built with a particula
 
 Each manual carries a version label in its own text, and a project's profile cites the label it adopts. The label identifies a revision of the guidance. It is not a selection or resolution mechanism.
 
-How projects select manuals, resolve versions, and record extensions through configuration is deferred to [#16](https://github.com/bdonaldharris/builder-garage/issues/16).
+A project selects manuals and their versions at extension point [E10](../docs/extension-points.md#e10-manuals-and-conditional-stack-or-provider-guidance) of the extension-point registry. How configuration records and validates that choice is being designed in [#35](https://github.com/bdonaldharris/builder-garage/issues/35).
 
 ## Boundary
 
@@ -29,7 +29,7 @@ Manuals own *how a technology should be designed and built*. They do not define:
 - who does the work, or where each role stops ([Crew](../crew/));
 - whether the work is correct ([Inspection](../inspection/));
 - how accepted work reaches its destination ([Shipping](../shipping/));
-- how a project selects, configures, or extends them ([#16](https://github.com/bdonaldharris/builder-garage/issues/16)).
+- how a project selects or configures them ([extension-point registry](../docs/extension-points.md#e10-manuals-and-conditional-stack-or-provider-guidance)).
 
 ## Status
 
