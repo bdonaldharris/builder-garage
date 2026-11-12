@@ -36,7 +36,7 @@ These are conceptual boundaries. Whether they later become package, module, or c
 | --- | --- |
 | [`skills/`](../skills/) | The canonical engineering skills. They remain at this path to preserve existing installation paths, references, and invocation contracts. |
 | [`workbench/`](../workbench/), [`crew/`](../crew/), [`inspection/`](../inspection/), [`shipping/`](../shipping/) | Documentation of each conceptual component's responsibility and its governing skills. |
-| [`docs/`](./) | Architectural direction, repository configuration notes, and [discovery notes](excavation/). |
+| [`docs/`](./) | Architectural direction, [engineering principles](principles.md), [project history](history.md), and repository configuration notes. |
 | [`cmd/garage/`](../cmd/garage/) | Entry point for the `garage` executable and its build-time version value. |
 | [`internal/cli/`](../internal/cli/) | Cobra command wiring and project initialization behavior. It does not implement the conceptual components. |
 | [`docs/adr/`](adr/) | Accepted architectural decision records, beginning with the [Go and Cobra CLI foundation](adr/0001-go-cobra-cli-foundation.md). |
@@ -67,4 +67,4 @@ Architectural decisions are made through the project's normal [contribution proc
 3. the decision is implemented, independently reviewed, and approved like any other substantive change;
 4. this document is updated when an approved change alters the direction recorded here.
 
-This follows the discipline the project's [discovery notes](excavation/) were written under: understand what the evidence supports before turning it into architecture. Those notes predate the Builder Garage name and refer to the project by its earlier working name, ABES.
+This follows the discipline recorded in the project's [history](history.md): understand what the evidence supports before turning it into architecture. Approved direction recorded here takes precedence over any historical hypothesis or candidate principle.
