@@ -222,6 +222,13 @@ The Agent #2 invocation is not complete until that durable comment has been succ
 
 ## Agent identity and role boundaries
 
+The [Crew](crew/README.md) describes who does the work:
+- **Human authorities** make accountable decisions.
+- **Technicians** perform bounded work: `discovery`, `readiness`, `planner`, `implementer`, and `reviewer`.
+- **Agent #1 and Agent #2** are workflow positions in the implementation and review sequence. Today the implementer fills Agent #1 and the reviewer fills Agent #2.
+
+Whichever Technicians fill the positions, the same execution context never both implements and independently reviews the same artifact.
+
 Agent #1 and Agent #2 are distinct agents.
 
 They are not personas, modes, phases, or interchangeable responsibilities of one agent.
@@ -294,6 +301,7 @@ Canonical reusable engineering procedures live under `skills/`.
 - [`engineering-discovery-workflow`](skills/engineering-discovery-workflow/SKILL.md) (`eng-discovery`) — Governs evidence-based investigation of existing software systems before implementation, including capability classification, cross-layer tracing, gap analysis, and durable discovery reporting. Discovery is not complete until the complete report is recorded in the originating GitHub issue or in an accessible durable artifact directly linked from that issue, and the documentation has been verified.
 - [`implementation-readiness-workflow`](skills/implementation-readiness-workflow/SKILL.md) (`readiness-workflow`) — Determines whether a defined change is sufficiently understood to implement responsibly by resolving material architectural, contract, data, authorization, integration, validation, and scope questions before coding begins.
 - [`independent-implementation-review`](skills/independent-implementation-review/SKILL.md) (`indep-review`) — Executes as **Agent #2 — Independent Review Agent** and defines the narrow three-question review contract, complete-artifact review, required verified durable Issue/PR disposition comments, bounded sibling-state review, the supplemental PR-review procedure, and auditable independent disposition of every material automated-review finding. Agent #2 never performs implementation/correction work, and its invocation is not complete until the governing Issue/PR record has been successfully written and verified.
+- [`issue-authoring-workflow`](skills/issue-authoring-workflow/SKILL.md) (`author-issue`) — Executes as the **planner** Technician. It authors a GitHub issue from durable evidence or a durable decision, and only with the Builder's explicit authorization. It checks for duplicates read-only, resolves the repository's template or Garage's fallback, confirms the full draft, and records the authoring role and evidence ([Issue authoring](docs/issue-authoring.md)). An authored issue never authorizes implementing it. The discovery, implementation, and review skills author their own follow-ups from their own records, under the same procedure.
 - [`integration-pr-review`](skills/integration-pr-review/SKILL.md) (`pr-review`) — Executes as **Agent #1 — Implementation Agent** for PR-side integration/finalization responsibilities. It governs durable PR workflow-state comments, artifact equivalence with the issue-approved change, the PR-review triggers and the role-based Agent #2 PR Review Request, hard Agent #2 disposition boundaries, required verified Agent #2 disposition on the PR itself when a PR review occurs, Agent #2-owned final correction approval, Environment / Deployment Requirements gating, and merge convergence without a post-correction review loop. Automated reviewers are optional input.
 
 ## Engineering principles

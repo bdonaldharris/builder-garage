@@ -209,7 +209,8 @@ func TestEmbeddedSkillsRenderWithRevision(t *testing.T) {
 		t.Fatal(err)
 	}
 	want := []string{"application-implementation-workflow", "engineering-discovery-workflow",
-		"implementation-readiness-workflow", "independent-implementation-review", "integration-pr-review"}
+		"implementation-readiness-workflow", "independent-implementation-review", "integration-pr-review",
+		"issue-authoring-workflow"}
 	if got := skillNames(set); strings.Join(got, ",") != strings.Join(want, ",") {
 		t.Fatalf("embedded skills = %v, want %v", got, want)
 	}

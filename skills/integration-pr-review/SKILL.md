@@ -532,7 +532,7 @@ If none of the three governing questions fails, do not correct the PR for that o
 
 Agent #2 finishes reviewing the complete current artifact and dispositioning every finding before returning. When a validated finding exposes a directly related issue-scoped behavior family governed by the same demonstrated cause, Agent #2 applies the bounded sibling-blocker semantics from `independent-implementation-review`.
 
-If Agent #2 determines that a finding is outside the current issue boundary, do not expand the current implementation scope. Record that determination in the `[AGENT #2 — INDEPENDENT REVIEW]` PR comment and return the warranted follow-up/discovery/backlog candidate to the workflow orchestrator for separate handling.
+If Agent #2 determines that a finding is outside the current issue boundary, do not expand the current implementation scope. Record that determination in the `[AGENT #2 — INDEPENDENT REVIEW]` PR comment and return the warranted follow-up/discovery/backlog candidate to the Builder for separate handling.
 
 Agent #2 writes the structured `[AGENT #2 — INDEPENDENT REVIEW]` comment to the PR, with the information required under [Relating a PR disposition to its artifact and evidence](#relating-a-pr-disposition-to-its-artifact-and-evidence), the three governing answers, validated blockers, finding dispositions, follow-up/out-of-scope determinations, validation, and verdict. Agent #2 verifies that the PR comment was recorded before terminating.
 

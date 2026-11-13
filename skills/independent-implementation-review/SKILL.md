@@ -351,7 +351,7 @@ If multiple material automated findings exist, Agent #2 must disposition all of 
 
 **Agent #2's determination, not an automated reviewer's severity label, blocker classification, or requested correction, controls whether Agent #1 is asked to make a correction.**
 
-If Agent #2 determines that a finding belongs outside the current issue boundary, do not expand the current implementation scope. Return the warranted follow-up, discovery, or backlog candidate to the workflow orchestrator for separate handling after disposition.
+If Agent #2 determines that a finding belongs outside the current issue boundary, do not expand the current implementation scope. Return the warranted follow-up, discovery, or backlog candidate to the Builder for separate handling after disposition.
 
 An automated finding does not automatically create follow-up work. Separate work is created only when Agent #2's determination shows it is warranted.
 
@@ -492,7 +492,7 @@ Adding a suggestion does not imply severity, priority, production gating, commit
 
 A suggestion becomes its own issue only when the Workflow Owner (E8), a human, deliberately promotes it into planned work.
 
-When an automated finding is determined to be outside the current issue boundary, keep it out of the current implementation. Return the warranted follow-up/discovery/backlog candidate to the workflow orchestrator for separate issue handling after Agent #2 disposition.
+When an automated finding is determined to be outside the current issue boundary, keep it out of the current implementation. Return the warranted follow-up/discovery/backlog candidate to the Builder for separate issue handling after Agent #2 disposition.
 
 ---
 
@@ -650,6 +650,66 @@ Do not manufacture ambiguity for minor implementation details that established r
 
 ---
 
+# Issue authoring
+
+This skill may author a GitHub issue only as this section describes. An authored issue records work. It never authorizes implementing that work, and it never assigns, invokes, or schedules anyone.
+
+## When an issue may be created
+
+- **Explicit authorization.** Create an issue only when the Builder explicitly authorizes creating it in the current task. A recommendation to create one is not authorization. Neither is approval of a plan, report, review, or decision. An authorization covers only the issues it names.
+- **Durable evidence.** Author only from durable GitHub records, each linked by URL. Never author from the conversation. When this skill writes its own record, author only after that record is written and verified.
+- **Assigned types only.** Author only the issue types listed under "What this skill may author".
+
+## Procedure
+
+1. **Check for duplicates.** Search open and closed issues read-only, by key terms and by matching labels. For example: `gh search issues --repo OWNER/REPO "<key terms>"`, which searches both open and closed issues when `--state` is omitted. Never comment on, close, label, or link a candidate.
+2. **Resolve the template.**
+   1. **The repository's issue templates.** Read `.github/ISSUE_TEMPLATE/` directly, for example with `gh api repos/OWNER/REPO/contents/.github/ISSUE_TEMPLATE`. GitHub's GraphQL `issueTemplates` does not list YAML issue forms.
+      - Choose the template whose purpose matches the issue. Ask the Builder when more than one fits, or none does.
+      - Honor `config.yml`. When `blank_issues_enabled` is `false`, a template is required.
+   2. **Otherwise, this skill's fallback template,** `templates/issue.md`.
+3. **Draft.**
+   - Fill every field that the template marks required. In a form, those are the fields with `validations: required: true`.
+   - Compose a form's body the way GitHub renders a form: one `### <label>` section per field, in the form's order.
+   - End the body with the authoring record.
+4. **Confirm.** Show the Builder the complete draft: the title, body, labels, the template used, and the duplicate candidates. Create the issue only after an explicit yes. Any change to the draft needs a new yes.
+5. **Create.**
+   - Set only the approved title, body, and labels. For example: `gh issue create --title "<title>" --body-file <file> --label <label>`.
+   - Suggest a label only from the template or from the Builder. A label that does not exist in the repository is reported and left out, never created.
+   - Never set project fields, assignees, or milestones, unless the Builder's authorization names that action.
+   - Never edit, comment on, or link another issue, unless the Builder's authorization names that action. Mention related issues only in the body.
+6. **Verify.** Read the created issue back, and confirm that its title, body, and labels are the approved ones. If creation or verification fails, report the failure. Do not retry silently, and do not claim the issue exists.
+
+## Authoring record
+
+Every authored issue's body ends with one fenced YAML block. The block's `checkable` values are durable URLs. Its `asserted` values are claims that no tool certifies. The block authorizes nothing.
+
+```yaml
+garage_authoring: 1
+checkable:
+  source_evidence:             # required: durable GitHub issue, pull request, or comment URLs
+    - "<URL>"
+  decision: "<URL of the durable decision, when decision_status is decided>"
+asserted:
+  technician: "<this skill's role>"        # discovery | readiness | planner | implementer | reviewer
+  position: "<this skill's position>"      # Agent #1 | Agent #2 | none
+  authorization: "<the Builder's words authorizing creation, or a link to them>"
+  decision_status: decided                 # decided | pending
+```
+
+## What this skill may author
+
+The authoring record uses `technician: reviewer` and `position: Agent #2`.
+
+| Issue | Required source evidence |
+| --- | --- |
+| An independently verified defect outside the current change | This skill's own `[AGENT #2 — INDEPENDENT REVIEW]` record, durably recorded and verified |
+| A finding the review dispositioned as outside the current issue boundary, as follow-up work | The same record, which carries that disposition |
+
+An unmet acceptance criterion, or a defect, in the *current* change is a blocker in the review record, never a new issue. A non-blocking improvement goes to the suggestions backlog (E7), unless the Workflow Owner promotes it.
+
+---
+
 # Required output format
 
 ```markdown
@@ -765,7 +825,7 @@ A review follows this skill only when:
 - multiple material automated findings are dispositioned together in the same review rather than drip-fed;
 - Agent #2, not automated severity or blocker labeling, determines whether Agent #1 receives correction work;
 - findings may be dispositioned as correction-required, non-blocking/informational, invalid, or outside the current issue boundary;
-- out-of-scope findings do not expand the current implementation and are returned to the workflow orchestrator for separate follow-up/discovery/backlog handling when warranted;
+- out-of-scope findings do not expand the current implementation and are returned to the Builder for separate follow-up/discovery/backlog handling when warranted;
 - only acceptance failures, change-introduced regressions, or non-working implemented behavior block advancement;
 - surrounding code is inspected only as far as needed to answer those questions;
 - when a blocker exposes a directly related issue-scoped behavior family, the reviewer performs a bounded sibling-state/transition sweep for the same demonstrated cause;
@@ -774,5 +834,6 @@ A review follows this skill only when:
 - a correction followed by another directly related sibling failure in the same subsystem triggers bounded churn analysis before another correction;
 - suggestions do not alter approval;
 - non-blocking observations are routed toward the project's suggestions backlog (E7) rather than automatically becoming standalone issues;
+- an issue is authored only with the Builder's explicit authorization, only from this skill's own verified review record, and only as "Issue authoring" describes. The authored issue does not authorize implementation;
 - correction re-review remains narrow and returns `APPROVED — MERGE` when the PR satisfies `Yes -> No -> Yes`;
 - the reviewer does not modify the implementation.
