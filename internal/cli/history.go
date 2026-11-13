@@ -197,6 +197,11 @@ func historyPath(cacheDir, repoKey string) string {
 // that are unreadable or no longer valid are discarded and counted, never
 // treated as an error. The file is replaced through a temporary file in the
 // same directory, so a failed write leaves the previous history intact.
+//
+// The whole read, trim, encode, and replace runs under the history's
+// cross-process lock, so concurrent recordings to the same history, from any
+// clone or worktree, each keep their event. If the lock stays held for the
+// bounded wait, nothing is written and an error is returned.
 func appendHistoryEvent(cacheDir string, event historyEvent) (historyAppendResult, error) {
 	if err := event.validate(); err != nil {
 		return historyAppendResult{}, err
@@ -209,6 +214,12 @@ func appendHistoryEvent(cacheDir string, event historyEvent) (historyAppendResul
 	if err := os.MkdirAll(dir, 0o700); err != nil {
 		return result, fmt.Errorf("cannot create the history directory: %w", err)
 	}
+
+	unlock, err := lockHistory(path, historyLockTimeout)
+	if err != nil {
+		return result, err
+	}
+	defer unlock()
 
 	existing, discarded, err := readHistory(path)
 	if err != nil {
