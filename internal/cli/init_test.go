@@ -6,9 +6,19 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
+	"reflect"
 	"strings"
 	"testing"
 )
+
+// noDefaultBranch makes guided setup find no repository default branch, so
+// its integration-branch menu is the same on every machine.
+func noDefaultBranch(t *testing.T) {
+	t.Helper()
+	saved := detectDefaultBranch
+	detectDefaultBranch = func(string) string { return "" }
+	t.Cleanup(func() { detectDefaultBranch = saved })
+}
 
 // newProjectDir returns an empty temporary directory and makes it the working
 // directory for the duration of the test, so "garage init" never touches a
@@ -124,9 +134,20 @@ func mustLoadValid(t *testing.T, projectDir string) projectConfig {
 type scriptedPrompter struct {
 	answers   []string
 	questions []string
+	told      []string
 	// onAsk, when set, runs before each question is answered; n counts
 	// questions from 1.
 	onAsk func(n int)
+}
+
+func (s *scriptedPrompter) Tell(text string) error {
+	s.told = append(s.told, text)
+	return nil
+}
+
+// transcript is everything the prompter showed, in order.
+func (s *scriptedPrompter) transcript() string {
+	return strings.Join(s.told, "") + strings.Join(s.questions, "")
 }
 
 func (s *scriptedPrompter) Ask(question string) (string, error) {
@@ -254,18 +275,32 @@ func TestInitRejectsInvalidValuesAndWritesNothing(t *testing.T) {
 	}
 }
 
-func TestInitPromptsForMissingRequiredValues(t *testing.T) {
+func TestInitGuidesARequiredValueSetupWithFlags(t *testing.T) {
+	noDefaultBranch(t)
 	dir := t.TempDir()
 	ask := &scriptedPrompter{answers: []string{
-		"sometimes", // rejected, asked again
-		"triggers",
-		"", // at least one trigger is required
-		"schema-change|the change alters a persisted schema",
-		"",
-		"lead maintainer:alice",
-		"   ", // an empty role is rejected
+		"",              // extra pull-request reviews: none
+		"",              // automated reviewer: none
+		"",              // small corrections: not allowed
+		"sometimes",     // discovery: not a number, asked again
+		"2",             // discovery: project-defined situations
+		"",              // a name is required
+		"schema-change", // situation name
+		"the change alters a persisted schema",
+		"",                // no other situation
+		"",                // release conditions: none
+		"",                // suggestions: default issue
+		"ROLE",            // a placeholder role is rejected
+		"lead maintainer", // Workflow Owner
+		"alice",           // its members
+		"2",               // change acceptor: someone else
 		"maintainer",
-		"Workflow Owner",
+		"",  // no members
+		"1", // product-intent acceptor: same as the Workflow Owner
+		"",  // user-facing inspection: standard rule
+		"",  // guidance: none
+		"",  // agent tools: none
+		"y", // confirm
 	}}
 
 	result, err := initProject(dir, desiredFrom(t, "--integration-branch", "main"), ask)
@@ -283,25 +318,47 @@ func TestInitPromptsForMissingRequiredValues(t *testing.T) {
 	if d.Mode != discoveryTriggers || len(*d.Triggers) != 1 || (*d.Triggers)[0].Name != "schema-change" {
 		t.Errorf("discovery = %+v", d)
 	}
-	if wo := cfg.Project.Authorities.WorkflowOwner; wo.Role != "lead maintainer" || len(wo.Members) != 1 || wo.Members[0] != "alice" {
+	a := cfg.Project.Authorities
+	if wo := a.WorkflowOwner; wo.Role != "lead maintainer" || len(wo.Members) != 1 || wo.Members[0] != "alice" {
 		t.Errorf("workflow owner = %+v", wo)
+	}
+	if !reflect.DeepEqual(a.ProductIntentAcceptor, a.WorkflowOwner) {
+		t.Errorf("product-intent acceptor = %+v, want the reused Workflow Owner", a.ProductIntentAcceptor)
 	}
 	if *cfg.Project.IntegrationBranch != "main" {
 		t.Errorf("integration branch = %q, want the flag value", *cfg.Project.IntegrationBranch)
 	}
+	if strings.Contains(ask.transcript(), "Which branch do implementation pull requests target") {
+		t.Error("asked for the integration branch, which a flag supplied")
+	}
 }
 
 func TestInitPromptsOnlyForValuesFlagsDoNotSupply(t *testing.T) {
+	noDefaultBranch(t)
 	dir := t.TempDir()
-	ask := &scriptedPrompter{answers: []string{"maintainer"}}
+	ask := &scriptedPrompter{answers: []string{
+		"", "", "", "", "", "", // branch, PR reviews, reviewer, small corrections, release, suggestions
+		"3", "maintainer", "", // change acceptor: someone else (after the two reusable authorities)
+		"", "", "", // inspection, guidance, agent tools
+		"y",
+	}}
 
 	_, err := initProject(dir, desiredFrom(t, "--discovery", "implementer-judgment",
 		"--workflow-owner", "lead maintainer", "--product-intent-acceptor", "Workflow Owner"), ask)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if len(ask.questions) != 1 || !strings.Contains(ask.questions[0], "Change acceptor") {
-		t.Errorf("questions = %q, want only the change acceptor", ask.questions)
+	all := ask.transcript()
+	for _, supplied := range []string{"Discovery is an investigation", "The Workflow Owner makes", "The product-intent acceptor decides"} {
+		if strings.Contains(all, supplied) {
+			t.Errorf("asked about a value a flag supplied (%q)", supplied)
+		}
+	}
+	if !strings.Contains(all, "The change acceptor decides") {
+		t.Error("did not ask for the change acceptor")
+	}
+	if got := mustLoadValid(t, dir).Project.Authorities.ChangeAcceptor; got.Role != "maintainer" {
+		t.Errorf("change acceptor = %+v", got)
 	}
 }
 
@@ -897,6 +954,16 @@ project:
       role: carol-team
 `
 
+// upgradeAnswers complete the required values of a schema version 1 file:
+// discovery, then the three authorities, each a new role, then confirmation.
+var upgradeAnswers = []string{
+	"1",        // discovery: the implementer decides
+	"lead", "", // Workflow Owner
+	"2", "maintainer", "", // change acceptor: someone else
+	"3", "owner", "", // product-intent acceptor: someone else
+	"y",
+}
+
 func TestInitUpgradeStopsWhenConfigurationChangesDuringPrompting(t *testing.T) {
 	writeInPlace := func(t *testing.T, path string) {
 		if err := os.WriteFile(path, []byte(concurrentConfig), 0o644); err != nil {
@@ -921,7 +988,7 @@ func TestInitUpgradeStopsWhenConfigurationChangesDuringPrompting(t *testing.T) {
 			path := configPathIn(dir)
 			writeFile(t, path, "schema_version: 1\n")
 			ask := &scriptedPrompter{
-				answers: []string{"implementer-judgment", "lead", "maintainer", "owner"},
+				answers: upgradeAnswers,
 				onAsk: func(n int) {
 					if n == 2 {
 						change(t, path)
@@ -953,7 +1020,7 @@ func TestInitUpgradeStillWritesWhenNothingChangedDuringPrompting(t *testing.T) {
 	path := configPathIn(dir)
 	writeFile(t, path, "schema_version: 1\n")
 	ask := &scriptedPrompter{
-		answers: []string{"implementer-judgment", "lead", "maintainer", "owner"},
+		answers: upgradeAnswers,
 		// Rewriting identical bytes in place is not a change.
 		onAsk: func(n int) {
 			if n == 2 {

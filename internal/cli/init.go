@@ -116,6 +116,9 @@ const (
 	initUpgraded
 	initUpdated
 	initUnchanged
+	// initDeclined: the summary was shown and not confirmed; nothing was
+	// written.
+	initDeclined
 )
 
 // initResult describes a completed initialization.
@@ -125,14 +128,22 @@ type initResult struct {
 	Added       []string
 }
 
-// prompter asks for a required value in an interactive terminal.
+// prompter talks to the person running init in an interactive terminal.
+// Ask shows a question and returns the trimmed answer; Tell shows text that
+// needs no answer.
 type prompter interface {
 	Ask(question string) (string, error)
+	Tell(text string) error
 }
 
 type linePrompter struct {
 	in  *bufio.Reader
 	out io.Writer
+}
+
+func (p linePrompter) Tell(text string) error {
+	_, err := fmt.Fprint(p.out, text)
+	return err
 }
 
 func (p linePrompter) Ask(question string) (string, error) {
@@ -170,9 +181,12 @@ settings. Some choices have no default and are required:
                                who classifies a small correction (E8),
                                required only when small corrections are enabled
 
-In an interactive terminal, init asks for each required value that no flag
-supplies. Otherwise every required value must be given as a flag: if one is
-missing, init fails and writes nothing. Init never writes an invalid or
+In an interactive terminal, init guides you through each choice in plain
+language when it creates a configuration, skipping any choice a flag
+supplies. When it upgrades an existing configuration, it asks only for
+missing required values. Either way it shows a summary, and writes only after
+you confirm. Otherwise every required value must be given as a flag: if one
+is missing, init fails and writes nothing. Init never writes an invalid or
 incomplete configuration.
 
 Running init again upgrades the configuration in place. Existing values are
@@ -276,6 +290,9 @@ func reportInit(w io.Writer, projectDir string, result initResult) error {
 	case initUpdated:
 		msg = fmt.Sprintf("Updated Builder Garage configuration in %s\n  added to %s: %s\n",
 			projectDir, configRel, strings.Join(result.Added, ", "))
+	case initDeclined:
+		_, err := fmt.Fprintf(w, "Nothing was written; %s was not changed.\n", configRel)
+		return err
 	default:
 		msg = fmt.Sprintf("Builder Garage configuration in %s is up to date\n  %s was not changed\n",
 			projectDir, configRel)
@@ -619,18 +636,17 @@ type requiredPrompt struct {
 	ask      func(prompter, *projectConfig) error
 }
 
-func askAuthority(question string, set func(*authorities, *authority)) func(prompter, *projectConfig) error {
+// askAuthorityPrompt asks, in plain language, for one missing
+// responsibility, offering those already held for reuse.
+func askAuthorityPrompt(q authorityQuestion, slot func(*authorities) **authority) func(prompter, *projectConfig) error {
 	return func(p prompter, c *projectConfig) error {
-		for {
-			answer, err := p.Ask(question)
-			if err != nil {
-				return err
-			}
-			if a := parseAuthority(answer); a.Role != "" {
-				set(authoritiesOf(c), &a)
-				return nil
-			}
+		a := authoritiesOf(c)
+		v, err := guide{p: p}.askAuthorityGuided(q, chosenAuthorities(a))
+		if err != nil {
+			return err
 		}
+		*slot(a) = v
+		return nil
 	}
 }
 
@@ -646,63 +662,35 @@ var requiredPrompts = []requiredPrompt{
 			return proj(c).Discovery == nil
 		},
 		ask: func(p prompter, c *projectConfig) error {
-			for {
-				mode, err := p.Ask("Discovery applicability (E5), " + strings.Join(discoveryModes, " or ") + ": ")
-				if err != nil {
-					return err
-				}
-				switch mode {
-				case discoveryJudgment:
-					projectOf(c).Discovery = &discoveryChoice{Mode: mode}
-					return nil
-				case discoveryTriggers:
-					var list []namedCondition
-					for {
-						answer, err := p.Ask("  Discovery trigger as NAME|WHEN (empty to finish): ")
-						if err != nil {
-							return err
-						}
-						if answer == "" {
-							if len(list) > 0 {
-								break
-							}
-							continue
-						}
-						if t, err := parseNamedCondition(answer); err == nil {
-							list = append(list, t)
-						}
-					}
-					projectOf(c).Discovery = &discoveryChoice{Mode: mode, Triggers: &list}
-					return nil
-				}
+			d, err := guide{p: p}.askDiscoveryGuided()
+			if err != nil {
+				return err
 			}
+			projectOf(c).Discovery = d
+			return nil
 		},
 	},
 	{
 		flag:    "--workflow-owner",
 		missing: func(c *projectConfig) bool { return auths(c).WorkflowOwner == nil },
-		ask: askAuthority("Workflow Owner (E8), as ROLE or ROLE:MEMBERS: ",
-			func(a *authorities, v *authority) { a.WorkflowOwner = v }),
+		ask:     askAuthorityPrompt(workflowOwnerQuestion, func(a *authorities) **authority { return &a.WorkflowOwner }),
 	},
 	{
 		flag:    "--change-acceptor",
 		missing: func(c *projectConfig) bool { return auths(c).ChangeAcceptor == nil },
-		ask: askAuthority("Change acceptor (E8), as ROLE or ROLE:MEMBERS: ",
-			func(a *authorities, v *authority) { a.ChangeAcceptor = v }),
+		ask:     askAuthorityPrompt(changeAcceptorQuestion, func(a *authorities) **authority { return &a.ChangeAcceptor }),
 	},
 	{
 		flag:    "--product-intent-acceptor",
 		missing: func(c *projectConfig) bool { return auths(c).ProductIntentAcceptor == nil },
-		ask: askAuthority("Product-intent acceptor (E8), as ROLE or ROLE:MEMBERS: ",
-			func(a *authorities, v *authority) { a.ProductIntentAcceptor = v }),
+		ask:     askAuthorityPrompt(productIntentQuestion, func(a *authorities) **authority { return &a.ProductIntentAcceptor }),
 	},
 	{
 		flag: "--small-correction-classifier",
 		missing: func(c *projectConfig) bool {
 			return smallCorrectionsEnabled(c) && auths(c).SmallCorrectionClassifier == nil
 		},
-		ask: askAuthority("Small-correction classifier (E8), as ROLE or ROLE:MEMBERS: ",
-			func(a *authorities, v *authority) { a.SmallCorrectionClassifier = v }),
+		ask: askAuthorityPrompt(classifierQuestion, func(a *authorities) **authority { return &a.SmallCorrectionClassifier }),
 	},
 }
 
@@ -786,6 +774,11 @@ func createNewConfig(garageDir, configPath string, desired projectConfig, ask pr
 	if problems := validateConfig(withoutMissingRequired(cfg)); problems != nil {
 		return initResult{}, fmt.Errorf("%w; nothing was written", problems)
 	}
+	if ask != nil {
+		if err := guideNewConfiguration(&cfg, ask, filepath.Dir(garageDir)); err != nil {
+			return initResult{}, err
+		}
+	}
 	if _, err := fillRequired(&cfg, ask); err != nil {
 		return initResult{}, err
 	}
@@ -795,6 +788,15 @@ func createNewConfig(garageDir, configPath string, desired projectConfig, ask pr
 	content, err := renderNewConfig(cfg)
 	if err != nil {
 		return initResult{}, err
+	}
+	if ask != nil {
+		ok, err := confirmWrite(ask, "garage init will create .garage/config.yaml with these choices:", cfg)
+		if err != nil {
+			return initResult{}, err
+		}
+		if !ok {
+			return initResult{Action: initDeclined}, nil
+		}
 	}
 
 	garageInfo, err := ensureGarageDirectory(garageDir)
@@ -883,6 +885,20 @@ func upgradeConfig(garageDir, configPath string, desired projectConfig, ask prom
 	// The written file must decode to exactly the validated configuration.
 	if check, err := decodeConfig(content); err != nil || !reflect.DeepEqual(check, merged) {
 		return initResult{}, fmt.Errorf("internal error: the upgraded configuration did not round-trip; %s was not changed", configPath)
+	}
+	if ask != nil {
+		heading := "garage init will add to .garage/config.yaml: " + describeAdded(added) + "."
+		if fromVersion != configSchemaVersion {
+			heading = fmt.Sprintf("garage init will upgrade .garage/config.yaml from schema version %d to %d, adding: %s.",
+				fromVersion, configSchemaVersion, describeAdded(added))
+		}
+		ok, err := confirmWrite(ask, heading+" The configuration will then be:", merged)
+		if err != nil {
+			return initResult{}, err
+		}
+		if !ok {
+			return initResult{Action: initDeclined}, nil
+		}
 	}
 
 	garageInfo, err := ensureGarageDirectory(garageDir)

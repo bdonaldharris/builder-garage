@@ -35,7 +35,16 @@ An omitted key means the canonical default applies. A key that is present is the
 
 `garage init` creates the configuration, or upgrades an existing one in place. It never writes an invalid or incomplete configuration, and it never discards a configured value.
 
-- **Required values.** In an interactive terminal, `init` asks for each required value that no flag supplies. Otherwise every required value must be given as a flag. If one is missing, `init` fails and writes nothing.
+- **Required values.** Without an interactive terminal, every required value must be given as a flag. If one is missing, `init` fails and writes nothing.
+- **Guided setup.** When both input and output are a terminal, `init` guides the person running it ([#54 decision](https://github.com/bdonaldharris/builder-garage/issues/54#issuecomment-6857444538)):
+  - **A new configuration.** `init` walks through every choice that no flag supplies: the integration branch, the human responsibilities, the policies, guidance, and skill targets. It uses plain language and numbered menus, shows each default, and does not show extension-point identifiers or flag syntax. A choice left at its default is not written, so the default applies.
+  - **Responsibilities.** Each human responsibility is explained where it is chosen. An authority already named can be reused without retyping it. Placeholder answers, such as `ROLE`, `TBD`, or `<role>`, are rejected.
+  - **Repository branch.** When the repository's `origin/HEAD` names a default branch, it is offered as the integration branch.
+  - **Skill targets.** These are offered as a pick list. Each chosen target is written with the version and date its paths were confirmed with.
+  - **An upgrade.** Upgrading an existing configuration asks only for missing required values. It never turns a default into an explicit value.
+  - **Confirmation.** Before any interactive write, `init` shows a readable summary, including the defaults that apply, and writes only after an explicit yes. Any other answer writes nothing.
+
+  Menu answers produce exactly the values the equivalent flags produce.
 - **Flags.** Each extension point and tooling setting has a flag; `garage init --help` lists them and their value formats.
 - **A new file** is written only after the complete configuration validates.
 - **An existing file** is upgraded in place:

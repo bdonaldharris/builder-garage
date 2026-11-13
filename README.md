@@ -44,7 +44,8 @@ The initial executable provides these entry points:
 
 `.garage/config.yaml` is the sole canonical source of a project's configured choices. Its `project` section holds the project's values at the extension points the [extension-point registry](docs/extension-points.md) declares. Its `tooling` section holds Garage tooling settings, which grant no workflow authority. The format and lifecycle are in [Project configuration](docs/configuration.md).
 
-- **Required values.** Some choices have no default: discovery applicability, and the Workflow Owner, change acceptor, and product-intent acceptor. In an interactive terminal, `garage init` asks for each one that no flag supplies. Otherwise each must be given as a flag, and `init` fails and writes nothing if one is missing. `garage init --help` lists every flag.
+- **Required values.** Some choices have no default: discovery applicability, and the Workflow Owner, change acceptor, and product-intent acceptor. Otherwise each must be given as a flag, and `init` fails and writes nothing if one is missing. `garage init --help` lists every flag.
+- **Guided setup.** In an interactive terminal, `garage init` walks through each choice in plain language when it creates a configuration, with numbered menus and each default shown. It asks only about choices that no flag supplies. It explains the human responsibilities, lets you reuse an authority you already named, and rejects placeholder answers such as `ROLE`. When upgrading an existing configuration, it asks only for missing required values. Either way it shows a summary and writes only after you confirm.
 - **Upgrade in place.** Running `garage init` again keeps every existing value and comment, adds only missing settings, and migrates a schema version 1 file to version 2. It never overwrites a configured value, and there is no `--force`. If the existing file is invalid, `init` stops without changing it and explains the correction required.
 - **Validation.** `garage config validate` checks the schema and every mechanically checkable value. It does not certify that a configured authority is human, or anything about agents or workflow state.
 
@@ -112,7 +113,7 @@ cd /path/to/project
 /path/to/garage init
 ```
 
-In a terminal, `init` asks for the required values. To supply them noninteractively:
+In a terminal, `init` guides you through each choice and asks you to confirm a summary before writing. To supply the values noninteractively instead:
 
 ```sh
 /path/to/garage init --discovery implementer-judgment \

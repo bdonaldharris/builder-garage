@@ -143,6 +143,15 @@ var supportedSkillTargets = map[string]skillPathRule{
 
 var supportedHarnesses = []string{"claude-code", "codex", "copilot-cli"}
 
+// confirmedSkillTargets are the harness versions whose skill paths the #37
+// load test confirmed, and the date it did. Guided setup declares a chosen
+// target with these values, so an adopter never types a version.
+var confirmedSkillTargets = map[string]struct{ Version, On string }{
+	"claude-code": {"2.1.277", "2026-11-12"},
+	"codex":       {"0.137.0", "2026-11-12"},
+	"copilot-cli": {"1.0.93-1", "2026-11-12"},
+}
+
 // errNoConfig reports that the project has no configuration file.
 var errNoConfig = errors.New("no configuration")
 
