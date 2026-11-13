@@ -42,7 +42,8 @@ An omitted key means the canonical default applies. A key that is present is the
   - every existing value and comment is kept;
   - only missing or newly required settings are added;
   - a schema version 1 file, which records only `schema_version: 1`, is migrated to version 2;
-  - the file is replaced atomically, through a temporary file in the same directory.
+  - the file is replaced atomically, through a temporary file in the same directory;
+  - immediately before the replacement, `init` checks that the file is still the one it read, with the same content. If it changed while `init` was running, for example while waiting for an answer, `init` stops without writing and asks to be run again, so a concurrent change is never overwritten.
 - **No overwrite.** A flag that conflicts with an already configured value is an error. Change configured values through the project's normal review process, not with `init`. There is no `--force`.
 - **Invalid or ambiguous files.** If the existing file is not valid YAML, does not match the schema, has an unsupported schema version, is a version 1 file with other keys, or holds an invalid value, `init` stops without changing it and explains the correction required.
 - **A symbolic link or non-regular file** at `.garage` or `.garage/config.yaml` is refused.

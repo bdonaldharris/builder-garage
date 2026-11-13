@@ -44,6 +44,48 @@ var errConfigExists = errors.New("configuration already exists")
 // prompted for. Nothing is written when it is returned.
 var errMissingRequired = errors.New("required configuration values are missing")
 
+// errConfigChanged reports that the configuration changed after init read
+// it. Init stops without writing rather than overwrite the change.
+var errConfigChanged = errors.New("the configuration changed while garage init was running")
+
+// configSnapshot is the configuration file as init read it.
+type configSnapshot struct {
+	path string
+	info fs.FileInfo
+	data []byte
+}
+
+// identifyFile returns path's Lstat information with the file's identity
+// fixed now. On Windows, os.SameFile loads a FileInfo's file ID lazily, by
+// path, on first use, so an unloaded FileInfo would identify whatever file
+// is at path when it is compared, not the file that was there when it was
+// taken. Comparing the information with itself loads the ID immediately; on
+// other platforms the ID is already part of the information.
+func identifyFile(path string) (fs.FileInfo, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	os.SameFile(info, info)
+	return info, nil
+}
+
+// verifyUnchanged reports errConfigChanged unless the destination is still
+// the same regular file, holding exactly the bytes that were read.
+func (s configSnapshot) verifyUnchanged() error {
+	changed := fmt.Errorf("%w; %s was not changed by init: run \"garage init\" again to upgrade its current content",
+		errConfigChanged, s.path)
+	info, err := os.Lstat(s.path)
+	if err != nil || !info.Mode().IsRegular() || !os.SameFile(info, s.info) {
+		return changed
+	}
+	data, err := os.ReadFile(s.path)
+	if err != nil || !bytes.Equal(data, s.data) {
+		return changed
+	}
+	return nil
+}
+
 // initFlags are the raw flag values of "garage init".
 type initFlags struct {
 	IntegrationBranch            string
@@ -139,7 +181,9 @@ version 1 file is migrated to version 2. A flag that conflicts with a value
 already configured is an error; change configured values through the
 project's normal review process. If the existing configuration is invalid or
 cannot be migrated unambiguously, init stops without changing it and explains
-the correction required.
+the correction required. If the configuration changes while init is running,
+for example while it waits for an answer, init stops without writing, so the
+change is never overwritten.
 
 Value formats:
   authority      ROLE or ROLE:MEMBER,MEMBER   e.g. "lead maintainer:alice"
@@ -768,10 +812,17 @@ func upgradeConfig(garageDir, configPath string, desired projectConfig, ask prom
 		return initResult{}, fmt.Errorf("%s was not changed: %s", configPath, fmt.Sprintf(format, args...))
 	}
 
+	// Identify the file before reading it. If it is replaced in between,
+	// the snapshot no longer matches and the upgrade stops before writing.
+	readInfo, err := identifyFile(configPath)
+	if err != nil {
+		return initResult{}, fmt.Errorf("cannot inspect %s: %w", configPath, err)
+	}
 	data, err := readConfigFile(configPath)
 	if err != nil {
 		return initResult{}, err
 	}
+	snapshot := configSnapshot{path: configPath, info: readInfo, data: data}
 	var doc yaml.Node
 	if err := yaml.Unmarshal(data, &doc); err != nil {
 		return stop("it is not valid YAML (%v); correct it by hand, then run \"garage init\" again", err)
@@ -838,7 +889,8 @@ func upgradeConfig(garageDir, configPath string, desired projectConfig, ask prom
 	if err != nil {
 		return initResult{}, err
 	}
-	if err := replaceConfiguration(configPath, content, garageInfo, prepareTemporaryConfig, commitConfigReplacement); err != nil {
+	if err := replaceConfiguration(configPath, content, garageInfo,
+		prepareTemporaryConfig, commitConfigReplacement, snapshot.verifyUnchanged); err != nil {
 		return initResult{}, err
 	}
 
@@ -1130,6 +1182,7 @@ func replaceConfiguration(
 	garageInfo fs.FileInfo,
 	prepare temporaryConfigPreparer,
 	commit configReplacementCommitter,
+	unchanged func() error,
 ) error {
 	garageDir := filepath.Dir(configPath)
 	if err := verifyGarageDirectory(garageDir, garageInfo); err != nil {
@@ -1152,6 +1205,14 @@ func replaceConfiguration(
 	}
 	if _, err := inspectConfigDestination(configPath); err != nil {
 		return err
+	}
+	// The last check before the commit: the destination must still be the
+	// configuration that was read, so a concurrent change is never
+	// overwritten with an earlier snapshot.
+	if unchanged != nil {
+		if err := unchanged(); err != nil {
+			return err
+		}
 	}
 	if err := commit(tempPath, configPath); err != nil {
 		return fmt.Errorf("cannot replace the configuration file: %w", err)
