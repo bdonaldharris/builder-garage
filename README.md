@@ -134,7 +134,7 @@ make check
 - There are no published releases or installation packages yet.
 - GoReleaser is an approved future direction, but it is not configured.
 - The CLI initializes configuration and records local workflow history only; it does not implement Workbench, Crew, Inspection, Shipping, or Manuals capabilities.
-- The canonical skills do not read `.garage/config.yaml` yet ([#33](https://github.com/bdonaldharris/builder-garage/issues/33)). It configures no agents, plugins, providers, or remote services.
+- The canonical skills read `.garage/config.yaml` only through `garage config validate`, so an agent needs a `garage` binary on its `PATH` to resolve a configured value; there is no installation package yet. The configuration configures no agents, plugins, providers, or remote services.
 
 ## An engineering discovery journey, built in public
 

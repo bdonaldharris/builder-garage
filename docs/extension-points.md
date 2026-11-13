@@ -11,7 +11,7 @@ This registry lists every point at which a project adopting Builder Garage may a
 - **Declared points only.** A setting that is not declared here is not adaptable. It is an error, not a silent extension.
 - **Required choices.** Where an extension point has no default, a project must supply its value explicitly. Leaving it unset is not a valid configuration. `garage config validate` reports each missing value, and `garage init` never writes a configuration without them ([Project configuration](configuration.md)).
 - **One authoritative value.** Once a project configures a value, its prose documents, such as GOVERNANCE or an adoption profile, may explain that value or authorize a change to it through the project's normal process. They do not silently redefine it.
-- **Configuration format.** A project records these values in the `project` section of `.garage/config.yaml`, as described in [Project configuration](configuration.md). That file is the sole canonical source of a project's configured values. The canonical skills do not read it yet ([#33](https://github.com/bdonaldharris/builder-garage/issues/33)); until they do, a project's adoption record, such as Builder Garage's [skill-adoption profile](skill-adoption.md), explains the configured values to agents without redefining them.
+- **Configuration format.** A project records these values in the `project` section of `.garage/config.yaml`, as described in [Project configuration](configuration.md). That file is the sole canonical source of a project's configured values. The canonical skills read it only at the extension points they cite, and only when `garage config validate` succeeds ([How the skills read the configuration](configuration.md#how-the-skills-read-the-configuration)). A project's adoption record, such as Builder Garage's [skill-adoption profile](skill-adoption.md), may explain the configured values without redefining them.
 - **Validation, not orchestration.** Garage may validate declared values and the structure of recorded evidence. Choosing a value never makes Garage assign, invoke, wait for, or advance any agent or workflow. See [No orchestration](responsibility-floor.md#no-orchestration).
 
 ## Extension points
@@ -21,7 +21,7 @@ This registry lists every point at which a project adopting Builder Garage may a
 | | |
 | --- | --- |
 | **Allowed values** | The name of one branch that implementation pull requests target. |
-| **Default** | `staging`, the branch the canonical [integration-pr-review](../skills/integration-pr-review/SKILL.md#no-pr-exists) skill names. |
+| **Default** | `staging`, the branch the canonical skills, such as [integration-pr-review](../skills/integration-pr-review/SKILL.md#no-pr-exists), use when E1 is omitted. |
 | **Constraint** | Changes the destination only. It changes no gate, review, or evidence requirement. |
 | **Source** | [GOVERNANCE: Changes to `main`](../GOVERNANCE.md#changes-to-main), [#6 discovery](https://github.com/bdonaldharris/builder-garage/issues/6) |
 

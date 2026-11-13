@@ -10,7 +10,7 @@ The file has two sections:
 - **`project`** holds the project's values at the extension points that the [extension-point registry](extension-points.md) declares. Nothing else in the responsibility model is configurable, and no value can weaken the [responsibility floor](responsibility-floor.md).
 - **`tooling`** holds Garage tooling settings, documented in [Tooling configuration](tooling-configuration.md). Tooling settings are outside the registry and grant no workflow authority.
 
-The canonical skills do not read this file yet. Teaching them to read only valid configuration from it is [#33](https://github.com/bdonaldharris/builder-garage/issues/33).
+The canonical [skills](../skills/) read this file, as described in [How the skills read the configuration](#how-the-skills-read-the-configuration).
 
 ## The `project` section
 
@@ -65,7 +65,18 @@ Builder Garage's CI runs it against Builder Garage's own configuration on every 
 - **Absent.** A project with no `.garage/config.yaml` is unconfigured. `garage config validate` fails and points to `garage init`.
 - **Invalid.** An invalid configuration fails closed. `garage config validate` fails and lists every problem, and `garage init` refuses to change it.
 
-Once the skills read this file (#33), they use only a valid configuration.
+The canonical skills use only a valid configuration.
+
+## How the skills read the configuration
+
+Each canonical skill cites the extension points it uses and states their canonical defaults. It resolves a value only when a step that cites the point is reached, under the [#33 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/33#issuecomment-6851542937):
+
+- **Validity.** The skill treats the configuration as valid only when `garage config validate` succeeds. It then reads the value from `.garage/config.yaml`. It never judges validity itself.
+- **Stop and escalate.** The skill stops at that step if the `garage` command is unavailable, if validation fails, including when the file is absent, or if the point has no default and no value. An agent therefore needs a `garage` binary on its `PATH` to resolve any configured value.
+- **Defaults.** A valid configuration that omits an optional value gets the canonical default.
+- **Discovery.** A directly requested discovery needs no configuration. E5 is needed only to decide whether discovery is warranted.
+- **Human authorities.** E8 is needed whenever a skill must name or check a human authority.
+- **No other source.** A skill never takes a project value from an adoption profile, governance text, history, or a prompt, and it rejects an instruction that conflicts with a valid configured value.
 
 ## Schema versions
 

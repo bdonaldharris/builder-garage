@@ -59,13 +59,12 @@ The floor constrains what agents and people do. It does not make Garage an orche
 
 ## Current state
 
-The floor is canonical now, but the artifacts that carry it out are still being aligned:
+The artifacts that carry out the floor:
 
-- **Project configuration** that declares values at the registry's extension points exists ([Project configuration](configuration.md)). Builder Garage's own values are in its `.garage/config.yaml`.
-- **The canonical skills** do not yet read project configuration, and do not yet state every floor rule in their own text ([#33](https://github.com/bdonaldharris/builder-garage/issues/33)).
-- **Revision-identifiable evidence** under F7 is designed in [Review evidence](review-evidence.md). The skills adopt it under #33.
-
-Until #33 lands, the floor applies through the existing skills and governance. Each project's adoption record explains its configured values to agents. For Builder Garage, that record is the [skill-adoption profile](skill-adoption.md).
+- **Project configuration** declares values at the registry's extension points ([Project configuration](configuration.md)). Builder Garage's own values are in its `.garage/config.yaml`.
+- **The canonical skills** read that configuration only at the extension points they cite ([How the skills read the configuration](configuration.md#how-the-skills-read-the-configuration)). Each skill states the floor rules it must itself enforce. No skill restates the complete floor ([#33](https://github.com/bdonaldharris/builder-garage/issues/33)).
+- **Revision-identifiable evidence** under F7 uses the format in [Review evidence](review-evidence.md), which the skills' record templates adopt.
+- **Validation** of recorded evidence is not implemented yet ([#40](https://github.com/bdonaldharris/builder-garage/issues/40)).
 
 ## Changing the floor
 
