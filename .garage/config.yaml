@@ -10,9 +10,6 @@
 schema_version: 2
 project:
   integration_branch: main
-  automated_reviewer:
-    name: codex
-    request: optional input where available; the chatgpt-codex-connector GitHub integration reviews a pull request when it is opened
   small_corrections:
     enabled: true
     without_issue: true
