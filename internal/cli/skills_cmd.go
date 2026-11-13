@@ -11,7 +11,9 @@ func newSkillsCommand(version string) *cobra.Command {
 		Long: `Install, update, and verify the canonical Builder Garage skills at the
 harness skill targets declared in this project's .garage/config.yaml.
 
-The skills are embedded in this garage binary; nothing is fetched at run time.
+The skills, and the manuals a project may adopt, are embedded in this garage
+binary; nothing is fetched at run time. Each manual the project adopts is
+delivered as the skill builder-garage-manual-<name>.
 Garage writes only the skill directories it installs, at the declared targets,
 and its own state under the user configuration directory. It never changes
 harness-owned or third-party skills.
@@ -33,6 +35,12 @@ func newSkillsInstallCommand(version string) *cobra.Command {
 		Long: `Install or update the canonical skills at the skill targets declared in
 .garage/config.yaml in the current directory. Running it again changes
 nothing when every skill is already Current.
+
+Each manual this project adopts is installed as the skill
+builder-garage-manual-<name>, and the project is recorded as adopting it. A
+manual skill this project does not adopt is left in place while another
+project still adopts it; otherwise an unmodified copy is removed, and a
+modified one is kept and reported.
 
 Installation is planned first, and refused without writing anything when:
   - a skill of the same name exists in another path the harness reads (a
@@ -81,6 +89,11 @@ Each canonical skill at each target is reported as:
   Missing        installed by Garage, then removed
   Unmanaged      present, but not installed by Garage
   Not installed  absent
+
+Each manual the project adopts is reported the same way, together with any
+difference between the configured version and the version this garage
+delivers. A manual skill installed only for other projects is shown for
+information. A modified manual skill that no project adopts is a problem.
 
 A skill Garage manages that is no longer canonical is reported as Extra. A
 skill of the same name in another path the harness reads is reported as a

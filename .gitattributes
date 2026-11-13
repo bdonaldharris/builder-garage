@@ -3,3 +3,7 @@
 # so that a binary built on Windows embeds the same bytes as one built
 # elsewhere.
 /skills/** text eol=lf
+
+# Manuals are embedded in the garage binary, and delivered as skills, in
+# the same way.
+/manuals/** text eol=lf

@@ -327,7 +327,7 @@ Before creating a new abstraction, service, component, integration path, domain 
 - established repository patterns;
 - existing contracts and extension points.
 
-Follow the manuals the project has adopted (E10) as guidance for these choices. A manual is guidance only: it never relaxes a gate or rule in this skill.
+Follow the manuals the project has adopted (E10) as guidance for these choices. A manual is guidance only: it never relaxes a gate or rule in this skill. Each adopted manual is delivered as the skill `builder-garage-manual-<name>`; read it there. A manual skill that is installed but that this project does not adopt does not apply.
 
 Prefer extending the established owning system over creating parallel capability unless a new boundary is actually required.
 

@@ -1,6 +1,11 @@
-# Go Manual
+---
+name: go
+version: "0.1"
+status: provisional
+description: "Baseline guidance for designing and building software in Go: package boundaries, dependency direction, errors, contexts, interfaces, configuration, external boundaries, and testing."
+---
 
-**Version:** 0.1 (provisional)
+# Go Manual
 
 This is the Garage-maintained baseline guidance for designing and building software in Go. It is portable: it describes practice for any Go project, not the choices of a particular project. A project adopts it through its own profile and records its deltas there. See [Manuals](README.md) for what adoption means, and for this guidance's relationship to canonical requirements.
 

@@ -324,6 +324,13 @@ func validateConfig(cfg projectConfig) configProblems {
 
 	if g := pc.Guidance; g != nil {
 		seen := map[string]bool{}
+		// A configured manual must be one this garage carries (#60 decision
+		// 4). A version other than the one it delivers is still valid; it
+		// is reported, not refused.
+		catalog, catalogErr := embeddedManualCatalog()
+		if catalogErr != nil && len(g.Manuals) > 0 {
+			add("project.guidance.manuals (E10): cannot read the manuals this garage carries: %v", catalogErr)
+		}
 		for i, m := range g.Manuals {
 			field := fmt.Sprintf("project.guidance.manuals[%d] (E10)", i)
 			checkLine(&p, field+".name", m.Name)
@@ -332,6 +339,10 @@ func validateConfig(cfg projectConfig) configProblems {
 				add("%s: manual %q is listed more than once", field, m.Name)
 			}
 			seen[m.Name] = true
+			if catalogErr == nil && m.Name != "" && findManual(catalog, m.Name) == nil {
+				add("%s.name: %q is not a manual this garage carries; available: %s",
+					field, m.Name, namesOrDefault(manualNames(catalog), "none"))
+			}
 		}
 		if len(g.Conditional) > 0 {
 			add("project.guidance.conditional is not configurable: conditional stack or provider guidance in the canonical skills applies whenever its own stated condition holds, and no project selects or disables it; remove project.guidance.conditional")

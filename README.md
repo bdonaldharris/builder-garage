@@ -37,7 +37,7 @@ The initial executable provides these entry points:
 | `garage init` | Creates or upgrades `.garage/config.yaml` in the current project directory. See [Project configuration](#project-configuration). |
 | `garage config validate` | Checks `.garage/config.yaml` against the configuration schema, read-only, and reports every problem. |
 | `garage record` | Records a private workflow event, such as an implementation handoff or a review verdict, in this developer's local history. See [Local workflow history](#local-workflow-history). |
-| `garage skills install`, `garage skills verify` | Install or update the canonical skills embedded in the binary at the project's declared harness targets, and check them read-only. See [Skill installation](docs/skill-installation.md). |
+| `garage skills install`, `garage skills verify` | Install or update the canonical skills embedded in the binary, and the manuals the project adopts, at the project's declared harness targets, and check them read-only. See [Skill installation](docs/skill-installation.md). |
 | `garage status` | Shows the workflow status of one issue or pull request, read once from GitHub. See [Workflow status](#workflow-status). |
 
 ### Project configuration

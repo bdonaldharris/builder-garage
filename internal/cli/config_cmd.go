@@ -137,8 +137,13 @@ func writeConfigSummary(w io.Writer, cfg projectConfig) error {
 	}
 	var manuals []string
 	if pc.Guidance != nil {
+		catalog, _ := embeddedManualCatalog()
 		for _, m := range pc.Guidance.Manuals {
-			manuals = append(manuals, m.Name+" "+m.Version)
+			entry := m.Name + " " + m.Version
+			if c := findManual(catalog, m.Name); c != nil && c.Version != m.Version {
+				entry += " (this garage delivers " + c.Version + ")"
+			}
+			manuals = append(manuals, entry)
 		}
 	}
 	row("E10", "manuals", namesOrDefault(manuals, "none (default)"))
