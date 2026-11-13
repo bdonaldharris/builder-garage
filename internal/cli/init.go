@@ -152,7 +152,7 @@ func (p linePrompter) Ask(question string) (string, error) {
 	line, err := p.in.ReadString('\n')
 	if err != nil && !(errors.Is(err, io.EOF) && line != "") {
 		if errors.Is(err, io.EOF) {
-			return "", errors.New("input ended before every required value was supplied")
+			return "", errors.New("input ended before an answer was given")
 		}
 		return "", err
 	}
@@ -191,8 +191,8 @@ incomplete configuration.
 Running init again upgrades the configuration in place. Existing values are
 kept, only missing or newly required settings are added, and a schema
 version 1 file is migrated to version 2. A flag that conflicts with a value
-already configured is an error; change configured values through the
-project's normal review process. If the existing configuration is invalid or
+already configured is an error; change configured values with "garage config
+set" or by editing the file, through the project's normal review process. If the existing configuration is invalid or
 cannot be migrated unambiguously, init stops without changing it and explains
 the correction required. If the configuration changes while init is running,
 for example while it waits for an answer, init stops without writing, so the
@@ -497,113 +497,6 @@ func parseSkillTarget(v string) (skillTarget, error) {
 		ConfirmedOn:      strings.TrimSpace(parts[2]),
 	}, nil
 }
-
-// configSetting is one independently configurable setting: an extension
-// point, one E8 responsibility, or a tooling setting. A setting is the unit
-// init adds, and the unit it refuses to change.
-type configSetting struct {
-	path []string
-	get  func(*projectConfig) any // nil when the setting is absent
-	set  func(dst, src *projectConfig)
-}
-
-func projectOf(c *projectConfig) *projectChoices {
-	if c.Project == nil {
-		c.Project = &projectChoices{}
-	}
-	return c.Project
-}
-
-func authoritiesOf(c *projectConfig) *authorities {
-	pc := projectOf(c)
-	if pc.Authorities == nil {
-		pc.Authorities = &authorities{}
-	}
-	return pc.Authorities
-}
-
-// proj and auths read a section without creating it.
-func proj(c *projectConfig) *projectChoices {
-	if c.Project == nil {
-		return &projectChoices{}
-	}
-	return c.Project
-}
-
-func auths(c *projectConfig) *authorities {
-	if pc := proj(c); pc.Authorities != nil {
-		return pc.Authorities
-	}
-	return &authorities{}
-}
-
-func present[T any](v *T) any {
-	if v == nil {
-		return nil
-	}
-	return v
-}
-
-var configSettings = []configSetting{
-	{[]string{"project", "integration_branch"},
-		func(c *projectConfig) any { return present(proj(c).IntegrationBranch) },
-		func(d, s *projectConfig) { projectOf(d).IntegrationBranch = projectOf(s).IntegrationBranch }},
-	{[]string{"project", "pr_review_triggers"},
-		func(c *projectConfig) any { return present(proj(c).PRReviewTriggers) },
-		func(d, s *projectConfig) { projectOf(d).PRReviewTriggers = projectOf(s).PRReviewTriggers }},
-	{[]string{"project", "automated_reviewer"},
-		func(c *projectConfig) any { return present(proj(c).AutomatedReviewer) },
-		func(d, s *projectConfig) { projectOf(d).AutomatedReviewer = projectOf(s).AutomatedReviewer }},
-	{[]string{"project", "small_corrections"},
-		func(c *projectConfig) any { return present(proj(c).SmallCorrections) },
-		func(d, s *projectConfig) { projectOf(d).SmallCorrections = projectOf(s).SmallCorrections }},
-	{[]string{"project", "discovery"},
-		func(c *projectConfig) any { return present(proj(c).Discovery) },
-		func(d, s *projectConfig) { projectOf(d).Discovery = projectOf(s).Discovery }},
-	{[]string{"project", "release_conditions"},
-		func(c *projectConfig) any { return present(proj(c).ReleaseConditions) },
-		func(d, s *projectConfig) { projectOf(d).ReleaseConditions = projectOf(s).ReleaseConditions }},
-	{[]string{"project", "suggestions_backlog"},
-		func(c *projectConfig) any { return present(proj(c).SuggestionsBacklog) },
-		func(d, s *projectConfig) { projectOf(d).SuggestionsBacklog = projectOf(s).SuggestionsBacklog }},
-	{[]string{"project", "authorities", "workflow_owner"},
-		func(c *projectConfig) any { return present(auths(c).WorkflowOwner) },
-		func(d, s *projectConfig) { authoritiesOf(d).WorkflowOwner = authoritiesOf(s).WorkflowOwner }},
-	{[]string{"project", "authorities", "change_acceptor"},
-		func(c *projectConfig) any { return present(auths(c).ChangeAcceptor) },
-		func(d, s *projectConfig) { authoritiesOf(d).ChangeAcceptor = authoritiesOf(s).ChangeAcceptor }},
-	{[]string{"project", "authorities", "product_intent_acceptor"},
-		func(c *projectConfig) any { return present(auths(c).ProductIntentAcceptor) },
-		func(d, s *projectConfig) {
-			authoritiesOf(d).ProductIntentAcceptor = authoritiesOf(s).ProductIntentAcceptor
-		}},
-	{[]string{"project", "authorities", "small_correction_classifier"},
-		func(c *projectConfig) any { return present(auths(c).SmallCorrectionClassifier) },
-		func(d, s *projectConfig) {
-			authoritiesOf(d).SmallCorrectionClassifier = authoritiesOf(s).SmallCorrectionClassifier
-		}},
-	{[]string{"project", "user_facing_inspection"},
-		func(c *projectConfig) any { return present(proj(c).UserFacingInspection) },
-		func(d, s *projectConfig) { projectOf(d).UserFacingInspection = projectOf(s).UserFacingInspection }},
-	{[]string{"project", "guidance"},
-		func(c *projectConfig) any { return present(proj(c).Guidance) },
-		func(d, s *projectConfig) { projectOf(d).Guidance = projectOf(s).Guidance }},
-	{[]string{"tooling", "skill_targets"},
-		func(c *projectConfig) any {
-			if c.Tooling == nil {
-				return nil
-			}
-			return present(c.Tooling.SkillTargets)
-		},
-		func(d, s *projectConfig) {
-			if d.Tooling == nil {
-				d.Tooling = &toolingConfig{}
-			}
-			d.Tooling.SkillTargets = s.Tooling.SkillTargets
-		}},
-}
-
-func settingName(path []string) string { return strings.Join(path, ".") }
 
 // mergeSettings adds to base every setting of desired that base lacks. A
 // setting both define with different values is a conflict; base is never
@@ -983,15 +876,6 @@ func applyToDocument(doc *yaml.Node, cfg projectConfig, added [][]string, migrat
 		}
 	}
 	return nil
-}
-
-func settingByPath(path []string) configSetting {
-	for _, s := range configSettings {
-		if slicesEqual(s.path, path) {
-			return s
-		}
-	}
-	panic("unknown configuration setting " + settingName(path))
 }
 
 func slicesEqual(a, b []string) bool {
