@@ -793,11 +793,16 @@ var builderGarageFlags = []string{
 	"--skill-target", "copilot-cli@1.0.93-1@2026-11-12",
 }
 
+// withLF normalizes line endings. A Windows checkout may convert the
+// repository's files to CRLF; line endings are a checkout artifact, not
+// content, so comparisons with repository files ignore them.
+func withLF(s string) string { return strings.ReplaceAll(s, "\r\n", "\n") }
+
 // documentedInitFlags returns the flags of the garage init command recorded
 // in docs/skill-adoption.md, with shell quoting removed.
 func documentedInitFlags(t *testing.T) []string {
 	t.Helper()
-	doc := readFile(t, filepath.Join("..", "..", "docs", "skill-adoption.md"))
+	doc := withLF(readFile(t, filepath.Join("..", "..", "docs", "skill-adoption.md")))
 	start := strings.Index(doc, "```sh\ngarage init \\\n")
 	if start < 0 {
 		t.Fatal("docs/skill-adoption.md has no garage init command block")
@@ -841,7 +846,7 @@ func TestCommittedConfigurationIsGeneratedByTheDocumentedCommand(t *testing.T) {
 	if strings.Join(documented, "\x00") != strings.Join(builderGarageFlags, "\x00") {
 		t.Fatalf("documented flags differ from builderGarageFlags:\n%q\n%q", documented, builderGarageFlags)
 	}
-	committed := readFile(t, filepath.Join("..", "..", garageDirName, configFileName))
+	committed := withLF(readFile(t, filepath.Join("..", "..", garageDirName, configFileName)))
 
 	dir := t.TempDir()
 	if _, err := initProject(dir, desiredFrom(t, documented...), nil); err != nil {
