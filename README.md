@@ -12,7 +12,7 @@ Builder Garage is at its foundation stage.
 
 **What exists today** is the initial `garage` command-line foundation and the project's engineering documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, the [engineering principles](docs/principles.md) and [history](docs/history.md) behind them, and governance and contribution process.
 
-The CLI can display help and version information, initialize, upgrade, and validate a project's `.garage/config.yaml`, and record private developer-local workflow events. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, release automation, or runtime for the conceptual components has been implemented.
+The CLI can display help and version information, initialize, upgrade, and validate a project's `.garage/config.yaml`, record private developer-local workflow events, and install and verify the canonical skills at a project's harness targets. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, release automation, or runtime for the conceptual components has been implemented.
 
 ## Architectural direction
 
@@ -37,6 +37,7 @@ The initial executable provides these entry points:
 | `garage init` | Creates or upgrades `.garage/config.yaml` in the current project directory. See [Project configuration](#project-configuration). |
 | `garage config validate` | Checks `.garage/config.yaml` against the configuration schema, read-only, and reports every problem. |
 | `garage record` | Records a private workflow event, such as an implementation handoff or a review verdict, in this developer's local history. See [Local workflow history](#local-workflow-history). |
+| `garage skills install`, `garage skills verify` | Install or update the canonical skills embedded in the binary at the project's declared harness targets, and check them read-only. See [Skill installation](docs/skill-installation.md). |
 | `garage status` | Shows the workflow status of one issue or pull request, read once from GitHub. See [Workflow status](#workflow-status). |
 
 ### Project configuration
@@ -143,7 +144,7 @@ make check
 
 - There are no published releases or installation packages yet.
 - GoReleaser is an approved future direction, but it is not configured.
-- The CLI initializes configuration, records local workflow history, and shows read-only workflow status only; it does not implement Workbench, Crew, Inspection, Shipping, or Manuals capabilities.
+- The CLI initializes configuration, records local workflow history, installs and verifies skills, and shows read-only workflow status only; it does not implement Workbench, Crew, Inspection, Shipping, or Manuals capabilities.
 - `garage status` needs the `gh` command, installed and authenticated, to read GitHub.
 - The canonical skills read `.garage/config.yaml` only through `garage config validate`, so an agent needs a `garage` binary on its `PATH` to resolve a configured value; there is no installation package yet. The configuration configures no agents, plugins, providers, or remote services.
 

@@ -1,0 +1,5 @@
+# The canonical skills are embedded byte for byte in the garage binary, and
+# their digests identify an installed copy. Keep them LF on every platform,
+# so that a binary built on Windows embeds the same bytes as one built
+# elsewhere.
+/skills/** text eol=lf
