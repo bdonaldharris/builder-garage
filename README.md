@@ -64,6 +64,7 @@ garage record --issue 39 --type implementation --outcome ready \
 - **Minimal.** Only a timestamp, the repository key, the issue or pull request number, the event type, the outcome, an optional link to the durable GitHub record, and an optional artifact identity are stored. Branch names, prompts, conversation text, diffs, file contents, environment values, and tokens are not.
 - **Not evidence.** GitHub Issue and pull request records are authoritative. Local history never authorizes, blocks, or advances work, and losing it loses nothing that matters.
 - **Best effort.** If an event cannot be recorded, `garage record` prints a warning and still exits successfully.
+- **Safe to run concurrently.** Recordings to the same repository's history, from separate processes, clones, or worktrees, take turns through an operating-system lock on a file beside the history, so each keeps its event. If the history stays locked for 5 seconds, the event is not recorded and a warning is printed. The lock serializes only these local writes; it never coordinates agents or workflow.
 
 Run `garage record --help` for the accepted event types and outcomes. The design is recorded in the [#19 decision](https://github.com/bdonaldharris/builder-garage/issues/19#issuecomment-6837362562).
 
