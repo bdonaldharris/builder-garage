@@ -55,6 +55,21 @@ type configSnapshot struct {
 	data []byte
 }
 
+// identifyFile returns path's Lstat information with the file's identity
+// fixed now. On Windows, os.SameFile loads a FileInfo's file ID lazily, by
+// path, on first use, so an unloaded FileInfo would identify whatever file
+// is at path when it is compared, not the file that was there when it was
+// taken. Comparing the information with itself loads the ID immediately; on
+// other platforms the ID is already part of the information.
+func identifyFile(path string) (fs.FileInfo, error) {
+	info, err := os.Lstat(path)
+	if err != nil {
+		return nil, err
+	}
+	os.SameFile(info, info)
+	return info, nil
+}
+
 // verifyUnchanged reports errConfigChanged unless the destination is still
 // the same regular file, holding exactly the bytes that were read.
 func (s configSnapshot) verifyUnchanged() error {
@@ -799,7 +814,7 @@ func upgradeConfig(garageDir, configPath string, desired projectConfig, ask prom
 
 	// Identify the file before reading it. If it is replaced in between,
 	// the snapshot no longer matches and the upgrade stops before writing.
-	readInfo, err := os.Lstat(configPath)
+	readInfo, err := identifyFile(configPath)
 	if err != nil {
 		return initResult{}, fmt.Errorf("cannot inspect %s: %w", configPath, err)
 	}

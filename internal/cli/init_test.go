@@ -979,9 +979,9 @@ func TestInitUpgradeStillWritesWhenNothingChangedDuringPrompting(t *testing.T) {
 func TestConfigSnapshotDetectsChanges(t *testing.T) {
 	newSnapshot := func(t *testing.T, path string) configSnapshot {
 		t.Helper()
-		info, err := os.Lstat(path)
+		info, err := identifyFile(path)
 		if err != nil {
-			t.Fatalf("lstat: %v", err)
+			t.Fatalf("identify: %v", err)
 		}
 		return configSnapshot{path: path, info: info, data: []byte(readFile(t, path))}
 	}
