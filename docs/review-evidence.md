@@ -2,7 +2,7 @@
 
 **Status:** Adopted. Designed under [#34](https://github.com/bdonaldharris/builder-garage/issues/34), and adopted into the canonical skills' record templates under [#33](https://github.com/bdonaldharris/builder-garage/issues/33). It implements item 6 of the [#16 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788).
 
-This document defines how a workflow record identifies the exact artifact it covers, and how it separates facts that can be checked from claims that cannot. The record templates in the canonical [skills](../skills/) carry this format, and Agent #2 stops when valid Agent #1 completion evidence in this format is absent. Records use the resolved object name of the integration branch tip as `integration_ref`, never a bare branch name. Automated validation of recorded evidence is [#40](https://github.com/bdonaldharris/builder-garage/issues/40).
+This document defines how a workflow record identifies the exact artifact it covers, and how it separates facts that can be checked from claims that cannot. The record templates in the canonical [skills](../skills/) carry this format, and Agent #2 stops when valid Agent #1 completion evidence in this format is absent. Records use the resolved object name of the integration branch tip as `integration_ref`, never a bare branch name. `garage status` ([#40](https://github.com/bdonaldharris/builder-garage/issues/40)) reports these records for one issue or pull request. It keeps the checked and asserted elements separate, compares recorded changesets, and recomputes a committed artifact only from objects already local. It never fetches, so it does not recompute in a partial clone.
 
 ## What does not change
 
@@ -230,5 +230,4 @@ A verifier's output must keep these two columns visible. A "valid" result means 
 
 ## Not decided here
 
-- The verifier, its command, and its GitHub access. See [#35](https://github.com/bdonaldharris/builder-garage/issues/35) and [#40](https://github.com/bdonaldharris/builder-garage/issues/40).
 - Support for sparse checkouts, and post-merge audit of squash or rebase merges without a recorded `base`.

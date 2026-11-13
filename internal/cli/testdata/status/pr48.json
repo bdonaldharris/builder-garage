@@ -1,0 +1,127 @@
+{
+ "data": {
+  "repository": {
+   "issueOrPullRequest": {
+    "__typename": "PullRequest",
+    "number": 48,
+    "title": "fix: stop garage init when the configuration changes while it runs",
+    "url": "https://github.com/bdonaldharris/builder-garage/pull/48",
+    "state": "MERGED",
+    "body": "## Governing issue\n\nCloses #47\n\n## Summary\n\n`garage init` no longer overwrites a configuration that changes while it runs.\n\n- **Before.** An in-place upgrade read `.garage/config.yaml`, could wait at interactive prompts, and then replaced the file without checking it. A concurrent save, for example from an editor or a checkout, was silently lost.\n- **Now.** `init` snapshots the file's identity and bytes before reading it, and checks them as the last step before the atomic replacement. If the file changed, `init` stops without writing, exits non-zero, and asks to be run again.\n\nThis is the B1 correction from PR #45. Agent #2 approved it there, but PR #45 merged before the correction was committed. The content is unchanged: it reproduces the tree approved on PR #45. It was reviewed again as a new artifact on #47.\n\n## Independent engineering review\n\n- Review record: [Agent #2 implementation review on #47](https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852415894), APPROVED. That review on the issue is the authoritative record of the review.\n- Reviewer: Agent #2, in an execution context separate from the Agent #1 that carried and recorded this change. The review records this separation as an assertion.\n\n- [x] The reviewer did not implement this change.\n- [x] Any required corrections were made and independently re-reviewed. None were required on #47.\n- [x] This pull request contains the change that was approved, and nothing else. The head's `garage-artifact-v1` changeset equals the approved one; see the equivalence record on this PR.\n\n## Validation\n\n- `make check` (gofmt, vet, `go test ./...`, build, six-platform cross-compile): pass.\n- `go test -race ./internal/cli`: pass. `GOOS=windows go vet ./...`: clean.\n- The four new tests pass. A mutation check confirms they catch B1: with the check disabled, both prompting subtests fail.\n- Agent #2 reran the B1 reproduction in a pty. A binary built from `main` loses the concurrent configuration and exits 0. A binary built from this change preserves it byte for byte and exits 1.\n- This branch merges cleanly with current `main`, including `docs/configuration.md`, which #46 also changed.\n\n## Environment / Deployment Requirements\n\nNone\n\n## Maintainer approval\n\nIndependent review approval does not authorize merge. A maintainer approves this pull request separately, and all required checks must pass.\n\n🤖 Generated with [Claude Code](https://claude.com/claude-code)\n",
+    "merged": true,
+    "mergedAt": "2026-11-13T12:23:56Z",
+    "baseRefName": "main",
+    "headRefOid": "ffd392fd2e7d3f17df6ffe192ee1079d0f01fe3d",
+    "mergeCommit": {
+     "oid": "0d767791bfb4053525e99599acbec5cb5c088437"
+    },
+    "comments": {
+     "totalCount": 4,
+     "pageInfo": {
+      "hasPreviousPage": false
+     },
+     "nodes": [
+      {
+       "url": "https://github.com/bdonaldharris/builder-garage/pull/48#issuecomment-6852566409",
+       "body": "<!-- codex-pull-request-review-summary -->\n<!-- codex-review-state:v1 {\"code_review\":{\"commit_sha\":\"8b0ce6c1b527968307b86bd770f4a412474cb2d4\",\"has_any_findings\":false,\"has_unresolved_findings\":false,\"status\":\"completed\"},\"security_review\":{\"commit_sha\":null,\"has_any_findings\":null,\"has_unresolved_findings\":null,\"status\":null}} -->\n\n<details>\n<summary><strong>Codex Review Summary</strong>: ✅ Completed</summary>\n\nThis comment shows the latest Codex review activity on this pull request.\n\n| Review | Status | Commit | Review trigger |\n| --- | --- | --- | --- |\n| 📝 **Code Review** | ✅ **Completed** <relative-time datetime=\"2026-11-13T12:15:20.000279Z\">2026-11-13T12:15:20.000279Z</relative-time> | `8b0ce6c` | PR opened |\n\n\n\n<details> <summary>ℹ️ About Codex in GitHub</summary>\n<br/>\n\n[Your team has set up Codex to review pull requests in this repo](https://chatgpt.com/codex/cloud/settings/general). Reviews are triggered when you\n- Open a pull request for review\n- Mark a draft as ready\n- Comment \"@codex review\" or \"@codex security review\".\n\nCodex reacts with 👀 while any review is running, comments if it has suggestions, and reacts with 👍 once all reviews finish with no findings.\n\n</details>\n\n</details>",
+       "createdAt": "2026-11-13T12:14:27Z",
+       "lastEditedAt": "2026-11-13T12:15:20Z",
+       "authorAssociation": "NONE",
+       "author": {
+        "login": "chatgpt-codex-connector",
+        "__typename": "Bot"
+       }
+      },
+      {
+       "url": "https://github.com/bdonaldharris/builder-garage/pull/48#issuecomment-6852567716",
+       "body": "[AGENT #1 — IMPLEMENTATION]\n\n```yaml\ngarage_evidence: 1\nrecord: equivalence\nissue: 47\nequivalent_to: \"https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852415894\"\ncheckable:\n  artifact:\n    method: garage-artifact-v1\n    object_format: sha1\n    stage: commit\n    integration_ref: ebc225163afbdd9960c3696a4c00b52dcc415daf\n    base: fa30a65b6a4f0ba04414491dda5a94d748469cc2\n    tree: 49c5126f982de772cf7b5083199b59a92fe0d3ea\n    changeset: sha256:4e68f58c12613d594d8d77184ac98189680d312cd2d8f38930ee0d907e70ff24\n    paths: 3\n    commit: 8b0ce6c1b527968307b86bd770f4a412474cb2d4\n```\n\nStatus: PR ESTABLISHED. No Agent #2 PR review is required at this head.\n\nPR head: `8b0ce6c1b527968307b86bd770f4a412474cb2d4`, targeting `main`, which is the configured integration branch (E1).\n\n**Artifact equivalence: shown.**\n- The approving disposition is the [Agent #2 implementation review on #47](https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852415894): APPROVED, recorded on the originating issue and authoritative.\n- The head's `changeset`, computed at the `commit` stage, equals the approved working-tree `changeset`: `sha256:4e68f58c…`. The `tree` and `base` are also identical.\n- The commit contains exactly the 3 approved paths.\n- `main` has advanced to `ebc2251` (#46) since the review. That is recorded above as `integration_ref`. The merge base is still `fa30a65`, so the changeset is unaffected.\n- The branch merges cleanly with `main`. #46 also changed `docs/configuration.md`, but in different hunks.\n\n**PR-review triggers at this head:**\n\n| Trigger | Status | Reason |\n| --- | --- | --- |\n| 1. Equivalence not shown | Does not apply | Equivalence is shown above. |\n| 2. Automated findings | Does not apply yet | No automated findings exist on this head. The configured automated reviewer (E3, `codex`) reviews a PR when it is opened, so its review may be pending. Any findings it reports on this head fire trigger 2, and an Agent #2 PR review is then required before merge. |\n| Configured additional triggers (E2) | Not applicable | None are configured. |\n\n**Remaining merge gates:**\n- CI passes on this head;\n- Codex's review has completed with no findings, or any findings are dispositioned by Agent #2;\n- the change acceptor approves (E8: a maintainer);\n- configured release conditions (E6): none.\n\nEnvironment / Deployment Requirements: None\n\nThis Agent #1 invocation stops here. If Codex reports findings on this head, a later Agent #1 invocation posts the Agent #2 PR Review Request.\n",
+       "createdAt": "2026-11-13T12:14:31Z",
+       "lastEditedAt": null,
+       "authorAssociation": "OWNER",
+       "author": {
+        "login": "bdonaldharris",
+        "__typename": "User"
+       }
+      },
+      {
+       "url": "https://github.com/bdonaldharris/builder-garage/pull/48#issuecomment-6852716150",
+       "body": "[AGENT #1 — IMPLEMENTATION]\n\n```yaml\ngarage_evidence: 1\nrecord: equivalence\nissue: 47\nequivalent_to: none\ncheckable:\n  artifact:\n    method: garage-artifact-v1\n    object_format: sha1\n    stage: commit\n    integration_ref: ebc225163afbdd9960c3696a4c00b52dcc415daf\n    base: fa30a65b6a4f0ba04414491dda5a94d748469cc2\n    tree: 93841f87b5b3301e833d386c185af1115c7b75e5\n    changeset: sha256:5c21b67444c13abae82cad7b864f9e157abd2312da81fd4a3ee88d5fea520e6f\n    paths: 3\n    commit: ffd392fd2e7d3f17df6ffe192ee1079d0f01fe3d\n```\n\nStatus: AGENT #2 PR REVIEW REQUIRED (trigger 1)\n\nPR head: `ffd392fd2e7d3f17df6ffe192ee1079d0f01fe3d`, targeting `main`, which is the configured integration branch (E1).\n\n**Why the head changed.** CI on the approved head `8b0ce6c` failed on Windows only:\n\n```text\n--- FAIL: TestConfigSnapshotDetectsChanges/file_replaced\ninit_test.go:1013: verifyUnchanged = <nil>, want errConfigChanged\n```\n\n([run](https://github.com/bdonaldharris/builder-garage/actions/runs/43423468811/job/131878921368))\n\n**Cause.** On Windows, `os.SameFile` loads a `FileInfo`'s file ID lazily, by path, when it is first compared.\n\n- The snapshot's `Lstat` information was first compared inside `verifyUnchanged`, so it identified the *replacement* file.\n- The test replaced the file with identical bytes, so the content check also passed, and the replacement went undetected.\n- This matches Go 1.27.4 `os/types_windows.go`, where `loadFileId` opens `fs.path` on first use.\n- On Linux and macOS, the file ID is filled in by `Lstat` itself.\n\n**Correction.** Commit `ffd392f` (+18/−3):\n\n- adds `identifyFile` to `internal/cli/init.go`, which runs `Lstat` and then loads the identity immediately, with `os.SameFile(info, info)`;\n- uses it for the snapshot in `upgradeConfig`;\n- uses it in the test's snapshot helper, so the test builds the snapshot the way production does.\n\nNothing else changed.\n\n**Artifact equivalence: not shown.** The head's `changeset` (`sha256:5c21b674…`) differs from the approved one (`sha256:4e68f58c…`), so the [#47 implementation review](https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852415894) no longer covers this head. Trigger 1 applies.\n\n**Validation on this head:**\n- CI passes on all four jobs: Format/vet/build/cross-compile, and Test on ubuntu, macOS, and **windows** ([run](https://github.com/bdonaldharris/builder-garage/actions/runs/43424079584)).\n- Locally: gofmt, `go vet` (native and `GOOS=windows`), `go test ./...`, and a Windows test-binary build all pass.\n\n**PR-review triggers at this head:**\n\n| Trigger | Status | Reason |\n| --- | --- | --- |\n| 1. Equivalence not shown | **Applies** | The changeset differs from the approved one. |\n| 2. Automated findings | None on this head | Codex reviewed `8b0ce6c` with no findings. It does not re-review on push. |\n| Configured additional triggers (E2) | None configured | — |\n\n**Out of scope, follow-up candidate.** The same lazy-ID behavior weakens the existing `.garage` directory-identity checks (`ensureGarageDirectory` → `verifyGarageDirectory`, and `removeIfSameFile`) on Windows. That code was already on `main` before this PR (#35), and this PR does not change it.\n\nEnvironment / Deployment Requirements: None\n",
+       "createdAt": "2026-11-13T12:20:43Z",
+       "lastEditedAt": null,
+       "authorAssociation": "OWNER",
+       "author": {
+        "login": "bdonaldharris",
+        "__typename": "User"
+       }
+      },
+      {
+       "url": "https://github.com/bdonaldharris/builder-garage/pull/48#issuecomment-6852717011",
+       "body": "Agent #2 PR review requested\n\nPR head: ffd392fd2e7d3f17df6ffe192ee1079d0f01fe3d\nResponds to: https://github.com/bdonaldharris/builder-garage/pull/48#issuecomment-6852716150\nSupplements: https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852415894\nTrigger(s): artifact equivalence not shown (commit `ffd392f` after approval, fixing a Windows-only CI failure in the snapshot identity)\nAutomated findings to disposition: None\n\nReview the complete current PR artifact at the head above against the governing issue, under independent-implementation-review.\n\nUse only this governing contract:\n\n1. Are the original issue acceptance criteria met?\n2. Did this PR introduce or materially worsen a bug/regression?\n3. Does the implemented behavior work?\n\nInspect only the relevant surrounding execution paths needed to answer those three questions. Do not stop after the first defect. If a demonstrated defect exposes a shared issue-scoped state, transition, authority, recovery, or other behavior rule, perform a bounded sweep of the directly interacting states/transitions governed by that same rule. Report all presently identifiable current-PR blockers together.\n\nDisposition every listed automated finding against the three governing questions. Automated severity or reviewer language is evidence, not authority.\n\nDiagnostic scenarios, matrices, reviewer-generated examples, and test ideas do not create new acceptance criteria.\n\nRecord the disposition as [AGENT #2 — INDEPENDENT REVIEW] on this PR, with its garage-evidence block: record pr-review, responds_to the equivalence record above, supplements the issue review above, and the recomputed artifact for the head reviewed.\n",
+       "createdAt": "2026-11-13T12:20:45Z",
+       "lastEditedAt": null,
+       "authorAssociation": "OWNER",
+       "author": {
+        "login": "bdonaldharris",
+        "__typename": "User"
+       }
+      }
+     ]
+    },
+    "reviews": {
+     "nodes": []
+    },
+    "commits": {
+     "nodes": [
+      {
+       "commit": {
+        "oid": "ffd392fd2e7d3f17df6ffe192ee1079d0f01fe3d",
+        "statusCheckRollup": {
+         "state": "SUCCESS"
+        }
+       }
+      }
+     ]
+    },
+    "closingIssuesReferences": {
+     "nodes": [
+      {
+       "number": 47,
+       "url": "https://github.com/bdonaldharris/builder-garage/issues/47",
+       "state": "CLOSED",
+       "comments": {
+        "totalCount": 2,
+        "pageInfo": {
+         "hasPreviousPage": false
+        },
+        "nodes": [
+         {
+          "url": "https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852351044",
+          "body": "[AGENT #1 — IMPLEMENTATION]\n\n```yaml\ngarage_evidence: 1\nrecord: implementation\nissue: 47\ncheckable:\n  artifact:\n    method: garage-artifact-v1\n    object_format: sha1\n    stage: working-tree\n    integration_ref: fa30a65b6a4f0ba04414491dda5a94d748469cc2\n    base: fa30a65b6a4f0ba04414491dda5a94d748469cc2\n    tree: 49c5126f982de772cf7b5083199b59a92fe0d3ea\n    changeset: sha256:4e68f58c12613d594d8d77184ac98189680d312cd2d8f38930ee0d907e70ff24\n    paths: 3\nasserted:\n  status: ready-for-review\n  validation_run: true\n```\n\nStatus: READY FOR AGENT #2 REVIEW\n\nArtifact/Branch: uncommitted working tree on `fix/47-init-concurrent-change`, in the git worktree `.claude/worktrees/fix-47`. Base `main` at `fa30a65`. Three modified paths: `internal/cli/init.go` (+48/−2), `internal/cli/init_test.go` (+182), and `docs/configuration.md` (+2/−1). No untracked files; `garage` and `dist/` are ignored.\n\nImplemented: the B1 correction, carried onto `main` unchanged.\n\n- **Where it comes from.** This is the B1 correction from PR #45, the [Agent #1 correction](https://github.com/bdonaldharris/builder-garage/pull/45#issuecomment-6844009977) that Agent #2 approved in its [correction re-review](https://github.com/bdonaldharris/builder-garage/pull/45#issuecomment-6844779192). It is applied unchanged as a patch, taken from the uncommitted changes that remained in the main checkout after PR #45 merged at `407ddf4`.\n- **The content is unchanged.** On `fa30a65`, all three paths are identical to `407ddf4`. Applying the patch to `407ddf4` reproduces tree `49c5126f…` exactly, which is the tree Agent #2 approved, and this working tree has the same tree. The `base` differs, because `fa30a65` is the merge of `407ddf4`. The changeset is therefore new (3 paths instead of 22), and **the PR #45 approval does not carry over**. This needs a full independent review.\n- **What the correction does.**\n  - `upgradeConfig` takes a `configSnapshot` (the `Lstat` identity and the bytes read) *before* it reads.\n  - `replaceConfiguration` gains an `unchanged` precondition. It runs as the last step before the atomic commit.\n  - On a change, `init` stops without writing, with `errConfigChanged`, and tells the user to run `garage init` again.\n  - The help text and `docs/configuration.md` state this behavior.\n  - Four tests cover it: a change during prompting, both written in place and replaced by rename; an unchanged rewrite that must still write; snapshot detection; and the precondition blocking the commit.\n\nValidation:\n- `make check` (gofmt, vet, `go test ./...`, build, six-platform cross-compile): pass.\n- `go test -race -count=1 ./internal/cli`: pass. `GOOS=windows go vet ./...`: clean.\n- The four new tests pass by name. Toolchain: checksum-verified go1.27.4.\n- **Mutation check.** With the precondition replaced by a no-op, both prompting subtests fail with `error = <nil>, want errConfigChanged`, which is B1. After `init.go` was restored byte-for-byte from a backup, they pass, and the artifact identity is unchanged.\n- `./garage config validate` on Builder Garage's configuration: valid. `git diff --check`: clean.\n\nEnvironment / Deployment Requirements: None\n\nNotes for Agent #2:\n- **This Agent #1 did not write the correction code.** It carried, validated, and recorded it. The reviewer must still be separate from this session.\n- **Not done here:** rerunning the pty-based real-binary reproduction from the B1 review.\n- **Unchanged:** the three non-blocking suggestions from #35 (null-valued keys, flag-error ordering, and the `docs/review-evidence.md:5` wording).\n",
+          "createdAt": "2026-11-13T12:05:31Z",
+          "lastEditedAt": null,
+          "authorAssociation": "OWNER",
+          "author": {
+           "login": "bdonaldharris",
+           "__typename": "User"
+          }
+         },
+         {
+          "url": "https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852415894",
+          "body": "[AGENT #2 — INDEPENDENT REVIEW]\n\n```yaml\ngarage_evidence: 1\nrecord: review\nissue: 47\nresponds_to: \"https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852351044\"\ncheckable:\n  artifact:\n    method: garage-artifact-v1\n    object_format: sha1\n    stage: working-tree\n    integration_ref: fa30a65b6a4f0ba04414491dda5a94d748469cc2\n    base: fa30a65b6a4f0ba04414491dda5a94d748469cc2\n    tree: 49c5126f982de772cf7b5083199b59a92fe0d3ea\n    changeset: sha256:4e68f58c12613d594d8d77184ac98189680d312cd2d8f38930ee0d907e70ff24\n    paths: 3\n  matches_responds_to: true\nasserted:\n  execution_context: separate-from-implementation\n  inspected: complete-artifact\n  answers: {acceptance_criteria_met: true, new_regression: false, works: true}\n  verdict: approved\n```\n\nPhase: INITIAL REVIEW\nArtifact/Head: uncommitted working tree on `fix/47-init-concurrent-change` (worktree `.claude/worktrees/fix-47`), base `main` at `fa30a65`. 3 modified paths, no untracked files.\nSequence: IMPLEMENTATION REVIEW (originating issue, authoritative)\n\n**Prerequisite evidence.** The Agent #1 record carries a well-formed `garage-evidence` block (`record: implementation`, `status: ready-for-review`). Its `integration_ref` is the tip of `origin/main`, the configured E1 branch. I recomputed the identity with the reference procedure, and it matches the record exactly. I recomputed it again after `make check`, and it was unchanged. The PR #45 approval does not carry over, so I reviewed this change in full.\n\nAcceptance criteria met? Yes\n- **The check runs immediately before the replacement.**\n  - `upgradeConfig` takes an `Lstat` snapshot before it reads, and keeps the bytes it read (`init.go` `configSnapshot`).\n  - `replaceConfiguration` runs `unchanged()` as its last step before `commit`, after the directory and destination checks.\n  - `verifyUnchanged` requires that the file is still regular, is `os.SameFile` with the snapshot, and holds byte-equal content.\n  - If the file was replaced between the `Lstat` and the read, the file identities differ, so `init` stops. It never writes over the change.\n- **A change stops the upgrade.**\n  - It returns `errConfigChanged`, with a message to run `garage init` again.\n  - It writes nothing and leaves no temporary file.\n  - It exits non-zero; exit 1 was observed.\n  - The help text and `docs/configuration.md` state this behavior.\n- **Tests.** `TestInitUpgradeStopsWhenConfigurationChangesDuringPrompting` covers a change made during interactive prompting, both written in place and replaced by rename. Further tests cover:\n  - snapshot detection: content changed, file replaced, file removed, and unchanged;\n  - a precondition failure blocking the commit;\n  - an identical rewrite still upgrading.\n\nNew bug/regression introduced? No\n- The only behavior added is the new stop. The two existing callers of `replaceConfiguration` in tests pass `nil` and keep their earlier behavior.\n- The extra `Lstat` runs only on the upgrade path, where the file already exists. Symlink and non-regular files are still refused by the existing checks.\n- An unchanged rewrite during prompting still upgrades, as tested. A plain upgrade with no concurrent change produces a valid configuration, as observed.\n\nDoes it work? Yes\n- I re-ran the B1 reproduction from the PR #45 review with a real binary in a pty. A v1 file is upgraded, and another writer saves a valid v2 configuration at the second prompt.\n\n  | Binary | Exit | Concurrent configuration |\n  | --- | --- | --- |\n  | Built from `fa30a65` | 0 | lost; B1 reproduces on `main` |\n  | Built from this artifact | 1 | preserved byte for byte; `.garage/` holds only `config.yaml` |\n\n- Control: with no concurrent change, the fixed binary upgrades the file, and `garage config validate` accepts the result.\n\nCurrent blockers:\n- None\n\nAutomated review findings and Agent #2 dispositions:\n- Not applicable — no applicable automated findings were present (no PR exists yet).\n\nFollow-up / Out of scope:\n- None new. The three #35 suggestions that Agent #1 noted remain as they were.\n\nValidation:\n- Toolchain: a checksum-verified go1.27.4, with fresh binaries built from this artifact and from `fa30a65`. Agent #1's binary was not used.\n- `make check`: exit 0.\n- `go test -race -count=1 ./internal/cli`: pass.\n- The four new tests pass, including both prompting subtests.\n- `GOOS=windows go vet ./...`: clean. `git diff --check`: clean.\n- The pty reproduction and the control are as described above.\n\nVerdict: APPROVED\n",
+          "createdAt": "2026-11-13T12:08:13Z",
+          "lastEditedAt": null,
+          "authorAssociation": "OWNER",
+          "author": {
+           "login": "bdonaldharris",
+           "__typename": "User"
+          }
+         }
+        ]
+       }
+      }
+     ]
+    }
+   }
+  }
+ }
+}

@@ -53,13 +53,13 @@ The repository now contains the initial Go CLI source, tests, build commands, an
 
 The following remain deliberately undecided:
 
-- commands and behavior beyond `garage --help`, `garage version`, `garage init`, `garage config validate`, and `garage record`;
+- commands and behavior beyond `garage --help`, `garage version`, `garage init`, `garage config validate`, `garage record`, and `garage status`;
 - installation and release channels for compiled executables;
 - package and module layout for future conceptual-component implementations;
 - adapter and extension interfaces;
 - the execution model for independent or distributed execution.
 
-Go, Cobra, Go modules, YAML, standard-library testing, standalone executables, GitHub Actions, and future GoReleaser use are decided in [ADR 0001](adr/0001-go-cobra-cli-foundation.md). No additional technology is introduced until an established requirement calls for it.
+Go, Cobra, Go modules, YAML, standard-library testing, standalone executables, GitHub Actions, and future GoReleaser use are decided in [ADR 0001](adr/0001-go-cobra-cli-foundation.md). `garage status` reads GitHub through the external `gh` command, as the [#19 decision](https://github.com/bdonaldharris/builder-garage/issues/19#issuecomment-6837362562) chose. No additional technology is introduced until an established requirement calls for it.
 
 ## How the architecture evolves
 
