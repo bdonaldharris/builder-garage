@@ -1,8 +1,8 @@
 # Revision-Identifiable Review Evidence
 
-**Status:** Design, produced under [#34](https://github.com/bdonaldharris/builder-garage/issues/34). It implements item 6 of the [#16 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788).
+**Status:** Adopted. Designed under [#34](https://github.com/bdonaldharris/builder-garage/issues/34), and adopted into the canonical skills' record templates under [#33](https://github.com/bdonaldharris/builder-garage/issues/33). It implements item 6 of the [#16 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788).
 
-This document defines how a workflow record identifies the exact artifact it covers, and how it separates facts that can be checked from claims that cannot. It is a design for later implementation. The record templates in the canonical [skills](../skills/) continue to govern until [#33](https://github.com/bdonaldharris/builder-garage/issues/33) adopts this format into them. Validation is implemented under [#35](https://github.com/bdonaldharris/builder-garage/issues/35) and [#40](https://github.com/bdonaldharris/builder-garage/issues/40). Until then, a record may include the evidence block below for information only.
+This document defines how a workflow record identifies the exact artifact it covers, and how it separates facts that can be checked from claims that cannot. The record templates in the canonical [skills](../skills/) carry this format, and Agent #2 stops when valid Agent #1 completion evidence in this format is absent. Records use the resolved object name of the integration branch tip as `integration_ref`, never a bare branch name. Automated validation of recorded evidence is [#40](https://github.com/bdonaldharris/builder-garage/issues/40).
 
 ## What does not change
 
@@ -137,7 +137,7 @@ Location and links depend on the record type, as the canonical skills place each
 | `correction` | The governing issue, after an implementation review; or the PR, after a PR review ([integration-pr-review: Current-PR correction](../skills/integration-pr-review/SKILL.md#phase-4--current-pr-correction)) | — | — |
 | `review` | The governing issue | An earlier Agent #1 `implementation` or `correction` record on the governing issue | — |
 | `pr-review` | The PR | An earlier record on the same PR for the reviewed artifact: the Agent #1 PR state record or Agent #2 PR Review Request for a triggered review, or the Agent #1 `correction` record for a correction re-review | `supplements`: an earlier approving `review` record on the governing issue. A `pr-review` without one is invalid, because the issue review stays authoritative. |
-| `equivalence` | The PR | — | `equivalent_to`: the approving `review` on the governing issue, or the approving `pr-review` on the PR, that the pushed head is equivalent to |
+| `equivalence` | The PR | — | `equivalent_to`: the approving `review` on the governing issue, or the approving `pr-review` on the PR, that the pushed head is equivalent to; `none` when equivalence is not shown, so minimum trigger 1 applies |
 
 ### Agent #1 completion record
 
@@ -153,7 +153,7 @@ checkable:
     method: garage-artifact-v1
     object_format: sha1
     stage: working-tree      # working-tree | commit
-    integration_ref: main
+    integration_ref: <full object name of the integration branch tip>
     base: <full object name>
     tree: <full object name>
     changeset: sha256:<64 hex>
@@ -182,7 +182,7 @@ checkable:
     method: garage-artifact-v1
     object_format: sha1
     stage: working-tree      # working-tree | commit, by what was inspected, not by record type
-    integration_ref: main
+    integration_ref: <full object name of the integration branch tip>
     base: <full object name>
     tree: <full object name>
     changeset: sha256:<64 hex>
@@ -230,6 +230,5 @@ A verifier's output must keep these two columns visible. A "valid" result means 
 
 ## Not decided here
 
-- The wording of the skill record templates. [#33](https://github.com/bdonaldharris/builder-garage/issues/33) adopts this format into the skills.
 - The verifier, its command, and its GitHub access. See [#35](https://github.com/bdonaldharris/builder-garage/issues/35) and [#40](https://github.com/bdonaldharris/builder-garage/issues/40).
 - Support for sparse checkouts, and post-merge audit of squash or rebase merges without a recorded `base`.

@@ -88,7 +88,7 @@ Once additional authorized maintainers are available, a maintainer-authored pull
 - `main` changes only through pull requests. No one pushes to `main` directly, including maintainers.
 - A pull request merges only after maintainer approval and after all required checks pass.
 
-The canonical [integration-pr-review](skills/integration-pr-review/SKILL.md) skill names `staging` as the branch an integration pull request is opened against. Builder Garage does not have a `staging` branch. Its integration branch is configured at extension point [E1](docs/extension-points.md#e1-integration-branch) in [`.garage/config.yaml`](.garage/config.yaml). It applies that workflow's review, validation, and authorization requirements in full: where the skill names `staging`, Builder Garage uses its configured integration branch. That changes the destination only. It does not change or relax any gate the skill defines.
+The canonical [integration-pr-review](skills/integration-pr-review/SKILL.md) skill opens an integration pull request against the integration branch configured at extension point [E1](docs/extension-points.md#e1-integration-branch) in [`.garage/config.yaml`](.garage/config.yaml). Its default, `staging`, does not apply, because Builder Garage configures its own. Builder Garage applies that workflow's review, validation, and authorization requirements in full. The configured branch changes the destination only. It does not change or relax any gate the skill defines.
 
 The human approval that skill requires before merge is the maintainer approval described under [Review requirements](#review-requirements).
 
