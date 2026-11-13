@@ -43,7 +43,7 @@ These follow from the decision above and can be revisited through the normal [co
 
 - **Layout.** `cmd/garage` holds the entry point and `internal/cli` holds command wiring. The conceptual components (Workbench, Crew, Inspection, Shipping) are not represented in code.
 - **Version.** `garage version` reports `dev` unless a version is supplied at link time with `-ldflags "-X main.version=<version>"`. No other build metadata is recorded.
-- **Configuration protection.** `garage init` never replaces an existing configuration file unless `--force` is given.
+- **Configuration protection.** `garage init` originally never replaced an existing configuration file unless `--force` was given. Revised under [#35](https://github.com/bdonaldharris/builder-garage/issues/35): `--force` is removed, and `init` upgrades an existing configuration in place without discarding any configured value. See [Project configuration](../configuration.md).
 - **Command set.** Cobra's generated shell-completion command is disabled so that the CLI exposes only commands the project has deliberately implemented.
 - **Build commands.** A `Makefile` wraps the plain Go commands for building, testing, format checking, static analysis, and cross-compilation.
 
@@ -59,7 +59,7 @@ These follow from the decision above and can be revisited through the normal [co
 This record does not decide:
 
 - commands and behavior beyond `--help`, `version`, and `init`;
-- configuration content beyond `schema_version`;
+- configuration content beyond `schema_version` (since decided under #35; see [Project configuration](../configuration.md));
 - how releases are versioned, built, signed, and published;
 - whether the conceptual components become packages, modules, or commands;
 - adapter and extension interfaces, and the execution model.

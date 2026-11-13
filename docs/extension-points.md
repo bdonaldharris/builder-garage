@@ -9,9 +9,9 @@ This registry lists every point at which a project adopting Builder Garage may a
 
 - **Precedence.** The responsibility floor comes first. Valid project configuration supplies values only at the extension points declared here. A canonical default applies only where a project omits a value it is allowed to supply. See [Precedence](responsibility-floor.md#precedence).
 - **Declared points only.** A setting that is not declared here is not adaptable. It is an error, not a silent extension.
-- **Required choices.** Where an extension point has no default, a project must supply its value explicitly. Leaving it unset is not a valid configuration. How validation reports a missing value is being designed in [#35](https://github.com/bdonaldharris/builder-garage/issues/35).
+- **Required choices.** Where an extension point has no default, a project must supply its value explicitly. Leaving it unset is not a valid configuration. `garage config validate` reports each missing value, and `garage init` never writes a configuration without them ([Project configuration](configuration.md)).
 - **One authoritative value.** Once a project configures a value, its prose documents, such as GOVERNANCE or an adoption profile, may explain that value or authorize a change to it through the project's normal process. They do not silently redefine it.
-- **Configuration format.** The format that carries these values, and how values are validated, is being designed in [#35](https://github.com/bdonaldharris/builder-garage/issues/35). Until then, a project records its choices in its interim adoption record, as Builder Garage does in its [skill-adoption profile](skill-adoption.md).
+- **Configuration format.** A project records these values in the `project` section of `.garage/config.yaml`, as described in [Project configuration](configuration.md). That file is the sole canonical source of a project's configured values. The canonical skills do not read it yet ([#33](https://github.com/bdonaldharris/builder-garage/issues/33)); until they do, a project's adoption record, such as Builder Garage's [skill-adoption profile](skill-adoption.md), explains the configured values to agents without redefining them.
 - **Validation, not orchestration.** Garage may validate declared values and the structure of recorded evidence. Choosing a value never makes Garage assign, invoke, wait for, or advance any agent or workflow. See [No orchestration](responsibility-floor.md#no-orchestration).
 
 ## Extension points
@@ -127,7 +127,7 @@ These are deliberately not extension points:
 
 ## Not registered in this version
 
-- **Skill installation targets.** The [#15 decision](https://github.com/bdonaldharris/builder-garage/issues/15#issuecomment-6837361506) (item 4) records Builder Garage's confirmed targets through project configuration ([#35](https://github.com/bdonaldharris/builder-garage/issues/35)), after the load test in [#37](https://github.com/bdonaldharris/builder-garage/issues/37). That is a Garage tooling setting, not a responsibility extension point. It is registered, if at all, once #37 has established which targets are supported.
+- **Skill installation targets.** These are a Garage tooling setting, not a responsibility extension point. They live in the separate `tooling` section of the configuration, governed by [Tooling configuration](tooling-configuration.md) rather than by this registry ([#35 decision](https://github.com/bdonaldharris/builder-garage/issues/35#issuecomment-6842152164), item 1). They grant no workflow authority.
 - **Developer-local history settings.** Developer-local history is private to each developer and is never project configuration ([#19 decision](https://github.com/bdonaldharris/builder-garage/issues/19#issuecomment-6837362562)).
 
 ## Changing the registry

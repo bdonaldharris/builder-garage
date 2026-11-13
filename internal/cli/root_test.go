@@ -36,6 +36,7 @@ func TestHelpDescribesPurposeAndCommands(t *testing.T) {
 				"Usage:",
 				"garage [command]",
 				"Available Commands:",
+				"config ",
 				"init ",
 				"record ",
 				"version ",
@@ -61,7 +62,7 @@ func TestRegisteredCommands(t *testing.T) {
 	}
 	slices.Sort(got)
 
-	want := []string{"init", "record", "version"}
+	want := []string{"config", "init", "record", "version"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("registered commands = %v, want %v", got, want)
 	}
@@ -72,10 +73,13 @@ func TestSubcommandHelp(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	for _, want := range []string{"garage init [flags]", "--force", ".garage"} {
+	for _, want := range []string{"garage init [flags]", ".garage", "--discovery", "--workflow-owner", "--skill-target"} {
 		if !strings.Contains(stdout, want) {
 			t.Errorf("init help does not contain %q:\n%s", want, stdout)
 		}
+	}
+	if strings.Contains(stdout, "--force") {
+		t.Errorf("init help still offers --force:\n%s", stdout)
 	}
 }
 

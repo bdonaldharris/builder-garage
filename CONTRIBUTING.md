@@ -77,7 +77,7 @@ If the change is modified after approval, it returns to independent review.
 
 - Pull-request-stage procedure: [integration-pr-review](skills/integration-pr-review/SKILL.md)
 
-`main` is Builder Garage's integration destination. The canonical skill names `staging` as the branch a pull request is opened against; Builder Garage has no `staging` branch and maps that destination to `main`. The skill's review, validation, and authorization requirements apply in full. Only the destination differs. See [GOVERNANCE.md](GOVERNANCE.md#changes-to-main).
+`main` is Builder Garage's integration destination. The canonical skill names `staging` as the branch a pull request is opened against; Builder Garage has no `staging` branch and uses the integration branch configured in [`.garage/config.yaml`](.garage/config.yaml) instead. The skill's review, validation, and authorization requirements apply in full. Only the destination differs. See [GOVERNANCE.md](GOVERNANCE.md#changes-to-main).
 
 ### 7. Maintainer approval and merge
 

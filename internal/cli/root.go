@@ -10,9 +10,9 @@ const rootLong = `Builder Garage is an agentic engineering system for builders: 
 practices, standards, roles, contracts, and workflows for responsible software
 construction with AI agents.
 
-The garage CLI is at its foundation stage. It initializes Builder Garage in a
-project directory, records private developer-local workflow events, and reports
-its own version.`
+The garage CLI is at its foundation stage. It initializes and validates a
+project's Builder Garage configuration, records private developer-local
+workflow events, and reports its own version.`
 
 // NewRootCommand builds the garage command tree. The version argument is the
 // value reported by "garage version".
@@ -30,6 +30,7 @@ func NewRootCommand(version string) *cobra.Command {
 	root.CompletionOptions.DisableDefaultCmd = true
 
 	root.AddCommand(
+		newConfigCommand(),
 		newInitCommand(),
 		newRecordCommand(),
 		newVersionCommand(version),

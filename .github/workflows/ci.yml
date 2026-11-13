@@ -31,6 +31,8 @@ jobs:
         run: |
           ./garage --help
           ./garage version
+      - name: Validate Builder Garage's own configuration
+        run: ./garage config validate
       - name: Cross-compile
         run: make cross
 
