@@ -37,6 +37,7 @@ The initial executable provides these entry points:
 | `garage init` | Creates or upgrades `.garage/config.yaml` in the current project directory. See [Project configuration](#project-configuration). |
 | `garage config validate` | Checks `.garage/config.yaml` against the configuration schema, read-only, and reports every problem. |
 | `garage record` | Records a private workflow event, such as an implementation handoff or a review verdict, in this developer's local history. See [Local workflow history](#local-workflow-history). |
+| `garage status` | Shows the workflow status of one issue or pull request, read once from GitHub. See [Workflow status](#workflow-status). |
 
 ### Project configuration
 
@@ -64,6 +65,15 @@ garage record --issue 39 --type implementation --outcome ready \
 - **Best effort.** If an event cannot be recorded, `garage record` prints a warning and still exits successfully.
 
 Run `garage record --help` for the accepted event types and outcomes. The design is recorded in the [#19 decision](https://github.com/bdonaldharris/builder-garage/issues/19#issuecomment-6837362562).
+
+### Workflow status
+
+`garage status 48` shows the workflow status of issue or pull request #48 in the repository's GitHub repository, including closed and merged ones:
+
+- **GitHub is the authority.** Status reads GitHub once, through the [`gh`](https://cli.github.com/) command, and writes nothing. Garage never stores a token. It never polls or waits, and it never assigns, invokes, or advances an agent. The next eligible action it shows is information only.
+- **Evidence, labeled.** Each line names its source and basis. A fact read from GitHub, or a comparison of recorded values, is *checked*. A verdict or a claim of separate execution contexts is *asserted*. A pull request head's [artifact identity](docs/review-evidence.md) is recomputed only when the commit is already local. Nothing is fetched. In a partial clone, where git fetches missing objects on demand, status does not recompute and says so.
+- **Whose records count.** A workflow record counts only when its author's GitHub association is owner, member, or collaborator. A record edited after posting is flagged. Human acceptance is evidenced only by an approving GitHub review. These rules are recorded in the [#40 decision](https://github.com/bdonaldharris/builder-garage/issues/40#issuecomment-6853390215).
+- **Degrades clearly.** Without `gh`, or without `gh` authentication, status says that GitHub was not consulted, reports no workflow state, and exits with an error. Local history is shown as a separate annotation, and is never used for any gate.
 
 ### Build from source
 
@@ -133,7 +143,8 @@ make check
 
 - There are no published releases or installation packages yet.
 - GoReleaser is an approved future direction, but it is not configured.
-- The CLI initializes configuration and records local workflow history only; it does not implement Workbench, Crew, Inspection, Shipping, or Manuals capabilities.
+- The CLI initializes configuration, records local workflow history, and shows read-only workflow status only; it does not implement Workbench, Crew, Inspection, Shipping, or Manuals capabilities.
+- `garage status` needs the `gh` command, installed and authenticated, to read GitHub.
 - The canonical skills read `.garage/config.yaml` only through `garage config validate`, so an agent needs a `garage` binary on its `PATH` to resolve a configured value; there is no installation package yet. The configuration configures no agents, plugins, providers, or remote services.
 
 ## An engineering discovery journey, built in public
