@@ -19,7 +19,7 @@ Manuals are maintained technical guidance on how software built with a particula
 
 Each manual carries a version label in its own text, and a project's profile cites the label it adopts. The label identifies a revision of the guidance. It is not a selection or resolution mechanism.
 
-A project selects manuals and their versions at extension point [E10](../docs/extension-points.md#e10-manuals-and-conditional-stack-or-provider-guidance) of the extension-point registry. The choice is recorded in the `project.guidance.manuals` setting of `.garage/config.yaml`, and `garage config validate` checks its form; see [Project configuration](../docs/configuration.md).
+A project selects manuals and their versions at extension point [E10](../docs/extension-points.md#e10-manuals) of the extension-point registry. The choice is recorded in the `project.guidance.manuals` setting of `.garage/config.yaml`, and `garage config validate` checks its form; see [Project configuration](../docs/configuration.md).
 
 ## Boundary
 
@@ -29,7 +29,7 @@ Manuals own *how a technology should be designed and built*. They do not define:
 - who does the work, or where each role stops ([Crew](../crew/));
 - whether the work is correct ([Inspection](../inspection/));
 - how accepted work reaches its destination ([Shipping](../shipping/));
-- how a project selects or configures them ([extension-point registry](../docs/extension-points.md#e10-manuals-and-conditional-stack-or-provider-guidance)).
+- how a project selects or configures them ([extension-point registry](../docs/extension-points.md#e10-manuals)).
 
 ## Status
 

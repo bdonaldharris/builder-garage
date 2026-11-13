@@ -757,8 +757,7 @@ func chosenAuthorities(a *authorities) []chosenAuthority {
 }
 
 // askGuidance asks which manuals the project adopts. Conditional stack or
-// provider guidance is not offered: what selecting it would mean is not
-// defined (#58, #56).
+// provider guidance is not configurable, so it is not offered (#59).
 func (g guide) askGuidance(pc *projectChoices) error {
 	n, err := g.choose("Manuals\n"+
 		"A project may adopt Builder Garage manuals, such as the Go Manual, as guidance\n"+
@@ -928,11 +927,6 @@ func describeConfiguration(cfg projectConfig) []summaryLine {
 		add("Manuals", strings.Join(m, ", "))
 	} else {
 		add("Manuals", def("none"))
-	}
-	// Conditional-guidance names are shown only when the configuration holds
-	// some, as configured, with no claim about their effect (#58).
-	if gd := pc.Guidance; gd != nil && len(gd.Conditional) > 0 {
-		add("Conditional guidance names", strings.Join(gd.Conditional, ", "))
 	}
 	if cfg.Tooling != nil && cfg.Tooling.SkillTargets != nil && len(*cfg.Tooling.SkillTargets) > 0 {
 		var t []string

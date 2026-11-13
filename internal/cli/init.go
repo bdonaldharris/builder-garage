@@ -104,7 +104,6 @@ type initFlags struct {
 	SmallCorrectionClassifier    string
 	InspectionConditions         []string
 	Manuals                      []string
-	ConditionalGuidance          []string
 	SkillTargets                 []string
 }
 
@@ -247,7 +246,6 @@ Value formats:
 	f.StringVar(&flags.SmallCorrectionClassifier, "small-correction-classifier", "", "who classifies a small correction, ROLE[:MEMBERS] (E8)")
 	f.StringArrayVar(&flags.InspectionConditions, "inspection-condition", nil, "an added user-facing inspection condition (E9; repeatable)")
 	f.StringArrayVar(&flags.Manuals, "manual", nil, "an adopted manual, NAME@VERSION (E10; repeatable)")
-	f.StringArrayVar(&flags.ConditionalGuidance, "conditional-guidance", nil, "enabled conditional stack or provider guidance (E10; repeatable)")
 	f.StringArrayVar(&flags.SkillTargets, "skill-target", nil, "a skill-install target, HARNESS@VERSION@YYYY-MM-DD (tooling; repeatable)")
 
 	return cmd
@@ -397,8 +395,8 @@ func configFromFlags(f initFlags, changed func(string) bool) (projectConfig, err
 	if changed("inspection-condition") {
 		pc.UserFacingInspection = &inspectionChoice{AdditionalConditions: nonEmpty(f.InspectionConditions)}
 	}
-	if changed("manual") || changed("conditional-guidance") {
-		g := &guidanceChoice{Conditional: nonEmpty(f.ConditionalGuidance)}
+	if changed("manual") {
+		g := &guidanceChoice{}
 		for _, v := range f.Manuals {
 			m, err := parseManual(v)
 			if err != nil {

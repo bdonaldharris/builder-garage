@@ -31,7 +31,7 @@ Builder Garage is organized around five conceptual components. Each has a direct
 
 These are conceptual boundaries. Whether they later become package, module, or command boundaries is undecided.
 
-Manuals are guidance that a project adopts explicitly. They are not configuration, and adopting one does not make it a requirement; see [Manuals](../manuals/README.md#how-manuals-are-used). A project selects manuals at extension point [E10](extension-points.md#e10-manuals-and-conditional-stack-or-provider-guidance) of the extension-point registry.
+Manuals are guidance that a project adopts explicitly. They are not configuration, and adopting one does not make it a requirement; see [Manuals](../manuals/README.md#how-manuals-are-used). A project selects manuals at extension point [E10](extension-points.md#e10-manuals) of the extension-point registry.
 
 ## Current repository organization
 
