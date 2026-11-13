@@ -124,10 +124,16 @@ func mustLoadValid(t *testing.T, projectDir string) projectConfig {
 type scriptedPrompter struct {
 	answers   []string
 	questions []string
+	// onAsk, when set, runs before each question is answered; n counts
+	// questions from 1.
+	onAsk func(n int)
 }
 
 func (s *scriptedPrompter) Ask(question string) (string, error) {
 	s.questions = append(s.questions, question)
+	if s.onAsk != nil {
+		s.onAsk(len(s.questions))
+	}
 	if len(s.answers) == 0 {
 		return "", errors.New("input ended before every required value was supplied")
 	}
@@ -662,6 +668,7 @@ func TestReplacementPreparationFailurePreservesOriginal(t *testing.T) {
 		garageInfo,
 		prepare,
 		commitConfigReplacement,
+		nil,
 	)
 	if !errors.Is(err, injectedErr) {
 		t.Fatalf("error = %v, want it to wrap the injected write failure", err)
@@ -693,6 +700,7 @@ func TestReplacementCommitFailurePreservesOriginal(t *testing.T) {
 		garageInfo,
 		prepareTemporaryConfig,
 		func(string, string) error { return injectedErr },
+		nil,
 	)
 	if !errors.Is(err, injectedErr) {
 		t.Fatalf("error = %v, want it to wrap the injected replacement failure", err)
@@ -872,5 +880,179 @@ func TestBuilderGarageFlagsProduceAValidConfiguration(t *testing.T) {
 	}
 	if len(*cfg.Tooling.SkillTargets) != 3 {
 		t.Errorf("skill targets = %+v", *cfg.Tooling.SkillTargets)
+	}
+}
+
+// concurrentConfig is a valid configuration another writer saves while init
+// is running.
+const concurrentConfig = `schema_version: 2
+project:
+  integration_branch: release
+  discovery:
+    mode: implementer-judgment
+  authorities:
+    workflow_owner:
+      role: alice-team
+    change_acceptor:
+      role: bob-team
+    product_intent_acceptor:
+      role: carol-team
+`
+
+func TestInitUpgradeStopsWhenConfigurationChangesDuringPrompting(t *testing.T) {
+	writeInPlace := func(t *testing.T, path string) {
+		if err := os.WriteFile(path, []byte(concurrentConfig), 0o644); err != nil {
+			t.Fatalf("concurrent write: %v", err)
+		}
+	}
+	replaceByRename := func(t *testing.T, path string) {
+		next := path + ".editor-save"
+		if err := os.WriteFile(next, []byte(concurrentConfig), 0o644); err != nil {
+			t.Fatalf("concurrent write: %v", err)
+		}
+		if err := os.Rename(next, path); err != nil {
+			t.Fatalf("concurrent rename: %v", err)
+		}
+	}
+	for name, change := range map[string]func(*testing.T, string){
+		"written in place":   writeInPlace,
+		"replaced by rename": replaceByRename,
+	} {
+		t.Run(name, func(t *testing.T) {
+			dir := t.TempDir()
+			path := configPathIn(dir)
+			writeFile(t, path, "schema_version: 1\n")
+			ask := &scriptedPrompter{
+				answers: []string{"implementer-judgment", "lead", "maintainer", "owner"},
+				onAsk: func(n int) {
+					if n == 2 {
+						change(t, path)
+					}
+				},
+			}
+
+			_, err := initProject(dir, projectConfig{}, ask)
+			if !errors.Is(err, errConfigChanged) {
+				t.Fatalf("error = %v, want errConfigChanged", err)
+			}
+			for _, want := range []string{"was not changed by init", "garage init"} {
+				if !strings.Contains(err.Error(), want) {
+					t.Errorf("error does not contain %q: %v", want, err)
+				}
+			}
+			if got := readFile(t, path); got != concurrentConfig {
+				t.Errorf("the concurrent change was overwritten:\n%s", got)
+			}
+			if got := entryNames(t, filepath.Join(dir, garageDirName)); len(got) != 1 || got[0] != configFileName {
+				t.Errorf("%s contains %v, want only %s", garageDirName, got, configFileName)
+			}
+		})
+	}
+}
+
+func TestInitUpgradeStillWritesWhenNothingChangedDuringPrompting(t *testing.T) {
+	dir := t.TempDir()
+	path := configPathIn(dir)
+	writeFile(t, path, "schema_version: 1\n")
+	ask := &scriptedPrompter{
+		answers: []string{"implementer-judgment", "lead", "maintainer", "owner"},
+		// Rewriting identical bytes in place is not a change.
+		onAsk: func(n int) {
+			if n == 2 {
+				if err := os.WriteFile(path, []byte("schema_version: 1\n"), 0o644); err != nil {
+					t.Fatalf("rewrite: %v", err)
+				}
+			}
+		},
+	}
+
+	result, err := initProject(dir, projectConfig{}, ask)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if result.Action != initUpgraded {
+		t.Errorf("action = %v, want upgraded", result.Action)
+	}
+	mustLoadValid(t, dir)
+}
+
+func TestConfigSnapshotDetectsChanges(t *testing.T) {
+	newSnapshot := func(t *testing.T, path string) configSnapshot {
+		t.Helper()
+		info, err := os.Lstat(path)
+		if err != nil {
+			t.Fatalf("lstat: %v", err)
+		}
+		return configSnapshot{path: path, info: info, data: []byte(readFile(t, path))}
+	}
+	cases := map[string]func(t *testing.T, path string){
+		"content changed": func(t *testing.T, path string) {
+			if err := os.WriteFile(path, []byte("schema_version: 2\n"), 0o644); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"file replaced": func(t *testing.T, path string) {
+			writeFile(t, path+".new", "schema_version: 1\n")
+			if err := os.Rename(path+".new", path); err != nil {
+				t.Fatal(err)
+			}
+		},
+		"file removed": func(t *testing.T, path string) {
+			if err := os.Remove(path); err != nil {
+				t.Fatal(err)
+			}
+		},
+	}
+	for name, change := range cases {
+		t.Run(name, func(t *testing.T) {
+			path := configPathIn(t.TempDir())
+			writeFile(t, path, "schema_version: 1\n")
+			snapshot := newSnapshot(t, path)
+			change(t, path)
+			if err := snapshot.verifyUnchanged(); !errors.Is(err, errConfigChanged) {
+				t.Errorf("verifyUnchanged = %v, want errConfigChanged", err)
+			}
+		})
+	}
+	t.Run("unchanged", func(t *testing.T) {
+		path := configPathIn(t.TempDir())
+		writeFile(t, path, "schema_version: 1\n")
+		if err := newSnapshot(t, path).verifyUnchanged(); err != nil {
+			t.Errorf("verifyUnchanged = %v, want nil", err)
+		}
+	})
+}
+
+func TestReplacementStopsWhenPreconditionFails(t *testing.T) {
+	projectDir := t.TempDir()
+	configPath := configPathIn(projectDir)
+	const original = "original: keep\n"
+	writeFile(t, configPath, original)
+	garageDir := filepath.Dir(configPath)
+	garageInfo, err := os.Lstat(garageDir)
+	if err != nil {
+		t.Fatalf("lstat %s: %v", garageDirName, err)
+	}
+	committed := false
+
+	err = replaceConfiguration(
+		configPath,
+		[]byte("replacement\n"),
+		garageInfo,
+		prepareTemporaryConfig,
+		func(string, string) error { committed = true; return nil },
+		func() error { return errConfigChanged },
+	)
+	if !errors.Is(err, errConfigChanged) {
+		t.Fatalf("error = %v, want errConfigChanged", err)
+	}
+	if committed {
+		t.Error("the replacement was committed despite the failed precondition")
+	}
+	if got := readFile(t, configPath); got != original {
+		t.Errorf("original configuration was modified: %q", got)
+	}
+	if got := entryNames(t, garageDir); len(got) != 1 || got[0] != configFileName {
+		t.Errorf("%s contains %v, want only %s", garageDirName, got, configFileName)
 	}
 }
