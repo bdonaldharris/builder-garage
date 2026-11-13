@@ -756,48 +756,36 @@ func chosenAuthorities(a *authorities) []chosenAuthority {
 	return out
 }
 
-// askGuidance asks which manuals the project adopts. Conditional stack or
-// provider guidance is not configurable, so it is not offered (#59).
+// askGuidance offers the manuals this garage carries as a pick list, each
+// with its version, status, and description; choosing none is the default.
+// A chosen manual is written with the version this garage delivers (#60).
+// Conditional stack or provider guidance is not configurable, so it is not
+// offered (#59).
 func (g guide) askGuidance(pc *projectChoices) error {
-	n, err := g.choose("Manuals\n"+
-		"A project may adopt Builder Garage manuals, such as the Go Manual, as guidance\n"+
-		"for its engineering choices. A manual never relaxes a review or approval gate.", []choice{
-		{label: "No manuals"},
-		{label: "Adopt manuals"},
-	}, 0)
-	if err != nil || n == 0 {
+	catalog, err := embeddedManualCatalog()
+	if err != nil {
+		return err
+	}
+	if len(catalog) == 0 {
+		return nil
+	}
+	options := make([]choice, len(catalog))
+	for i, m := range catalog {
+		options[i] = choice{label: describeManual(m)}
+	}
+	chosen, err := g.chooseMany("Manuals\n"+
+		"A project may adopt Builder Garage manuals as guidance for its engineering\n"+
+		"choices. A manual never relaxes a review or approval gate. Which manuals does\n"+
+		"this project adopt?", options)
+	if err != nil || len(chosen) == 0 {
 		return err
 	}
 	var gc guidanceChoice
-	for {
-		name, err := g.text("Manual name (for example: go): ", "", checkTokenAnswer)
-		if err != nil {
-			return err
-		}
-		version, err := g.text("Version adopted (for example: 0.1): ", "", checkTokenAnswer)
-		if err != nil {
-			return err
-		}
-		gc.Manuals = append(gc.Manuals, manualChoice{Name: name, Version: version})
-		more, err := g.yesNo("Adopt another manual?", false)
-		if err != nil {
-			return err
-		}
-		if !more {
-			break
-		}
+	for _, i := range chosen {
+		gc.Manuals = append(gc.Manuals, manualChoice{Name: catalog[i].Name, Version: catalog[i].Version})
 	}
 	pc.Guidance = &gc
 	return nil
-}
-
-func checkTokenAnswer(v string) error {
-	var p configProblems
-	checkToken(&p, "the answer", v)
-	if len(p) > 0 {
-		return errors.New("enter a single word without spaces")
-	}
-	return checkNotPlaceholder(v)
 }
 
 func (g guide) askSkillTargets(cfg *projectConfig) error {

@@ -149,7 +149,7 @@ func TestGuidedSetupMatchesTheEquivalentFlags(t *testing.T) {
 		"1", // product-intent acceptor: same as the Workflow Owner
 		"2", // classifier: same as the change acceptor
 		"2", "the change alters a user-visible flow", "n",
-		"2", "go", "0.1", "", // adopt the Go Manual 0.1, and no other
+		"1",   // manuals: the Go Manual, from the catalog
 		"1,3", // Claude Code and GitHub Copilot CLI
 		"yes",
 	}}
@@ -266,7 +266,7 @@ func TestGuideMenusAskAgainOnInvalidAnswers(t *testing.T) {
 // when none is configured (#58).
 func TestGuidedSetupNeverAsksForConditionalGuidance(t *testing.T) {
 	adoptManual := append(append([]string(nil), defaultAnswers[:len(defaultAnswers)-2]...),
-		"2", "go", "0.1", "", // adopt the Go Manual 0.1
+		"1", // manuals: the Go Manual, from the catalog
 		"",  // agent tools: none
 		"y") // confirm
 	for name, answers := range map[string][]string{

@@ -335,7 +335,7 @@ func TestSkillsInstallThenVerifyIsCurrent(t *testing.T) {
 	if err != nil {
 		t.Fatalf("verify: %v\n%s", err, vout)
 	}
-	if strings.Count(vout, "Current\n") != 4 || !strings.Contains(vout, "All managed skills are Current") {
+	if strings.Count(vout, "Current\n") != 4 || !strings.Contains(vout, "All managed skills and adopted manuals are Current") {
 		t.Errorf("verify output:\n%s", vout)
 	}
 
@@ -591,8 +591,10 @@ func TestSkillsInstallRequiresACleanBuildOrDevelopment(t *testing.T) {
 	}
 	m, _ := loadSkillManifest(f.manifestPath())
 	set, _ := loadSkillSet(f.Env.Skills)
-	want := developmentRevision(skillSetDigest(set))
-	if !m.Targets[0].Development || m.Targets[0].Revision != want || m.Targets[0].SkillSetDigest != skillSetDigest(set) {
+	catalog, _ := embeddedManualCatalog()
+	digest := embeddedSetDigest(set, catalog)
+	want := developmentRevision(digest)
+	if !m.Targets[0].Development || m.Targets[0].Revision != want || m.Targets[0].SkillSetDigest != digest {
 		t.Errorf("manifest target = %+v, want development revision %s", m.Targets[0], want)
 	}
 	data, _ := os.ReadFile(filepath.Join(f.root("claude-code"), "alpha", "SKILL.md"))

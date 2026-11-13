@@ -23,10 +23,12 @@ import (
 // Garage's per-user skill state lives under the user configuration
 // directory, never the cache, so backups survive (#38 decision 6).
 const (
-	userStateDirName     = "builder-garage"
-	skillManifestName    = "skills-manifest.json"
-	skillBackupsDirName  = "skill-backups"
-	skillManifestVersion = 1
+	userStateDirName    = "builder-garage"
+	skillManifestName   = "skills-manifest.json"
+	skillBackupsDirName = "skill-backups"
+	// skillManifestVersion 2 adds each manual skill's project associations
+	// (#60). Version 1 manifests are read and upgraded when next written.
+	skillManifestVersion = 2
 	harnessProbeTimeout  = 10 * time.Second
 )
 
@@ -354,6 +356,39 @@ type manifestSkill struct {
 	Name     string `json:"name"`
 	Revision string `json:"revision"`
 	Digest   string `json:"digest"`
+	// Projects are the projects that adopt a manual skill (#60 decisions 2
+	// and 3). Canonical skills do not record any.
+	Projects []manifestRepository `json:"projects,omitempty"`
+}
+
+// sameProject reports whether a and b are the same project: the same
+// repository key when both have one, so worktrees and clones of one
+// repository are one project, and otherwise the same path.
+func sameProject(a, b manifestRepository) bool {
+	if a.Key != "" && b.Key != "" {
+		return a.Key == b.Key
+	}
+	return a.Path == b.Path
+}
+
+// withoutProject returns projects with every entry for p removed.
+func withoutProject(projects []manifestRepository, p manifestRepository) []manifestRepository {
+	var out []manifestRepository
+	for _, q := range projects {
+		if !sameProject(q, p) {
+			out = append(out, q)
+		}
+	}
+	return out
+}
+
+func sortProjects(projects []manifestRepository) {
+	sort.Slice(projects, func(i, j int) bool {
+		if projects[i].Key != projects[j].Key {
+			return projects[i].Key < projects[j].Key
+		}
+		return projects[i].Path < projects[j].Path
+	})
 }
 
 func (m *skillManifest) target(root string) *manifestTarget {
@@ -411,9 +446,10 @@ func loadSkillManifest(path string) (skillManifest, error) {
 	if err := decoder.Decode(&m); err != nil {
 		return skillManifest{}, fmt.Errorf("the skill manifest %s is not valid: %w; correct or remove it by hand", path, err)
 	}
-	if m.Version != skillManifestVersion {
+	if m.Version != 1 && m.Version != skillManifestVersion {
 		return skillManifest{}, fmt.Errorf("the skill manifest %s has unsupported version %d", path, m.Version)
 	}
+	m.Version = skillManifestVersion
 	return m, nil
 }
 
@@ -457,10 +493,14 @@ type skillsContext struct {
 	Repository manifestRepository
 	Home       string
 	Skills     []canonicalSkill
-	SetDigest  string
-	Targets    []resolvedTarget
-	StateDir   string
-	Manifest   skillManifest
+	// Catalog is every manual this binary carries; Adopted maps each manual
+	// the project adopts to the version it configures.
+	Catalog   []catalogManual
+	Adopted   map[string]string
+	SetDigest string
+	Targets   []resolvedTarget
+	StateDir  string
+	Manifest  skillManifest
 }
 
 // prepareSkills loads the valid project configuration, the embedded skills,
@@ -504,6 +544,16 @@ func prepareSkills(ctx context.Context, env skillsEnv, selected []string) (skill
 	if err != nil {
 		return skillsContext{}, err
 	}
+	catalog, err := embeddedManualCatalog()
+	if err != nil {
+		return skillsContext{}, err
+	}
+	adopted := map[string]string{}
+	if pc := cfg.Project; pc != nil && pc.Guidance != nil {
+		for _, m := range pc.Guidance.Manuals {
+			adopted[m.Name] = m.Version
+		}
+	}
 
 	repo := manifestRepository{Path: env.WorkDir}
 	if identity, err := identifyRepository(ctx, env.WorkDir, env.Git); err == nil {
@@ -525,7 +575,9 @@ func prepareSkills(ctx context.Context, env skillsEnv, selected []string) (skill
 		Repository: repo,
 		Home:       home,
 		Skills:     set,
-		SetDigest:  skillSetDigest(set),
+		Catalog:    catalog,
+		Adopted:    adopted,
+		SetDigest:  embeddedSetDigest(set, catalog),
 		Targets:    targets,
 		StateDir:   stateDir,
 		Manifest:   manifest,
@@ -556,8 +608,43 @@ type targetReport struct {
 	Harness    harnessCheck
 	Owner      *manifestTarget
 	Skills     []skillInspection
+	Manuals    []manualInspection
 	Extras     []manifestSkill
 	Collisions []skillCollision
+}
+
+// manualInspection is the observed state of one manual skill at a target:
+// one the current project adopts, or one Garage installed for any project.
+type manualInspection struct {
+	skillInspection
+	Manual catalogManual
+	// Adopted is true when the current project adopts the manual, and
+	// Configured is the version it configures.
+	Adopted    bool
+	Configured string
+	// Projects are the projects the manifest associates with the skill.
+	Projects []manifestRepository
+}
+
+// adoptedManualSkillNames lists the skill names of the manuals the current
+// project adopts.
+func adoptedManualSkillNames(sc skillsContext) []string {
+	var names []string
+	for _, m := range sc.Catalog {
+		if _, ok := sc.Adopted[m.Name]; ok {
+			names = append(names, manualSkillName(m.Name))
+		}
+	}
+	return names
+}
+
+func isCatalogManualSkill(catalog []catalogManual, skill string) bool {
+	for _, m := range catalog {
+		if manualSkillName(m.Name) == skill {
+			return true
+		}
+	}
+	return false
 }
 
 // inspectTarget inspects every canonical skill, every managed skill that is
@@ -573,14 +660,32 @@ func inspectTarget(ctx context.Context, env skillsEnv, sc skillsContext, target 
 		}
 		report.Skills = append(report.Skills, inspection)
 	}
+	for _, m := range sc.Catalog {
+		name := manualSkillName(m.Name)
+		owned := owner.skill(name)
+		configured, adopted := sc.Adopted[m.Name]
+		if !adopted && owned == nil {
+			continue
+		}
+		inspection, err := inspectSkill(target.Root, name, owned, revision)
+		if err != nil {
+			return report, err
+		}
+		mi := manualInspection{skillInspection: inspection, Manual: m, Adopted: adopted, Configured: configured}
+		if owned != nil {
+			mi.Projects = append([]manifestRepository(nil), owned.Projects...)
+		}
+		report.Manuals = append(report.Manuals, mi)
+	}
 	if owner != nil {
 		for _, ms := range owner.Skills {
-			if !containsString(skillNames(sc.Skills), ms.Name) {
+			if !containsString(skillNames(sc.Skills), ms.Name) && !isCatalogManualSkill(sc.Catalog, ms.Name) {
 				report.Extras = append(report.Extras, ms)
 			}
 		}
 	}
-	collisions, err := findCollisions(target, skillNames(sc.Skills), sc.ProjectDir, sc.Home, env.Getenv)
+	names := append(skillNames(sc.Skills), adoptedManualSkillNames(sc)...)
+	collisions, err := findCollisions(target, names, sc.ProjectDir, sc.Home, env.Getenv)
 	if err != nil {
 		return report, err
 	}
@@ -614,12 +719,22 @@ func verifySkills(ctx context.Context, env skillsEnv, selected []string, w io.Wr
 				problems++
 			}
 		}
+		for _, m := range report.Manuals {
+			switch {
+			case m.Adopted && m.State != stateCurrent:
+				problems++
+			case !m.Adopted && len(withoutProject(m.Projects, sc.Repository)) == 0:
+				// Installed by Garage, but no project adopts it any longer:
+				// a modified copy that install left in place.
+				problems++
+			}
+		}
 		problems += len(report.Extras) + len(report.Collisions)
 	}
 	if problems > 0 {
 		return fmt.Errorf("%w: %d problem(s) found", errSkillsNotCurrent, problems)
 	}
-	fmt.Fprintln(w, "\nAll managed skills are Current, with no collisions.")
+	fmt.Fprintln(w, "\nAll managed skills and adopted manuals are Current, with no collisions.")
 	return nil
 }
 
@@ -647,11 +762,36 @@ func writeTargetReport(w io.Writer, r targetReport, current manifestRepository) 
 		}
 		fmt.Fprintln(w, line)
 	}
+	for _, m := range r.Manuals {
+		fmt.Fprintf(w, "  %-40s %s\n", m.Name, describeManualState(m, current))
+	}
 	for _, e := range r.Extras {
 		fmt.Fprintf(w, "  %-40s Extra (managed by Garage, but no longer a canonical skill)\n", e.Name)
 	}
 	for _, c := range r.Collisions {
 		fmt.Fprintf(w, "  collision: %s\n", c.describe(r.Target.Config.Harness))
+	}
+}
+
+// describeManualState explains a manual skill's state relative to the
+// current project.
+func describeManualState(m manualInspection, current manifestRepository) string {
+	label := fmt.Sprintf("manual %s %s", m.Manual.Name, m.Manual.Version)
+	others := len(withoutProject(m.Projects, current))
+	switch {
+	case m.Adopted:
+		text := fmt.Sprintf("%s (%s, adopted here)", m.State, label)
+		if m.State == stateStale {
+			text = fmt.Sprintf("%s (%s, adopted here; installed revision %s)", m.State, label, m.Revision)
+		}
+		if m.Configured != m.Manual.Version {
+			text += fmt.Sprintf("; the configuration names version %s, but this garage delivers %s", m.Configured, m.Manual.Version)
+		}
+		return text
+	case others > 0:
+		return fmt.Sprintf("%s (%s, installed for %d other project(s); not adopted here)", m.State, label, others)
+	default:
+		return fmt.Sprintf("%s (%s; no project adopts it; left in place because it was modified)", m.State, label)
 	}
 }
 
@@ -668,6 +808,13 @@ type skillAction struct {
 	Files      []skillFile
 	Digest     string
 	Backup     bool
+	// Remove deletes an unmodified manual skill that no project adopts any
+	// longer (#60 decision 3).
+	Remove bool
+	// Projects are the projects to record for a manual skill once written.
+	Projects []manifestRepository
+	// Manual labels a manual skill in the output.
+	Manual string
 }
 
 // errInstallRefused reports that the plan required something the user has
@@ -683,10 +830,10 @@ func installSkills(ctx context.Context, env skillsEnv, opts installOptions, w io
 	if err != nil {
 		return err
 	}
-	names := skillNames(sc.Skills)
+	names := append(skillNames(sc.Skills), adoptedManualSkillNames(sc)...)
 	for _, r := range opts.Replace {
 		if !containsString(names, r) {
-			return fmt.Errorf("--replace %s is not a canonical skill (canonical skills: %s)", r, strings.Join(names, ", "))
+			return fmt.Errorf("--replace %s is not a canonical skill or an adopted manual skill (skills: %s)", r, strings.Join(names, ", "))
 		}
 	}
 	revision, development, err := installRevision(env.Build(), sc.SetDigest, opts.Development)
@@ -755,6 +902,50 @@ func installSkills(ctx context.Context, env skillsEnv, opts installOptions, w io
 				action.Backup = true
 			}
 			files, err := renderSkill(sc.Skills[i], revision)
+			if err != nil {
+				return err
+			}
+			action.Files = files
+			action.Digest = digestSkillFiles(files)
+			plan.Actions = append(plan.Actions, action)
+		}
+		for _, m := range report.Manuals {
+			others := withoutProject(m.Projects, sc.Repository)
+			label := fmt.Sprintf("manual %s %s", m.Manual.Name, m.Manual.Version)
+			if !m.Adopted {
+				// No longer adopted here. Another project's association keeps
+				// it; otherwise an unmodified copy is removed, and a modified
+				// one is kept and reported.
+				if len(others) == 0 && (m.State == stateCurrent || m.State == stateStale) {
+					plan.Actions = append(plan.Actions, skillAction{Inspection: m.skillInspection, Remove: true, Manual: label})
+				}
+				continue
+			}
+			if m.State == stateCurrent {
+				continue
+			}
+			action := skillAction{Inspection: m.skillInspection, Manual: label,
+				Projects: append(others, sc.Repository)}
+			switch m.State {
+			case stateModified, stateUnmanaged:
+				if m.Unsupported != "" {
+					refusals = append(refusals, fmt.Sprintf("%s: %s is %s and contains %s, which is not a regular file; "+
+						"Garage cannot back it up or replace it. Resolve it by hand.",
+						target.Config.Harness, m.Dir, strings.ToLower(m.State.String()), m.Unsupported))
+					continue
+				}
+				if !containsString(opts.Replace, m.Name) {
+					refusals = append(refusals, fmt.Sprintf("%s: %s is %s. To replace it, after a backup, pass --replace %s.",
+						target.Config.Harness, m.Dir, strings.ToLower(m.State.String()), m.Name))
+					continue
+				}
+				action.Backup = true
+			}
+			skill, err := manualSkill(m.Manual)
+			if err != nil {
+				return err
+			}
+			files, err := renderSkill(skill, revision)
 			if err != nil {
 				return err
 			}
@@ -832,6 +1023,25 @@ func installSkills(ctx context.Context, env skillsEnv, opts installOptions, w io
 			}
 		}
 		entry.Skills = append(entry.Skills, plan.Report.Extras...)
+		// Manual skills keep their records, with this project's association
+		// added or dropped. A record whose skill is written or removed below
+		// is updated when that action completes.
+		for _, m := range plan.Report.Manuals {
+			projects := withoutProject(m.Projects, sc.Repository)
+			if m.Adopted {
+				projects = append(projects, sc.Repository)
+			}
+			sortProjects(projects)
+			owned := plan.Report.Owner.skill(m.Name)
+			switch {
+			case m.Adopted && m.State == stateCurrent:
+				entry.Skills = append(entry.Skills, manifestSkill{Name: m.Name, Revision: m.Revision, Digest: m.Digest, Projects: projects})
+			case owned != nil && (m.State != stateMissing || len(projects) > 0):
+				record := *owned
+				record.Projects = projects
+				entry.Skills = append(entry.Skills, record)
+			}
+		}
 		save := func() error {
 			sort.Slice(entry.Skills, func(i, j int) bool { return entry.Skills[i].Name < entry.Skills[j].Name })
 			setManifestTarget(&sc.Manifest, entry)
@@ -848,24 +1058,50 @@ func installSkills(ctx context.Context, env skillsEnv, opts installOptions, w io
 			if err != nil {
 				return err
 			}
-			recorded := manifestSkill{Name: action.Inspection.Name, Revision: revision, Digest: action.Digest}
-			replaced := false
-			for i := range entry.Skills {
-				if entry.Skills[i].Name == recorded.Name {
-					entry.Skills[i], replaced = recorded, true
+			if action.Remove {
+				kept := entry.Skills[:0]
+				for _, s := range entry.Skills {
+					if s.Name != action.Inspection.Name {
+						kept = append(kept, s)
+					}
+				}
+				entry.Skills = kept
+			} else {
+				projects := append([]manifestRepository(nil), action.Projects...)
+				sortProjects(projects)
+				recorded := manifestSkill{Name: action.Inspection.Name, Revision: revision, Digest: action.Digest, Projects: projects}
+				replaced := false
+				for i := range entry.Skills {
+					if entry.Skills[i].Name == recorded.Name {
+						entry.Skills[i], replaced = recorded, true
+					}
+				}
+				if !replaced {
+					entry.Skills = append(entry.Skills, recorded)
 				}
 			}
-			if !replaced {
-				entry.Skills = append(entry.Skills, recorded)
-			}
 			if err := save(); err != nil {
-				return fmt.Errorf("%s was written, but the manifest could not be saved: %w", action.Inspection.Dir, err)
+				return fmt.Errorf("%s was changed, but the manifest could not be saved: %w", action.Inspection.Dir, err)
+			}
+			if action.Manual != "" {
+				result += " (" + action.Manual + ")"
 			}
 			fmt.Fprintf(w, "  %-40s %s\n", action.Inspection.Name, result)
 		}
 		for _, s := range plan.Report.Skills {
 			if s.State == stateCurrent {
 				fmt.Fprintf(w, "  %-40s Current\n", s.Name)
+			}
+		}
+		for _, m := range plan.Report.Manuals {
+			others := len(withoutProject(m.Projects, sc.Repository))
+			switch {
+			case m.Adopted && m.State == stateCurrent:
+				fmt.Fprintf(w, "  %-40s Current (manual %s %s)\n", m.Name, m.Manual.Name, m.Manual.Version)
+			case !m.Adopted && others > 0:
+				fmt.Fprintf(w, "  %-40s kept: not adopted here, still adopted by %d other project(s)\n", m.Name, others)
+			case !m.Adopted && m.State == stateModified:
+				fmt.Fprintf(w, "  %-40s kept: no project adopts it, but it was modified; remove it by hand if it is not needed\n", m.Name)
 			}
 		}
 		for _, e := range plan.Report.Extras {
@@ -936,6 +1172,9 @@ var errSkillChanged = errors.New("the skill changed while garage was running")
 // the skill are removed only after that check, and after the backup.
 func applySkillAction(action skillAction, target resolvedTarget, backupRoot string) (string, error) {
 	s := action.Inspection
+	if action.Remove {
+		return removeManualSkill(s)
+	}
 	exists := s.State != stateNotInstalled && s.State != stateMissing
 	if exists {
 		files, unsupported, err := readSkillDir(s.Dir)
@@ -996,6 +1235,23 @@ func applySkillAction(action skillAction, target resolvedTarget, backupRoot stri
 		return fmt.Sprintf("replaced (was %s; backup at %s)", s.State,
 			filepath.Join(backupRoot, target.Config.Harness, s.Name)), nil
 	}
+}
+
+// removeManualSkill deletes a manual skill that no project adopts any longer.
+// The directory is first checked again against the digest observed when the
+// removal was planned, so a copy changed since then is left in place.
+func removeManualSkill(s skillInspection) (string, error) {
+	files, unsupported, err := readSkillDir(s.Dir)
+	if err != nil {
+		return "", fmt.Errorf("cannot read %s: %w", s.Dir, err)
+	}
+	if unsupported != "" || digestSkillFiles(files) != s.Digest {
+		return "", fmt.Errorf("%w: %s was not removed; run the install again", errSkillChanged, s.Dir)
+	}
+	if err := os.RemoveAll(s.Dir); err != nil {
+		return "", fmt.Errorf("cannot remove %s: %w", s.Dir, err)
+	}
+	return "removed: no project adopts it any longer", nil
 }
 
 // backupSkill copies a skill's files to dir, which must not exist yet.
