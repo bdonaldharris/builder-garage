@@ -53,7 +53,7 @@ An omitted key means the canonical default applies. A key that is present is the
   - a schema version 1 file, which records only `schema_version: 1`, is migrated to version 2;
   - the file is replaced atomically, through a temporary file in the same directory;
   - immediately before the replacement, `init` checks that the file is still the one it read, with the same content. If it changed while `init` was running, for example while waiting for an answer, `init` stops without writing and asks to be run again, so a concurrent change is never overwritten.
-- **No overwrite.** A flag that conflicts with an already configured value is an error. Change configured values through the project's normal review process, not with `init`. There is no `--force`.
+- **No overwrite.** A flag that conflicts with an already configured value is an error. Change configured values with the [configuration commands](#reading-and-changing-settings-garage-config) or by editing the file, through the project's normal review process, not with `init`. There is no `--force`.
 - **Invalid or ambiguous files.** If the existing file is not valid YAML, does not match the schema, has an unsupported schema version, is a version 1 file with other keys, or holds an invalid value, `init` stops without changing it and explains the correction required.
 - **A symbolic link or non-regular file** at `.garage` or `.garage/config.yaml` is refused.
 
@@ -71,10 +71,47 @@ Builder Garage's CI runs it against Builder Garage's own configuration on every 
 | That each adopted manual is one this `garage` binary carries ([#60 decision](https://github.com/bdonaldharris/builder-garage/issues/60#issuecomment-6860594142)). A known manual at another version is valid; the output reports the version the binary delivers. | Whether a configured branch or issue exists |
 | Tooling values, as described in [Tooling configuration](tooling-configuration.md) | |
 
+## Reading and changing settings: `garage config`
+
+Six commands read and change one setting at a time ([#64 decision](https://github.com/bdonaldharris/builder-garage/issues/64#issuecomment-6866391233), [#67](https://github.com/bdonaldharris/builder-garage/issues/67)). They are a convenience and automation surface over the same configuration model; editing the file by hand remains supported.
+
+| Command | What it does |
+| --- | --- |
+| `garage config show` | Shows every setting in plain language, with its name, and the default that applies where none is set, marked "(default)" |
+| `garage config get SETTING` | Prints one value, in the format its `init` flag takes; a list prints one item per line, and a default is marked "(default)" |
+| `garage config set SETTING VALUE` | Sets a setting that holds one value |
+| `garage config unset SETTING...` | Removes settings, so that their defaults apply. Unsetting a list removes all its items. |
+| `garage config add SETTING VALUE` | Adds one item to a list setting |
+| `garage config remove SETTING NAME` | Removes one list item, identified by its name, its harness for a skill target, or its exact text for an inspection condition |
+
+- **Names and formats.** A setting's name is its `init` flag's name, such as `integration-branch`, `workflow-owner`, `manual`, or `skill-target`, and its value takes that flag's format. Each command's `--help` lists its settings. The commands' output and help use plain language, never extension-point identifiers. Refusals name settings, not YAML keys.
+- **Versions.** `add manual NAME` adopts the version of the manual this `garage` binary delivers. `add skill-target HARNESS` writes the version and date that harness's skill paths were confirmed with. The full forms, `NAME@VERSION` and `HARNESS@VERSION@YYYY-MM-DD`, are also accepted.
+- **Settings that depend on each other** change in one command:
+  - `set automated-reviewer NAME --automated-reviewer-request TEXT`
+  - `set small-corrections enabled --small-correction-classifier ROLE [--small-corrections-without-issue]`
+  - `set discovery triggers --discovery-trigger "NAME|WHEN" ...`, where the triggers given replace the configured ones
+  - `unset small-corrections small-correction-classifier`, which removes several settings together
+
+  Setting `discovery` to `implementer-judgment` removes the discovery triggers, and disabling small corrections removes `small-corrections-without-issue`, because each applies only to the other choice. The change shown before writing lists what is removed. Any other change that would leave the configuration invalid is refused, with the reason; it is never repaired silently.
+- **Required settings.** `discovery`, `workflow-owner`, `change-acceptor`, and `product-intent-acceptor` cannot be unset; set a new value instead.
+- **One write pipeline.** Every change follows `init`'s path:
+  1. take a snapshot of the file and decode it strictly;
+  2. refuse an invalid file, or one at another schema version, which `garage init` upgrades;
+  3. apply the change to the complete configuration and validate the result;
+  4. edit the YAML, and check that the result decodes to exactly the validated configuration;
+  5. confirm;
+  6. replace the file atomically, after checking that it is still the file that was read.
+
+  An invalid configuration is never written, and a concurrent change is never overwritten.
+- **Confirmation.** In an interactive terminal, the command shows the exact change and writes only after an explicit yes. Outside one, a change fails and writes nothing unless `--yes` is given, so a script never changes the configuration silently.
+- **Comments.** Comments on untouched settings are kept, and a changed value keeps its key's comments. A removed setting or list item loses its own comments; the command lists them before writing.
+- **Invalid files.** Every change refuses an invalid configuration, with one exception. `unset conditional-guidance` alone removes the retired `guidance.conditional` setting, but only when the result validates. It is not a way to change an otherwise invalid file.
+- **Authority.** The commands change only `.garage/config.yaml`. They never commit, push, or open pull requests, and they authorize nothing. A configured value still changes through the project's normal review process.
+
 ## Absent and invalid configuration
 
 - **Absent.** A project with no `.garage/config.yaml` is unconfigured. `garage config validate` fails and points to `garage init`.
-- **Invalid.** An invalid configuration fails closed. `garage config validate` fails and lists every problem, and `garage init` refuses to change it.
+- **Invalid.** An invalid configuration fails closed. `garage config validate` fails and lists every problem, and `garage init` and the configuration commands refuse to change it, apart from removing the retired setting described above.
 
 The canonical skills use only a valid configuration.
 

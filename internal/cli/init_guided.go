@@ -821,6 +821,8 @@ func (g guide) askSkillTargets(cfg *projectConfig) error {
 // summaryLine is one plain-language line of the configuration summary.
 type summaryLine struct {
 	label, value string
+	// name is the setting's command-line name.
+	name string
 }
 
 // describeConfiguration summarizes cfg in plain language, showing the
@@ -837,39 +839,42 @@ func describeConfiguration(cfg projectConfig) []summaryLine {
 		return strings.Join(n, ", ")
 	}
 	var lines []summaryLine
-	add := func(label, value string) { lines = append(lines, summaryLine{label, value}) }
+	add := func(field, value string) {
+		s := settingByPath(strings.Split(field, "."))
+		lines = append(lines, summaryLine{label: s.label, value: value, name: s.options[0].name})
+	}
 
 	if pc.IntegrationBranch != nil {
-		add("Integration branch", *pc.IntegrationBranch)
+		add("project.integration_branch", *pc.IntegrationBranch)
 	} else {
-		add("Integration branch", def(defaultIntegrationBranch))
+		add("project.integration_branch", def(defaultIntegrationBranch))
 	}
 	if pc.PRReviewTriggers != nil && len(*pc.PRReviewTriggers) > 0 {
-		add("Extra pull-request reviews", "also when: "+names(*pc.PRReviewTriggers))
+		add("project.pr_review_triggers", "also when: "+names(*pc.PRReviewTriggers))
 	} else {
-		add("Extra pull-request reviews", def("only the two standard situations"))
+		add("project.pr_review_triggers", def("only the two standard situations"))
 	}
 	if r := pc.AutomatedReviewer; r != nil {
-		add("Automated reviewer", r.Name+"; review input only")
+		add("project.automated_reviewer", r.Name+"; review input only")
 	} else {
-		add("Automated reviewer", def("none"))
+		add("project.automated_reviewer", def("none"))
 	}
 	if smallCorrectionsEnabled(&cfg) {
 		v := "allowed when the small-correction classifier decides; an issue is required"
 		if sc := pc.SmallCorrections; sc.WithoutIssue != nil && *sc.WithoutIssue {
 			v = "allowed when the small-correction classifier decides; no issue needed"
 		}
-		add("Small corrections", v)
+		add("project.small_corrections", v)
 	} else if pc.SmallCorrections != nil {
-		add("Small corrections", "not allowed; every change gets independent review")
+		add("project.small_corrections", "not allowed; every change gets independent review")
 	} else {
-		add("Small corrections", def("not allowed; every change gets independent review"))
+		add("project.small_corrections", def("not allowed; every change gets independent review"))
 	}
 	if d := pc.Discovery; d != nil {
 		if d.Mode == discoveryTriggers && d.Triggers != nil {
-			add("Discovery", "required when: "+names(*d.Triggers))
+			add("project.discovery", "required when: "+names(*d.Triggers))
 		} else {
-			add("Discovery", "the implementer decides; the Workflow Owner can require it")
+			add("project.discovery", "the implementer decides; the Workflow Owner can require it")
 		}
 	}
 	if pc.ReleaseConditions != nil && len(*pc.ReleaseConditions) > 0 {
@@ -877,53 +882,53 @@ func describeConfiguration(cfg projectConfig) []summaryLine {
 		for _, c := range *pc.ReleaseConditions {
 			n = append(n, c.Name)
 		}
-		add("Release conditions", strings.Join(n, ", "))
+		add("project.release_conditions", strings.Join(n, ", "))
 	} else {
-		add("Release conditions", def("none"))
+		add("project.release_conditions", def("none"))
 	}
 	switch {
 	case pc.SuggestionsBacklog == nil:
-		add("Improvement suggestions", def(fmt.Sprintf("the issue named %q", defaultSuggestionsIssue)))
+		add("project.suggestions_backlog", def(fmt.Sprintf("the issue named %q", defaultSuggestionsIssue)))
 	case *pc.SuggestionsBacklog == backlogNone:
-		add("Improvement suggestions", "kept in the review record that raised them")
+		add("project.suggestions_backlog", "kept in the review record that raised them")
 	default:
-		add("Improvement suggestions", "issue "+*pc.SuggestionsBacklog)
+		add("project.suggestions_backlog", "issue "+*pc.SuggestionsBacklog)
 	}
 	for _, c := range []struct {
-		label string
+		field string
 		value *authority
 	}{
-		{"Workflow Owner", a.WorkflowOwner},
-		{"Change acceptor", a.ChangeAcceptor},
-		{"Product-intent acceptor", a.ProductIntentAcceptor},
-		{"Small-correction classifier", a.SmallCorrectionClassifier},
+		{"workflow_owner", a.WorkflowOwner},
+		{"change_acceptor", a.ChangeAcceptor},
+		{"product_intent_acceptor", a.ProductIntentAcceptor},
+		{"small_correction_classifier", a.SmallCorrectionClassifier},
 	} {
 		if c.value != nil {
-			add(c.label, describeAuthority(*c.value))
+			add("project.authorities."+c.field, describeAuthority(*c.value))
 		}
 	}
 	if ui := pc.UserFacingInspection; ui != nil && len(ui.AdditionalConditions) > 0 {
-		add("User-facing inspection", "the standard rule, plus: "+strings.Join(ui.AdditionalConditions, "; "))
+		add("project.user_facing_inspection", "the standard rule, plus: "+strings.Join(ui.AdditionalConditions, "; "))
 	} else {
-		add("User-facing inspection", def("the standard rule"))
+		add("project.user_facing_inspection", def("the standard rule"))
 	}
 	if gd := pc.Guidance; gd != nil && len(gd.Manuals) > 0 {
 		var m []string
 		for _, man := range gd.Manuals {
 			m = append(m, man.Name+" "+man.Version)
 		}
-		add("Manuals", strings.Join(m, ", "))
+		add("project.guidance", strings.Join(m, ", "))
 	} else {
-		add("Manuals", def("none"))
+		add("project.guidance", def("none"))
 	}
 	if cfg.Tooling != nil && cfg.Tooling.SkillTargets != nil && len(*cfg.Tooling.SkillTargets) > 0 {
 		var t []string
 		for _, target := range *cfg.Tooling.SkillTargets {
 			t = append(t, harnessNames[target.Harness])
 		}
-		add("Skills installed for", strings.Join(t, ", "))
+		add("tooling.skill_targets", strings.Join(t, ", "))
 	} else {
-		add("Skills installed for", "no agent tools")
+		add("tooling.skill_targets", "no agent tools")
 	}
 	return lines
 }
@@ -942,35 +947,23 @@ func formatSummary(lines []summaryLine) string {
 	return b.String()
 }
 
-// addedSettingNames are plain-language names for settings an upgrade adds.
-var addedSettingNames = map[string]string{
-	"project.integration_branch":                      "integration branch",
-	"project.pr_review_triggers":                      "extra pull-request reviews",
-	"project.automated_reviewer":                      "automated reviewer",
-	"project.small_corrections":                       "small corrections",
-	"project.discovery":                               "discovery",
-	"project.release_conditions":                      "release conditions",
-	"project.suggestions_backlog":                     "improvement suggestions",
-	"project.authorities.workflow_owner":              "Workflow Owner",
-	"project.authorities.change_acceptor":             "change acceptor",
-	"project.authorities.product_intent_acceptor":     "product-intent acceptor",
-	"project.authorities.small_correction_classifier": "small-correction classifier",
-	"project.user_facing_inspection":                  "user-facing inspection",
-	"project.guidance":                                "manuals",
-	"tooling.skill_targets":                           "skills installed for",
-}
-
+// describeAdded names the added settings in plain language, by their
+// registry labels.
 func describeAdded(paths [][]string) string {
 	var names []string
 	for _, p := range paths {
-		key := settingName(p)
-		if n, ok := addedSettingNames[key]; ok {
-			names = append(names, n)
-		} else {
-			names = append(names, key)
-		}
+		names = append(names, labelInSentence(settingByPath(p).label))
 	}
 	return strings.Join(names, ", ")
+}
+
+// labelInSentence lowercases a label's first letter for use inside a
+// sentence, except in "Workflow Owner", which is a proper name.
+func labelInSentence(label string) string {
+	if strings.HasPrefix(label, "Workflow Owner") {
+		return label
+	}
+	return strings.ToLower(label[:1]) + label[1:]
 }
 
 // confirmWrite shows what will be written and asks for explicit confirmation.
