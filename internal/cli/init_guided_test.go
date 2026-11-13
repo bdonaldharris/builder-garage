@@ -149,7 +149,7 @@ func TestGuidedSetupMatchesTheEquivalentFlags(t *testing.T) {
 		"1", // product-intent acceptor: same as the Workflow Owner
 		"2", // classifier: same as the change acceptor
 		"2", "the change alters a user-visible flow", "n",
-		"2", "y", "go", "0.1", "", "y", "supabase-data-api", "n",
+		"2", "go", "0.1", "", // adopt the Go Manual 0.1, and no other
 		"1,3", // Claude Code and GitHub Copilot CLI
 		"yes",
 	}}
@@ -176,7 +176,6 @@ func TestGuidedSetupMatchesTheEquivalentFlags(t *testing.T) {
 		"--small-correction-classifier", "maintainer",
 		"--inspection-condition", "the change alters a user-visible flow",
 		"--manual", "go@0.1",
-		"--conditional-guidance", "supabase-data-api",
 		"--skill-target", "claude-code@2.1.277@2026-11-12",
 		"--skill-target", "copilot-cli@1.0.93-1@2026-11-12",
 	)
@@ -259,5 +258,83 @@ func TestGuideMenusAskAgainOnInvalidAnswers(t *testing.T) {
 	yn := &scriptedPrompter{answers: []string{"maybe", "Y"}}
 	if ok, err := (guide{p: yn}).yesNo("Sure?", false); err != nil || !ok {
 		t.Fatalf("yesNo = %v, %v; want true", ok, err)
+	}
+}
+
+// Guided setup never asks about conditional stack or provider guidance, on
+// either path through its manuals step, and its summary does not mention it
+// when none is configured (#58).
+func TestGuidedSetupNeverAsksForConditionalGuidance(t *testing.T) {
+	adoptManual := append(append([]string(nil), defaultAnswers[:len(defaultAnswers)-2]...),
+		"2", "go", "0.1", "", // adopt the Go Manual 0.1
+		"",  // agent tools: none
+		"y") // confirm
+	for name, answers := range map[string][]string{
+		"no manuals":   append(append([]string(nil), defaultAnswers...), "y"),
+		"adopt manual": adoptManual,
+	} {
+		t.Run(name, func(t *testing.T) {
+			noDefaultBranch(t)
+			dir := t.TempDir()
+			ask := &scriptedPrompter{answers: answers}
+			if _, err := initProject(dir, projectConfig{}, ask); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if len(ask.answers) != 0 {
+				t.Fatalf("unused answers %q", ask.answers)
+			}
+			if all := strings.ToLower(ask.transcript()); strings.Contains(all, "conditional") {
+				t.Errorf("guided setup mentions conditional guidance:\n%s", ask.transcript())
+			}
+			cfg := mustLoadValid(t, dir)
+			if g := cfg.Project.Guidance; g != nil && len(g.Conditional) > 0 {
+				t.Errorf("guided setup wrote conditional guidance %v", g.Conditional)
+			}
+			if name == "adopt manual" {
+				if g := cfg.Project.Guidance; g == nil || len(g.Manuals) != 1 || g.Manuals[0] != (manualChoice{Name: "go", Version: "0.1"}) {
+					t.Errorf("manuals = %+v, want go 0.1", cfg.Project.Guidance)
+				}
+			}
+		})
+	}
+}
+
+// --conditional-guidance still writes its names, and a guided summary shows
+// configured names as they are, without claiming they are enabled or have
+// an effect (#58).
+func TestConditionalGuidanceFlagIsUnchangedAndShownAsConfigured(t *testing.T) {
+	noninteractive := t.TempDir()
+	desired := desiredFrom(t, "--discovery", "implementer-judgment",
+		"--workflow-owner", "lead", "--change-acceptor", "lead", "--product-intent-acceptor", "lead",
+		"--conditional-guidance", "supabase-data-api")
+	if _, err := initProject(noninteractive, desired, nil); err != nil {
+		t.Fatalf("flag setup: %v", err)
+	}
+	if g := mustLoadValid(t, noninteractive).Project.Guidance; g == nil || len(g.Conditional) != 1 || g.Conditional[0] != "supabase-data-api" {
+		t.Fatalf("guidance = %+v, want the flag's name", g)
+	}
+
+	noDefaultBranch(t)
+	guided := t.TempDir()
+	ask := &scriptedPrompter{answers: []string{
+		"", "", "", "", "", "", "", // branch, PR reviews, reviewer, small corrections, release, suggestions, inspection
+		"", // agent tools: none; the manuals step is skipped because a flag set guidance
+		"y",
+	}}
+	if _, err := initProject(guided, desired, ask); err != nil {
+		t.Fatalf("guided setup: %v", err)
+	}
+	if len(ask.answers) != 0 {
+		t.Fatalf("unused answers %q", ask.answers)
+	}
+	summary := strings.Join(ask.told, "")
+	if !strings.Contains(summary, "Conditional guidance names") || !strings.Contains(summary, "supabase-data-api") {
+		t.Errorf("the summary does not show the configured names:\n%s", summary)
+	}
+	if strings.Contains(strings.ToLower(summary), "enabled") {
+		t.Errorf("the summary claims an effect for the names:\n%s", summary)
+	}
+	if readFile(t, configPathIn(guided)) != readFile(t, configPathIn(noninteractive)) {
+		t.Error("guided setup with the flag wrote a different file from the flag alone")
 	}
 }

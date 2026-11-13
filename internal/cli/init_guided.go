@@ -756,25 +756,21 @@ func chosenAuthorities(a *authorities) []chosenAuthority {
 	return out
 }
 
+// askGuidance asks which manuals the project adopts. Conditional stack or
+// provider guidance is not offered: what selecting it would mean is not
+// defined (#58, #56).
 func (g guide) askGuidance(pc *projectChoices) error {
-	n, err := g.choose("Manuals and guidance\n"+
+	n, err := g.choose("Manuals\n"+
 		"A project may adopt Builder Garage manuals, such as the Go Manual, as guidance\n"+
-		"for its engineering choices. Guidance never relaxes a review or approval gate.", []choice{
-		{label: "No manuals or extra guidance"},
-		{label: "Adopt manuals or enable guidance"},
+		"for its engineering choices. A manual never relaxes a review or approval gate.", []choice{
+		{label: "No manuals"},
+		{label: "Adopt manuals"},
 	}, 0)
 	if err != nil || n == 0 {
 		return err
 	}
 	var gc guidanceChoice
 	for {
-		adopt, err := g.yesNo("Adopt a manual?", len(gc.Manuals) == 0)
-		if err != nil {
-			return err
-		}
-		if !adopt {
-			break
-		}
 		name, err := g.text("Manual name (for example: go): ", "", checkTokenAnswer)
 		if err != nil {
 			return err
@@ -784,34 +780,15 @@ func (g guide) askGuidance(pc *projectChoices) error {
 			return err
 		}
 		gc.Manuals = append(gc.Manuals, manualChoice{Name: name, Version: version})
-	}
-	for {
-		enable, err := g.yesNo("Enable conditional stack or provider guidance by name?", false)
+		more, err := g.yesNo("Adopt another manual?", false)
 		if err != nil {
 			return err
 		}
-		if !enable {
+		if !more {
 			break
 		}
-		name, err := g.text("Guidance name: ", "", func(v string) error {
-			if err := checkSingleLine(v); err != nil {
-				return err
-			}
-			for _, existing := range gc.Conditional {
-				if existing == strings.TrimSpace(v) {
-					return fmt.Errorf("%q is already listed", v)
-				}
-			}
-			return checkNotPlaceholder(v)
-		})
-		if err != nil {
-			return err
-		}
-		gc.Conditional = append(gc.Conditional, strings.TrimSpace(name))
 	}
-	if len(gc.Manuals) > 0 || len(gc.Conditional) > 0 {
-		pc.Guidance = &gc
-	}
+	pc.Guidance = &gc
 	return nil
 }
 
@@ -952,10 +929,10 @@ func describeConfiguration(cfg projectConfig) []summaryLine {
 	} else {
 		add("Manuals", def("none"))
 	}
+	// Conditional-guidance names are shown only when the configuration holds
+	// some, as configured, with no claim about their effect (#58).
 	if gd := pc.Guidance; gd != nil && len(gd.Conditional) > 0 {
-		add("Conditional guidance", strings.Join(gd.Conditional, ", "))
-	} else {
-		add("Conditional guidance", def("none enabled"))
+		add("Conditional guidance names", strings.Join(gd.Conditional, ", "))
 	}
 	if cfg.Tooling != nil && cfg.Tooling.SkillTargets != nil && len(*cfg.Tooling.SkillTargets) > 0 {
 		var t []string
@@ -997,7 +974,7 @@ var addedSettingNames = map[string]string{
 	"project.authorities.product_intent_acceptor":     "product-intent acceptor",
 	"project.authorities.small_correction_classifier": "small-correction classifier",
 	"project.user_facing_inspection":                  "user-facing inspection",
-	"project.guidance":                                "manuals and guidance",
+	"project.guidance":                                "manuals",
 	"tooling.skill_targets":                           "skills installed for",
 }
 
