@@ -45,6 +45,7 @@ These follow from the decision above and can be revisited through the normal [co
 - **Version.** `garage version` reports `dev` unless a version is supplied at link time with `-ldflags "-X main.version=<version>"`. No other build metadata is recorded.
 - **Configuration protection.** `garage init` originally never replaced an existing configuration file unless `--force` was given. Revised under [#35](https://github.com/bdonaldharris/builder-garage/issues/35): `--force` is removed, and `init` upgrades an existing configuration in place without discarding any configured value. See [Project configuration](../configuration.md).
 - **Command set.** Cobra's generated shell-completion command is disabled so that the CLI exposes only commands the project has deliberately implemented.
+- **GitHub access.** Added under [#40](https://github.com/bdonaldharris/builder-garage/issues/40): `garage status` runs the external `gh` command, as the [#19 decision](https://github.com/bdonaldharris/builder-garage/issues/19#issuecomment-6837362562) chose. Garage adds no Go dependency for it and stores no token.
 - **Build commands.** A `Makefile` wraps the plain Go commands for building, testing, format checking, static analysis, and cross-compilation.
 
 ## Consequences

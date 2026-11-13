@@ -1,0 +1,54 @@
+{
+ "data": {
+  "repository": {
+   "issueOrPullRequest": {
+    "__typename": "Issue",
+    "number": 47,
+    "title": "garage init upgrade can overwrite a configuration changed while it runs",
+    "url": "https://github.com/bdonaldharris/builder-garage/issues/47",
+    "state": "CLOSED",
+    "closedAt": "2026-11-13T12:23:59Z",
+    "comments": {
+     "totalCount": 2,
+     "pageInfo": {
+      "hasPreviousPage": false
+     },
+     "nodes": [
+      {
+       "url": "https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852351044",
+       "body": "[AGENT #1 — IMPLEMENTATION]\n\n```yaml\ngarage_evidence: 1\nrecord: implementation\nissue: 47\ncheckable:\n  artifact:\n    method: garage-artifact-v1\n    object_format: sha1\n    stage: working-tree\n    integration_ref: fa30a65b6a4f0ba04414491dda5a94d748469cc2\n    base: fa30a65b6a4f0ba04414491dda5a94d748469cc2\n    tree: 49c5126f982de772cf7b5083199b59a92fe0d3ea\n    changeset: sha256:4e68f58c12613d594d8d77184ac98189680d312cd2d8f38930ee0d907e70ff24\n    paths: 3\nasserted:\n  status: ready-for-review\n  validation_run: true\n```\n\nStatus: READY FOR AGENT #2 REVIEW\n\nArtifact/Branch: uncommitted working tree on `fix/47-init-concurrent-change`, in the git worktree `.claude/worktrees/fix-47`. Base `main` at `fa30a65`. Three modified paths: `internal/cli/init.go` (+48/−2), `internal/cli/init_test.go` (+182), and `docs/configuration.md` (+2/−1). No untracked files; `garage` and `dist/` are ignored.\n\nImplemented: the B1 correction, carried onto `main` unchanged.\n\n- **Where it comes from.** This is the B1 correction from PR #45, the [Agent #1 correction](https://github.com/bdonaldharris/builder-garage/pull/45#issuecomment-6844009977) that Agent #2 approved in its [correction re-review](https://github.com/bdonaldharris/builder-garage/pull/45#issuecomment-6844779192). It is applied unchanged as a patch, taken from the uncommitted changes that remained in the main checkout after PR #45 merged at `407ddf4`.\n- **The content is unchanged.** On `fa30a65`, all three paths are identical to `407ddf4`. Applying the patch to `407ddf4` reproduces tree `49c5126f…` exactly, which is the tree Agent #2 approved, and this working tree has the same tree. The `base` differs, because `fa30a65` is the merge of `407ddf4`. The changeset is therefore new (3 paths instead of 22), and **the PR #45 approval does not carry over**. This needs a full independent review.\n- **What the correction does.**\n  - `upgradeConfig` takes a `configSnapshot` (the `Lstat` identity and the bytes read) *before* it reads.\n  - `replaceConfiguration` gains an `unchanged` precondition. It runs as the last step before the atomic commit.\n  - On a change, `init` stops without writing, with `errConfigChanged`, and tells the user to run `garage init` again.\n  - The help text and `docs/configuration.md` state this behavior.\n  - Four tests cover it: a change during prompting, both written in place and replaced by rename; an unchanged rewrite that must still write; snapshot detection; and the precondition blocking the commit.\n\nValidation:\n- `make check` (gofmt, vet, `go test ./...`, build, six-platform cross-compile): pass.\n- `go test -race -count=1 ./internal/cli`: pass. `GOOS=windows go vet ./...`: clean.\n- The four new tests pass by name. Toolchain: checksum-verified go1.27.4.\n- **Mutation check.** With the precondition replaced by a no-op, both prompting subtests fail with `error = <nil>, want errConfigChanged`, which is B1. After `init.go` was restored byte-for-byte from a backup, they pass, and the artifact identity is unchanged.\n- `./garage config validate` on Builder Garage's configuration: valid. `git diff --check`: clean.\n\nEnvironment / Deployment Requirements: None\n\nNotes for Agent #2:\n- **This Agent #1 did not write the correction code.** It carried, validated, and recorded it. The reviewer must still be separate from this session.\n- **Not done here:** rerunning the pty-based real-binary reproduction from the B1 review.\n- **Unchanged:** the three non-blocking suggestions from #35 (null-valued keys, flag-error ordering, and the `docs/review-evidence.md:5` wording).\n",
+       "createdAt": "2026-11-13T12:05:31Z",
+       "lastEditedAt": null,
+       "authorAssociation": "OWNER",
+       "author": {
+        "login": "bdonaldharris",
+        "__typename": "User"
+       }
+      },
+      {
+       "url": "https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852415894",
+       "body": "[AGENT #2 — INDEPENDENT REVIEW]\n\n```yaml\ngarage_evidence: 1\nrecord: review\nissue: 47\nresponds_to: \"https://github.com/bdonaldharris/builder-garage/issues/47#issuecomment-6852351044\"\ncheckable:\n  artifact:\n    method: garage-artifact-v1\n    object_format: sha1\n    stage: working-tree\n    integration_ref: fa30a65b6a4f0ba04414491dda5a94d748469cc2\n    base: fa30a65b6a4f0ba04414491dda5a94d748469cc2\n    tree: 49c5126f982de772cf7b5083199b59a92fe0d3ea\n    changeset: sha256:4e68f58c12613d594d8d77184ac98189680d312cd2d8f38930ee0d907e70ff24\n    paths: 3\n  matches_responds_to: true\nasserted:\n  execution_context: separate-from-implementation\n  inspected: complete-artifact\n  answers: {acceptance_criteria_met: true, new_regression: false, works: true}\n  verdict: approved\n```\n\nPhase: INITIAL REVIEW\nArtifact/Head: uncommitted working tree on `fix/47-init-concurrent-change` (worktree `.claude/worktrees/fix-47`), base `main` at `fa30a65`. 3 modified paths, no untracked files.\nSequence: IMPLEMENTATION REVIEW (originating issue, authoritative)\n\n**Prerequisite evidence.** The Agent #1 record carries a well-formed `garage-evidence` block (`record: implementation`, `status: ready-for-review`). Its `integration_ref` is the tip of `origin/main`, the configured E1 branch. I recomputed the identity with the reference procedure, and it matches the record exactly. I recomputed it again after `make check`, and it was unchanged. The PR #45 approval does not carry over, so I reviewed this change in full.\n\nAcceptance criteria met? Yes\n- **The check runs immediately before the replacement.**\n  - `upgradeConfig` takes an `Lstat` snapshot before it reads, and keeps the bytes it read (`init.go` `configSnapshot`).\n  - `replaceConfiguration` runs `unchanged()` as its last step before `commit`, after the directory and destination checks.\n  - `verifyUnchanged` requires that the file is still regular, is `os.SameFile` with the snapshot, and holds byte-equal content.\n  - If the file was replaced between the `Lstat` and the read, the file identities differ, so `init` stops. It never writes over the change.\n- **A change stops the upgrade.**\n  - It returns `errConfigChanged`, with a message to run `garage init` again.\n  - It writes nothing and leaves no temporary file.\n  - It exits non-zero; exit 1 was observed.\n  - The help text and `docs/configuration.md` state this behavior.\n- **Tests.** `TestInitUpgradeStopsWhenConfigurationChangesDuringPrompting` covers a change made during interactive prompting, both written in place and replaced by rename. Further tests cover:\n  - snapshot detection: content changed, file replaced, file removed, and unchanged;\n  - a precondition failure blocking the commit;\n  - an identical rewrite still upgrading.\n\nNew bug/regression introduced? No\n- The only behavior added is the new stop. The two existing callers of `replaceConfiguration` in tests pass `nil` and keep their earlier behavior.\n- The extra `Lstat` runs only on the upgrade path, where the file already exists. Symlink and non-regular files are still refused by the existing checks.\n- An unchanged rewrite during prompting still upgrades, as tested. A plain upgrade with no concurrent change produces a valid configuration, as observed.\n\nDoes it work? Yes\n- I re-ran the B1 reproduction from the PR #45 review with a real binary in a pty. A v1 file is upgraded, and another writer saves a valid v2 configuration at the second prompt.\n\n  | Binary | Exit | Concurrent configuration |\n  | --- | --- | --- |\n  | Built from `fa30a65` | 0 | lost; B1 reproduces on `main` |\n  | Built from this artifact | 1 | preserved byte for byte; `.garage/` holds only `config.yaml` |\n\n- Control: with no concurrent change, the fixed binary upgrades the file, and `garage config validate` accepts the result.\n\nCurrent blockers:\n- None\n\nAutomated review findings and Agent #2 dispositions:\n- Not applicable — no applicable automated findings were present (no PR exists yet).\n\nFollow-up / Out of scope:\n- None new. The three #35 suggestions that Agent #1 noted remain as they were.\n\nValidation:\n- Toolchain: a checksum-verified go1.27.4, with fresh binaries built from this artifact and from `fa30a65`. Agent #1's binary was not used.\n- `make check`: exit 0.\n- `go test -race -count=1 ./internal/cli`: pass.\n- The four new tests pass, including both prompting subtests.\n- `GOOS=windows go vet ./...`: clean. `git diff --check`: clean.\n- The pty reproduction and the control are as described above.\n\nVerdict: APPROVED\n",
+       "createdAt": "2026-11-13T12:08:13Z",
+       "lastEditedAt": null,
+       "authorAssociation": "OWNER",
+       "author": {
+        "login": "bdonaldharris",
+        "__typename": "User"
+       }
+      }
+     ]
+    },
+    "closedByPullRequestsReferences": {
+     "nodes": [
+      {
+       "number": 48,
+       "url": "https://github.com/bdonaldharris/builder-garage/pull/48",
+       "state": "MERGED",
+       "mergedAt": "2026-11-13T12:23:56Z"
+      }
+     ]
+    }
+   }
+  }
+ }
+}
