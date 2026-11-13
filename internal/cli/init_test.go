@@ -785,8 +785,6 @@ func TestInitProjectUsesTheGivenDirectory(t *testing.T) {
 // committed configuration.
 var builderGarageFlags = []string{
 	"--integration-branch", "main",
-	"--automated-reviewer", "codex",
-	"--automated-reviewer-request", "optional input where available; the chatgpt-codex-connector GitHub integration reviews a pull request when it is opened",
 	"--small-corrections", "enabled",
 	"--small-corrections-without-issue",
 	"--small-correction-classifier", "maintainer",

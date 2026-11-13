@@ -25,8 +25,6 @@ The file was generated, not hand-authored, by running this noninteractive comman
 ```sh
 garage init \
   --integration-branch main \
-  --automated-reviewer codex \
-  --automated-reviewer-request "optional input where available; the chatgpt-codex-connector GitHub integration reviews a pull request when it is opened" \
   --small-corrections enabled \
   --small-corrections-without-issue \
   --small-correction-classifier maintainer \
@@ -46,7 +44,7 @@ The canonical skills read these values from the configuration, at the extension 
 | Configured choice | What it means here | Source |
 | --- | --- | --- |
 | Integration branch ([E1](extension-points.md#e1-integration-branch)) | Implementation pull requests target the configured integration branch, and review records resolve it as their `integration_ref`. This changes the destination only, not any gate. | [GOVERNANCE: Changes to `main`](../GOVERNANCE.md#changes-to-main) |
-| Automated reviewer ([E3](extension-points.md#e3-automated-reviewer)) | The configured reviewer is optional review input where available. Builder Garage does not require a GitHub-hosted agent reviewer, and no tool establishes review authority. Its findings on a PR head fire minimum PR-review trigger 2. | [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 3), [#7 decision](https://github.com/bdonaldharris/builder-garage/issues/7#issuecomment-6817635061) (item 5) |
+| Automated reviewer ([E3](extension-points.md#e3-automated-reviewer)) | None is configured, so the canonical default applies: no automated reviewer. No pull-request review is requested from one, and its absence establishes nothing. If any automated reviewer does report findings on a PR head, they still fire minimum PR-review trigger 2. No tool establishes review authority. | [#52](https://github.com/bdonaldharris/builder-garage/issues/52), [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 3), [#7 decision](https://github.com/bdonaldharris/builder-garage/issues/7#issuecomment-6817635061) (item 5) |
 | Small corrections ([E4](extension-points.md#e4-small-correction-entry-path)) | A small correction that changes no meaning, such as a typo, broken link, or formatting, may be proposed as a pull request without an issue, and does not require independent review. Only the configured classifier, a human authority, decides that a change is a small correction; an agent never does ([F5](responsibility-floor.md#rules)). Maintainer approval is still required. | [CONTRIBUTING: Small corrections](../CONTRIBUTING.md#small-corrections), [pull request template](../.github/PULL_REQUEST_TEMPLATE.md), [#16 decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788) (item 1) |
 | Discovery ([E5](extension-points.md#e5-discovery-applicability)) | The implementer decides whether discovery is needed, and the Workflow Owner may require it. | [#16 decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788) (item 5), [CONTRIBUTING: Discover when warranted](../CONTRIBUTING.md#2-discover-when-warranted) |
 | Suggestions backlog ([E7](extension-points.md#e7-improvement-suggestions-backlog)) | Non-blocking review observations and dogfooding friction go to the configured issue. A suggestion authorizes nothing until it is promoted into a separately scoped issue. | [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 5) |
