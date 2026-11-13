@@ -11,6 +11,7 @@ Engineering skills currently remain in [`../skills/`](../skills/) to preserve ex
 - [Implementation readiness](../skills/implementation-readiness-workflow/SKILL.md)
 - [Independent implementation review](../skills/independent-implementation-review/SKILL.md)
 - [Integration PR review](../skills/integration-pr-review/SKILL.md)
+- [Issue authoring](../skills/issue-authoring-workflow/SKILL.md)
 
 Follow the canonical skill contracts, not a summary here.
 

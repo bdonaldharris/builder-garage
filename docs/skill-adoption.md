@@ -1,6 +1,6 @@
 # Builder Garage Skill Adoption Profile
 
-Builder Garage adopts the five canonical engineering [skills](../skills/) it publishes, as its own engineering workflow. This profile makes that adoption explicit, points to Builder Garage's configured choices, and records the other project choices that qualify the skill text. The skills themselves are not repeated here.
+Builder Garage adopts the six canonical engineering [skills](../skills/) it publishes, as its own engineering workflow. This profile makes that adoption explicit, points to Builder Garage's configured choices, and records the other project choices that qualify the skill text. The skills themselves are not repeated here.
 
 The skills are framework artifacts that any project can adopt. This profile is Builder Garage's adoption record as a project. Builder Garage's adoption of the Go Manual is recorded separately, in the [Go Manual profile](go-manual.md).
 
@@ -13,6 +13,7 @@ The skills are framework artifacts that any project can adopt. This profile is B
 | [application-implementation-workflow](../skills/application-implementation-workflow/SKILL.md) | `implement-workflow` |
 | [independent-implementation-review](../skills/independent-implementation-review/SKILL.md) | `indep-review` |
 | [integration-pr-review](../skills/integration-pr-review/SKILL.md) | `pr-review` |
+| [issue-authoring-workflow](../skills/issue-authoring-workflow/SKILL.md) | `author-issue` |
 
 **Revision adopted.** The skills carry no version label today. Builder Garage adopts them as they exist on its `main` branch. A specific revision is identified by commit: the skills at the commit that contains a given change are the ones that governed it. Agents should run copies that match `main`. `garage skills install` installs the skills a `garage` binary embeds, each marked with its revision, and `garage skills verify` checks installed copies against them ([Skill installation](skill-installation.md)).
 
