@@ -14,7 +14,7 @@ The skills are framework artifacts that any project can adopt. This profile is B
 | [independent-implementation-review](../skills/independent-implementation-review/SKILL.md) | `indep-review` |
 | [integration-pr-review](../skills/integration-pr-review/SKILL.md) | `pr-review` |
 
-**Revision adopted.** The skills carry no version label today. Builder Garage adopts them as they exist on its `main` branch. A specific revision is identified by commit: the skills at the commit that contains a given change are the ones that governed it. Agents should run copies that match `main`. Distributing skills and verifying installed copies is owned by [#15](https://github.com/bdonaldharris/builder-garage/issues/15).
+**Revision adopted.** The skills carry no version label today. Builder Garage adopts them as they exist on its `main` branch. A specific revision is identified by commit: the skills at the commit that contains a given change are the ones that governed it. Agents should run copies that match `main`. `garage skills install` installs the skills a `garage` binary embeds, each marked with its revision, and `garage skills verify` checks installed copies against them ([Skill installation](skill-installation.md)).
 
 ## Configuration
 

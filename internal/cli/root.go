@@ -12,7 +12,8 @@ construction with AI agents.
 
 The garage CLI is at its foundation stage. It initializes and validates a
 project's Builder Garage configuration, records private developer-local
-workflow events, and reports its own version.`
+workflow events, installs and verifies the canonical skills at a project's
+harness targets, and reports its own version.`
 
 // NewRootCommand builds the garage command tree. The version argument is the
 // value reported by "garage version".
@@ -33,6 +34,7 @@ func NewRootCommand(version string) *cobra.Command {
 		newConfigCommand(),
 		newInitCommand(),
 		newRecordCommand(),
+		newSkillsCommand(version),
 		newVersionCommand(version),
 	)
 

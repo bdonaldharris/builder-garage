@@ -11,7 +11,7 @@ This document is the schema for the section. A tooling key not defined here is a
 
 ## `skill_targets`
 
-The harness locations where Garage may manage installed copies of the canonical skills. Installation, update, and verification are implemented in [#38](https://github.com/bdonaldharris/builder-garage/issues/38). This section only records which targets a project uses and what has been confirmed about them.
+The harness locations where Garage may manage installed copies of the canonical skills. `garage skills install` and `garage skills verify` act on these targets; see [Skill installation](skill-installation.md). This section only records which targets a project uses and what has been confirmed about them.
 
 Each entry has:
 
@@ -35,7 +35,7 @@ Garage does not manage `~/.agents/skills` or any other path. A project cannot ad
 
 ### Confirmation
 
-`confirmed_version` and `confirmed_on` record evidence about a harness's behavior. They are not a version requirement. When the installed harness version differs from the confirmed version, or cannot be determined, Garage's verification ([#38](https://github.com/bdonaldharris/builder-garage/issues/38)) reports the target as **Unverified**:
+`confirmed_version` and `confirmed_on` record evidence about a harness's behavior. They are not a version requirement. When the installed harness version differs from the confirmed version, or cannot be determined, `garage skills install` and `garage skills verify` report the target as **Unverified** ([Skill installation](skill-installation.md#status)):
 - This is not an integrity failure.
 - The target's behavior must not be represented as confirmed until it is re-tested.
 - Re-testing records a new version and date through the project's normal review process.

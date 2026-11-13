@@ -37,12 +37,12 @@ Manuals are guidance that a project adopts explicitly. They are not configuratio
 
 | Path | Contents |
 | --- | --- |
-| [`skills/`](../skills/) | The canonical engineering skills. They remain at this path to preserve existing installation paths, references, and invocation contracts. |
+| [`skills/`](../skills/) | The canonical engineering skills. They remain at this path to preserve existing installation paths, references, and invocation contracts. Its `embed.go` embeds them in the `garage` binary ([Skill installation](skill-installation.md)). |
 | [`workbench/`](../workbench/), [`crew/`](../crew/), [`inspection/`](../inspection/), [`shipping/`](../shipping/) | Documentation of each conceptual component's responsibility and its governing skills. |
 | [`manuals/`](../manuals/) | Documentation of the Manuals component, and the Garage-maintained baseline manuals, beginning with the [Go Manual](../manuals/go.md). |
 | [`docs/`](./) | Architectural direction, the [responsibility floor](responsibility-floor.md) and [extension-point registry](extension-points.md), the [project configuration](configuration.md) and [tooling configuration](tooling-configuration.md) formats, [engineering principles](principles.md), [project history](history.md), Builder Garage's adoption profiles for the [canonical skills](skill-adoption.md) and the [Go Manual](go-manual.md), the [revision-identifiable review evidence](review-evidence.md) design, and repository configuration notes. |
 | [`cmd/garage/`](../cmd/garage/) | Entry point for the `garage` executable and its build-time version value. |
-| [`internal/cli/`](../internal/cli/) | Cobra command wiring, project configuration initialization and validation, and local event recording. It does not implement the conceptual components. |
+| [`internal/cli/`](../internal/cli/) | Cobra command wiring, project configuration initialization and validation, local event recording, and skill installation and verification. It does not implement the conceptual components. |
 | [`docs/adr/`](adr/) | Accepted architectural decision records, beginning with the [Go and Cobra CLI foundation](adr/0001-go-cobra-cli-foundation.md). |
 | [`.github/`](../.github/) | Issue and pull request templates and pull-request validation workflow. |
 | Repository root | README, license, governance, contribution, conduct, and security documents. |
@@ -53,7 +53,7 @@ The repository now contains the initial Go CLI source, tests, build commands, an
 
 The following remain deliberately undecided:
 
-- commands and behavior beyond `garage --help`, `garage version`, `garage init`, `garage config validate`, and `garage record`;
+- commands and behavior beyond `garage --help`, `garage version`, `garage init`, `garage config validate`, `garage record`, and `garage skills install` and `verify`;
 - installation and release channels for compiled executables;
 - package and module layout for future conceptual-component implementations;
 - adapter and extension interfaces;
