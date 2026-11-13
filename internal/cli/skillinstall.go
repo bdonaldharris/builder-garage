@@ -894,7 +894,16 @@ func sameOwnership(existing *manifestTarget, entry manifestTarget) bool {
 // not exist yet. A suffix is tried only when the candidate exists. Any other
 // error, such as a parent that is not a directory or cannot be searched, is
 // returned rather than retried.
+//
+// The parent is checked first because Windows reports a path beneath a
+// regular file as not existing, where Unix reports ENOTDIR.
 func uniquePath(base string) (string, error) {
+	parent := filepath.Dir(base)
+	if info, err := os.Lstat(parent); err == nil && !info.IsDir() {
+		return "", fmt.Errorf("cannot use %s: it is not a directory", parent)
+	} else if err != nil && !errors.Is(err, fs.ErrNotExist) {
+		return "", fmt.Errorf("cannot inspect %s: %w", parent, err)
+	}
 	candidate := base
 	for n := 1; ; n++ {
 		_, err := os.Lstat(candidate)
