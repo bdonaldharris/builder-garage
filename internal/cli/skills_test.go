@@ -8,6 +8,7 @@ import (
 	"io/fs"
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 	"testing/fstest"
@@ -704,5 +705,123 @@ func TestSkillsRefuseSymlinkedContent(t *testing.T) {
 	out, err := f.install(installOptions{Replace: []string{"alpha"}})
 	if !errors.Is(err, errInstallRefused) || !strings.Contains(out, "not a regular file") {
 		t.Fatalf("install = %v\n%s", err, out)
+	}
+}
+
+// A backup location that cannot be inspected stops an install that needs a
+// backup, before anything changes, and never blocks one that backs nothing
+// up. Neither case may hang.
+func TestSkillsBackupLocationProblemsTerminate(t *testing.T) {
+	type breakage struct {
+		name  string
+		apply func(t *testing.T, backups string)
+		skip  func() string
+	}
+	cases := []breakage{
+		{
+			name: "skill-backups is a regular file",
+			apply: func(t *testing.T, backups string) {
+				mustWrite(t, backups, "not a directory")
+			},
+		},
+		{
+			name: "skill-backups cannot be searched",
+			apply: func(t *testing.T, backups string) {
+				mustMkdir(t, backups)
+				if err := os.Chmod(backups, 0); err != nil {
+					t.Fatal(err)
+				}
+				t.Cleanup(func() { _ = os.Chmod(backups, 0o700) })
+			},
+			skip: func() string {
+				if runtime.GOOS == "windows" {
+					return "directory search permission is not enforced by mode bits on Windows"
+				}
+				if os.Geteuid() == 0 {
+					return "root bypasses directory permissions"
+				}
+				return ""
+			},
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			if c.skip != nil {
+				if reason := c.skip(); reason != "" {
+					t.Skip(reason)
+				}
+			}
+			f := newSkillsFixture(t, "claude-code")
+			f.mustInstall(installOptions{})
+			backups := filepath.Join(f.ConfigDir, userStateDirName, skillBackupsDirName)
+			c.apply(t, backups)
+
+			// Nothing to back up: the install completes.
+			type result struct {
+				out string
+				err error
+			}
+			run := func(opts installOptions) result {
+				t.Helper()
+				done := make(chan result, 1)
+				go func() {
+					out, err := f.install(opts)
+					done <- result{out, err}
+				}()
+				select {
+				case r := <-done:
+					return r
+				case <-time.After(10 * time.Second):
+					t.Fatal("install did not terminate")
+					return result{}
+				}
+			}
+			if r := run(installOptions{}); r.err != nil {
+				t.Fatalf("install with nothing to back up = %v\n%s", r.err, r.out)
+			}
+
+			// A backup is needed: the install fails before changing anything.
+			mustWrite(t, filepath.Join(f.root("claude-code"), "alpha", "SKILL.md"), "my local edit")
+			before := snapshotTree(t, f.Home)
+			r := run(installOptions{Replace: []string{"alpha"}})
+			if r.err == nil || !strings.Contains(r.err.Error(), "cannot choose a backup location") {
+				t.Fatalf("install needing a backup = %v, want a backup-location error\n%s", r.err, r.out)
+			}
+			if after := snapshotTree(t, f.Home); !sameSnapshot(before, after) {
+				t.Error("a failed install changed the skill targets")
+			}
+		})
+	}
+}
+
+func TestUniquePath(t *testing.T) {
+	dir := t.TempDir()
+	base := filepath.Join(dir, "b")
+	if got, err := uniquePath(base); err != nil || got != base {
+		t.Fatalf("uniquePath(absent) = %q, %v; want %q", got, err, base)
+	}
+	mustMkdir(t, base)
+	mustMkdir(t, base+"-1")
+	if got, err := uniquePath(base); err != nil || got != base+"-2" {
+		t.Fatalf("uniquePath(taken) = %q, %v; want %q", got, err, base+"-2")
+	}
+	notDir := filepath.Join(dir, "file")
+	mustWrite(t, notDir, "x")
+	type result struct {
+		path string
+		err  error
+	}
+	done := make(chan result, 1)
+	go func() {
+		got, err := uniquePath(filepath.Join(notDir, "b"))
+		done <- result{got, err}
+	}()
+	select {
+	case r := <-done:
+		if r.err == nil {
+			t.Fatalf("uniquePath under a file = %q, want an error", r.path)
+		}
+	case <-time.After(10 * time.Second):
+		t.Fatal("uniquePath under a file did not terminate")
 	}
 }

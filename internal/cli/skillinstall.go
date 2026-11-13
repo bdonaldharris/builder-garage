@@ -773,7 +773,23 @@ func installSkills(ctx context.Context, env skillsEnv, opts installOptions, w io
 
 	now := env.Now().UTC()
 	manifestPath := filepath.Join(sc.StateDir, skillManifestName)
-	backupRoot := uniquePath(filepath.Join(sc.StateDir, skillBackupsDirName, now.Format("20060102T150405Z")))
+	// The backup location is chosen only when an action needs a backup, and
+	// before anything is written, so a problem with it stops the install
+	// before any change, and never blocks an install that backs nothing up.
+	needBackup := false
+	for _, plan := range plans {
+		for _, action := range plan.Actions {
+			needBackup = needBackup || action.Backup
+		}
+	}
+	var backupRoot string
+	if needBackup {
+		root, err := uniquePath(filepath.Join(sc.StateDir, skillBackupsDirName, now.Format("20060102T150405Z")))
+		if err != nil {
+			return fmt.Errorf("cannot choose a backup location; nothing was changed: %w", err)
+		}
+		backupRoot = root
+	}
 	fmt.Fprintf(w, "Installing skills at revision %s\n", revision)
 	if development {
 		fmt.Fprintln(w, "warning: this is a development install. Its skills are marked unversioned, bound only to their skill-set digest.")
@@ -875,12 +891,18 @@ func sameOwnership(existing *manifestTarget, entry manifestTarget) bool {
 }
 
 // uniquePath returns base, or base with the smallest "-N" suffix that does
-// not exist yet.
-func uniquePath(base string) string {
+// not exist yet. A suffix is tried only when the candidate exists. Any other
+// error, such as a parent that is not a directory or cannot be searched, is
+// returned rather than retried.
+func uniquePath(base string) (string, error) {
 	candidate := base
 	for n := 1; ; n++ {
-		if _, err := os.Lstat(candidate); errors.Is(err, fs.ErrNotExist) {
-			return candidate
+		_, err := os.Lstat(candidate)
+		switch {
+		case errors.Is(err, fs.ErrNotExist):
+			return candidate, nil
+		case err != nil:
+			return "", fmt.Errorf("cannot inspect %s: %w", candidate, err)
 		}
 		candidate = fmt.Sprintf("%s-%d", base, n)
 	}
