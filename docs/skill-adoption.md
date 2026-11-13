@@ -1,6 +1,6 @@
 # Builder Garage Skill Adoption Profile
 
-Builder Garage adopts the five canonical engineering [skills](../skills/) it publishes, as its own engineering workflow. This profile makes that adoption explicit and records the project choices that differ from, or qualify, the skill text. The skills themselves are not repeated here.
+Builder Garage adopts the five canonical engineering [skills](../skills/) it publishes, as its own engineering workflow. This profile makes that adoption explicit, points to Builder Garage's configured choices, and records the other project choices that qualify the skill text. The skills themselves are not repeated here.
 
 The skills are framework artifacts that any project can adopt. This profile is Builder Garage's adoption record as a project. Builder Garage's adoption of the Go Manual is recorded separately, in the [Go Manual profile](go-manual.md).
 
@@ -16,23 +16,51 @@ The skills are framework artifacts that any project can adopt. This profile is B
 
 **Revision adopted.** The skills carry no version label today. Builder Garage adopts them as they exist on its `main` branch. A specific revision is identified by commit: the skills at the commit that contains a given change are the ones that governed it. Agents should run copies that match `main`. Distributing skills and verifying installed copies is owned by [#15](https://github.com/bdonaldharris/builder-garage/issues/15).
 
-## Project deltas
+## Configuration
 
-Each row records a choice that differs from, or qualifies, the skill text. Where a row and its source differ, the source is authoritative.
+Builder Garage's configured choices are recorded in [`.garage/config.yaml`](../.garage/config.yaml), which is their sole canonical source ([Project configuration](configuration.md)). Run `garage config validate` to see each configured value, and the default that applies where none is configured. This profile explains those choices; it does not restate or redefine them.
+
+The file was generated, not hand-authored, by running this noninteractive command from the repository root ([#35 decision](https://github.com/bdonaldharris/builder-garage/issues/35#issuecomment-6842152164), item 5):
+
+```sh
+garage init \
+  --integration-branch main \
+  --automated-reviewer codex \
+  --automated-reviewer-request "optional input where available; the chatgpt-codex-connector GitHub integration reviews a pull request when it is opened" \
+  --small-corrections enabled \
+  --small-corrections-without-issue \
+  --small-correction-classifier maintainer \
+  --discovery implementer-judgment \
+  --suggestions-backlog "#24" \
+  --workflow-owner "lead maintainer" \
+  --change-acceptor maintainer \
+  --product-intent-acceptor "Workflow Owner" \
+  --manual go@0.1 \
+  --skill-target claude-code@2.1.277@2026-11-12 \
+  --skill-target codex@0.137.0@2026-11-12 \
+  --skill-target copilot-cli@1.0.93-1@2026-11-12
+```
+
+The canonical skills do not read the configuration yet ([#33](https://github.com/bdonaldharris/builder-garage/issues/33)). Until they do, an agent applies the configured value wherever a skill names a default. The table explains what each configured choice means for Builder Garage.
+
+| Configured choice | What it means here | Source |
+| --- | --- | --- |
+| Integration branch ([E1](extension-points.md#e1-integration-branch)) | Where a skill names `staging` as the integration branch, Builder Garage uses its configured integration branch. This changes the destination only, not any gate. | [GOVERNANCE: Changes to `main`](../GOVERNANCE.md#changes-to-main) |
+| Automated reviewer ([E3](extension-points.md#e3-automated-reviewer)) | The configured reviewer is optional review input where available. Builder Garage does not require a GitHub-hosted agent reviewer, and no tool establishes review authority. Its findings on a PR head fire minimum PR-review trigger 2. | [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 3), [#7 decision](https://github.com/bdonaldharris/builder-garage/issues/7#issuecomment-6817635061) (item 5) |
+| Small corrections ([E4](extension-points.md#e4-small-correction-entry-path)) | A small correction that changes no meaning, such as a typo, broken link, or formatting, may be proposed as a pull request without an issue, and does not require independent review. Only the configured classifier, a human authority, decides that a change is a small correction; an agent never does ([F5](responsibility-floor.md#rules)). Maintainer approval is still required. | [CONTRIBUTING: Small corrections](../CONTRIBUTING.md#small-corrections), [pull request template](../.github/PULL_REQUEST_TEMPLATE.md), [#16 decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788) (item 1) |
+| Discovery ([E5](extension-points.md#e5-discovery-applicability)) | The implementer decides whether discovery is needed, and the Workflow Owner may require it. | [#16 decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788) (item 5), [CONTRIBUTING: Discover when warranted](../CONTRIBUTING.md#2-discover-when-warranted) |
+| Suggestions backlog ([E7](extension-points.md#e7-improvement-suggestions-backlog)) | Non-blocking review observations and dogfooding friction go to the configured issue. A suggestion authorizes nothing until it is promoted into a separately scoped issue. | [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 5) |
+| Human authorities ([E8](extension-points.md#e8-human-authorities)) | The configured roles are explained in [GOVERNANCE: Workflow Owner](../GOVERNANCE.md#workflow-owner) and [GOVERNANCE: Review requirements](../GOVERNANCE.md#review-requirements). | [#8 decision](https://github.com/bdonaldharris/builder-garage/issues/8#issuecomment-6817923896) (item 1), #18 |
+| Skill targets ([tooling](tooling-configuration.md)) | The harness targets Builder Garage's maintainer uses, as confirmed by the #37 load test. They grant no workflow authority. | [#37 decision](https://github.com/bdonaldharris/builder-garage/issues/37#issuecomment-6837792244) |
+
+## Other project deltas
+
+These choices qualify the skill text but are not extension-point values.
 
 | Area | Builder Garage choice | Source |
 | --- | --- | --- |
-| Integration branch | `main`. Where a skill names `staging` as the integration branch, Builder Garage uses `main`. This changes the destination only, not any gate. | [GOVERNANCE: Changes to `main`](../GOVERNANCE.md#changes-to-main) |
 | Implementation-review evidence | Agent #2's implementation review is recorded on the originating issue before commit. That record is authoritative, and it governs whether the implementation may advance. | [GOVERNANCE: Review requirements](../GOVERNANCE.md#review-requirements), [CONTRIBUTING: Obtain independent review](../CONTRIBUTING.md#4-obtain-independent-review), [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (items 1–2) |
-| PR-review condition | An Agent #2 PR review is required when either canonical minimum trigger applies: the PR cannot be shown to be artifact-equivalent to the change Agent #2 approved, or an optional automated reviewer has reported findings on the current PR head. Builder Garage records no additional trigger today. The PR review is supplemental to the authoritative issue-recorded implementation review; it does not replace it. When no trigger applies, a Builder Garage PR proceeds on the issue-recorded review, recorded artifact equivalence, CI, and maintainer approval. | [#26 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/26#issuecomment-6834102663), [#27 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/27#issuecomment-6833011353), [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 2), [integration-pr-review: PR-review triggers](../skills/integration-pr-review/SKILL.md#pr-review-triggers) |
-| Automated review input | Codex, or any other automated reviewer, is optional review input where available. Builder Garage does not require a GitHub-hosted agent reviewer, and no tool establishes review authority. | [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 3), [#7 decision](https://github.com/bdonaldharris/builder-garage/issues/7#issuecomment-6817635061) (item 5) |
-| Small corrections | A small correction that changes no meaning, such as a typo, broken link, or formatting, may be proposed as a pull request without an issue, and does not require independent review. It still requires maintainer approval, and a maintainer decides whether a change is substantive. This is interim treatment until project configuration exists ([#35](https://github.com/bdonaldharris/builder-garage/issues/35)). It is Builder Garage's choice at extension point [E4](extension-points.md#e4-small-correction-entry-path), with a maintainer as the human authority who classifies, as floor rule [F5](responsibility-floor.md#rules) requires. | [CONTRIBUTING: Small corrections](../CONTRIBUTING.md#small-corrections), [pull request template](../.github/PULL_REQUEST_TEMPLATE.md), [#7 decision](https://github.com/bdonaldharris/builder-garage/issues/7#issuecomment-6817635061) (item 4) |
-| Discovery applicability | Implementer judgment with Workflow Owner escalation: the implementer decides whether discovery is needed, and the Workflow Owner may require it. This is Builder Garage's explicit choice at extension point [E5](extension-points.md#e5-discovery-applicability), which has no default. | [#16 decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788) (item 5), [CONTRIBUTING: Discover when warranted](../CONTRIBUTING.md#2-discover-when-warranted) |
-| Suggestions inbox | Non-blocking review observations and dogfooding friction go to the persistent [Application Improvement Suggestions](https://github.com/bdonaldharris/builder-garage/issues/24) issue, which the skills name as the backlog. A suggestion authorizes nothing until it is promoted into a separately scoped issue. | [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 5) |
-
-## Interim documentation
-
-This profile is interim, human-readable documentation. It is not configuration, and nothing reads or validates it. What a project may adapt, and what it may not weaken, is defined by the [extension-point registry](extension-points.md) and the [responsibility floor](responsibility-floor.md). The configuration that records and validates those choices is being designed in [#35](https://github.com/bdonaldharris/builder-garage/issues/35). When that model exists, these choices move into Builder Garage's configuration, and this profile is replaced or reduced to a pointer.
+| PR-review condition | An Agent #2 PR review is required when either canonical minimum trigger applies: the PR cannot be shown to be artifact-equivalent to the change Agent #2 approved, or an optional automated reviewer has reported findings on the current PR head. Added triggers are configured at [E2](extension-points.md#e2-additional-pr-review-triggers). The PR review is supplemental to the authoritative issue-recorded implementation review; it does not replace it. When no trigger applies, a Builder Garage PR proceeds on the issue-recorded review, recorded artifact equivalence, CI, and maintainer approval. | [#26 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/26#issuecomment-6834102663), [#27 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/27#issuecomment-6833011353), [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 2), [integration-pr-review: PR-review triggers](../skills/integration-pr-review/SKILL.md#pr-review-triggers) |
 
 ## What this adoption does and does not show
 

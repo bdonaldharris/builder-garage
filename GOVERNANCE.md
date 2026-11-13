@@ -28,7 +28,7 @@ The Workflow Owner is the human authority for workflow decisions that belong to 
 
 The Workflow Owner is the human authority that accepts product intent for Builder Garage. See [Product-intent acceptance](#product-intent-acceptance).
 
-Until Builder Garage's project configuration records its human authorities ([#35](https://github.com/bdonaldharris/builder-garage/issues/35)), this section is the record of that mapping. Once it does, the configured value is authoritative, and this section explains it.
+Builder Garage's project configuration records these human authorities at extension point [E8](docs/extension-points.md#e8-human-authorities), in [`.garage/config.yaml`](.garage/config.yaml). The configured value is authoritative, and this section explains it. Whether a configured authority is human is a governance responsibility; Garage's validation does not certify it.
 
 ### Contributors
 
@@ -88,7 +88,7 @@ Once additional authorized maintainers are available, a maintainer-authored pull
 - `main` changes only through pull requests. No one pushes to `main` directly, including maintainers.
 - A pull request merges only after maintainer approval and after all required checks pass.
 
-The canonical [integration-pr-review](skills/integration-pr-review/SKILL.md) skill names `staging` as the branch an integration pull request is opened against. Builder Garage does not have a `staging` branch. It applies that workflow's review, validation, and authorization requirements in full, with one repository-specific destination mapping: where the skill names `staging` as the integration branch, Builder Garage uses `main`. The mapping changes the destination only. It does not change or relax any gate the skill defines.
+The canonical [integration-pr-review](skills/integration-pr-review/SKILL.md) skill names `staging` as the branch an integration pull request is opened against. Builder Garage does not have a `staging` branch. Its integration branch is configured at extension point [E1](docs/extension-points.md#e1-integration-branch) in [`.garage/config.yaml`](.garage/config.yaml). It applies that workflow's review, validation, and authorization requirements in full: where the skill names `staging`, Builder Garage uses its configured integration branch. That changes the destination only. It does not change or relax any gate the skill defines.
 
 The human approval that skill requires before merge is the maintainer approval described under [Review requirements](#review-requirements).
 
