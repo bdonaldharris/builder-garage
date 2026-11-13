@@ -136,15 +136,12 @@ func writeConfigSummary(w io.Writer, cfg projectConfig) error {
 		row("E9", "user-facing inspection", "canonical trigger")
 	}
 	var manuals []string
-	var conditional []string
 	if pc.Guidance != nil {
 		for _, m := range pc.Guidance.Manuals {
 			manuals = append(manuals, m.Name+" "+m.Version)
 		}
-		conditional = pc.Guidance.Conditional
 	}
 	row("E10", "manuals", namesOrDefault(manuals, "none (default)"))
-	row("", "conditional guidance", namesOrDefault(conditional, "none enabled (default)"))
 
 	b.WriteString("\nTooling:\n")
 	if cfg.Tooling == nil || cfg.Tooling.SkillTargets == nil || len(*cfg.Tooling.SkillTargets) == 0 {

@@ -628,7 +628,11 @@ This narrow review contract does not remove existing engineering discipline.
 
 Where relevant to the changed behavior, verify that the implementation did not create an unnecessary parallel architecture when an established owner/pattern already exists.
 
-When the **current implementation** creates or modifies a Supabase table or migration used through the Data API, inspect the relevant PostgreSQL grants and RLS path only far enough to answer the three governing questions.
+**Conditional guidance `supabase-data-api-grants`.** It applies when a change creates a table in a Supabase project, or changes the grants or Row Level Security of a table that the Supabase Data API exposes. It is canonical guidance, not configuration: it applies whenever that condition holds, and no project setting enables or disables it.
+
+**Standing rule.** Supabase does not grant Data API access to a new table automatically. Never rely on automatic or historical grants. The migration that creates a table establishes any Data API access explicitly, or none.
+
+When this guidance applies to the **current implementation**, inspect the relevant PostgreSQL grants and RLS path only far enough to answer the three governing questions.
 
 A missing required grant is a current implementation blocker only when it causes one of the governing questions to fail, for example when:
 

@@ -299,42 +299,46 @@ func TestGuidedSetupNeverAsksForConditionalGuidance(t *testing.T) {
 	}
 }
 
-// --conditional-guidance still writes its names, and a guided summary shows
-// configured names as they are, without claiming they are enabled or have
-// an effect (#58).
-func TestConditionalGuidanceFlagIsUnchangedAndShownAsConfigured(t *testing.T) {
-	noninteractive := t.TempDir()
-	desired := desiredFrom(t, "--discovery", "implementer-judgment",
-		"--workflow-owner", "lead", "--change-acceptor", "lead", "--product-intent-acceptor", "lead",
-		"--conditional-guidance", "supabase-data-api")
-	if _, err := initProject(noninteractive, desired, nil); err != nil {
-		t.Fatalf("flag setup: %v", err)
-	}
-	if g := mustLoadValid(t, noninteractive).Project.Guidance; g == nil || len(g.Conditional) != 1 || g.Conditional[0] != "supabase-data-api" {
-		t.Fatalf("guidance = %+v, want the flag's name", g)
-	}
+// Conditional stack or provider guidance is not configurable (#59): its flag
+// is gone, validation refuses a configured value with a correction, and init
+// refuses to upgrade a configuration that holds one.
+func TestConditionalGuidanceIsNotConfigurable(t *testing.T) {
+	t.Run("flag removed", func(t *testing.T) {
+		newProjectDir(t)
+		_, _, err := runCLI(t, "dev", initArgs("--conditional-guidance", "supabase-data-api")...)
+		if err == nil || !strings.Contains(err.Error(), "unknown flag") {
+			t.Fatalf("init --conditional-guidance = %v, want an unknown-flag error", err)
+		}
+	})
 
-	noDefaultBranch(t)
-	guided := t.TempDir()
-	ask := &scriptedPrompter{answers: []string{
-		"", "", "", "", "", "", "", // branch, PR reviews, reviewer, small corrections, release, suggestions, inspection
-		"", // agent tools: none; the manuals step is skipped because a flag set guidance
-		"y",
-	}}
-	if _, err := initProject(guided, desired, ask); err != nil {
-		t.Fatalf("guided setup: %v", err)
-	}
-	if len(ask.answers) != 0 {
-		t.Fatalf("unused answers %q", ask.answers)
-	}
-	summary := strings.Join(ask.told, "")
-	if !strings.Contains(summary, "Conditional guidance names") || !strings.Contains(summary, "supabase-data-api") {
-		t.Errorf("the summary does not show the configured names:\n%s", summary)
-	}
-	if strings.Contains(strings.ToLower(summary), "enabled") {
-		t.Errorf("the summary claims an effect for the names:\n%s", summary)
-	}
-	if readFile(t, configPathIn(guided)) != readFile(t, configPathIn(noninteractive)) {
-		t.Error("guided setup with the flag wrote a different file from the flag alone")
-	}
+	const withConditional = validConfigYAML + `  guidance:
+    conditional:
+      - supabase-data-api
+`
+	t.Run("validation refuses it", func(t *testing.T) {
+		problems := validateConfig(decodeOrFail(t, withConditional))
+		if len(problems) != 1 || !strings.Contains(problems[0], "project.guidance.conditional is not configurable") ||
+			!strings.Contains(problems[0], "remove project.guidance.conditional") {
+			t.Fatalf("problems = %v, want one not-configurable correction", problems)
+		}
+	})
+
+	t.Run("an empty list is harmless", func(t *testing.T) {
+		empty := validConfigYAML + "  guidance:\n    conditional: []\n"
+		if problems := validateConfig(decodeOrFail(t, empty)); problems != nil {
+			t.Fatalf("problems = %v, want none", problems)
+		}
+	})
+
+	t.Run("init refuses to upgrade it", func(t *testing.T) {
+		dir := t.TempDir()
+		writeFile(t, configPathIn(dir), withConditional)
+		_, err := initProject(dir, desiredFrom(t, "--integration-branch", "main"), nil)
+		if err == nil || !strings.Contains(err.Error(), "not configurable") || !strings.Contains(err.Error(), "was not changed") {
+			t.Fatalf("init upgrade = %v, want a refusal that leaves the file unchanged", err)
+		}
+		if got := readFile(t, configPathIn(dir)); got != withConditional {
+			t.Errorf("the configuration was changed:\n%s", got)
+		}
+	})
 }

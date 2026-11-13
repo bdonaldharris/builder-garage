@@ -481,9 +481,13 @@ Agent #1:
 11. identifies and maintains the authoritative Environment / Deployment Requirements for the current artifact;
 12. computes the artifact identity and posts the structured `[AGENT #1 — IMPLEMENTATION]` workflow-state comment, with its evidence block, to the governing Issue or PR with implementation, validation, environment/deployment requirements, and terminal status, then verifies it.
 
-## Supabase table creation
+## Supabase Data API grants
 
-When Agent #1 creates a Supabase table, do not assume that Data API access should exist and do not rely on historical automatic grants.
+**Conditional guidance `supabase-data-api-grants`.** It applies when a change creates a table in a Supabase project, or changes the grants or Row Level Security of a table that the Supabase Data API exposes. It is canonical guidance, not configuration: it applies whenever that condition holds, and no project setting enables or disables it.
+
+**Standing rule.** Supabase does not grant Data API access to a new table automatically. Never rely on automatic or historical grants. The migration that creates a table establishes any Data API access explicitly, or none.
+
+When this guidance applies, do not assume that Data API access should exist and do not rely on historical automatic grants.
 
 Use the access model established during readiness:
 

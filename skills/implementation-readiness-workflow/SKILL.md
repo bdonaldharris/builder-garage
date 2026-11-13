@@ -234,11 +234,13 @@ Where applicable, determine:
 - likely query-volume or N+1 risks;
 - idempotency requirements.
 
-### Supabase Data API access for newly created tables
+### Supabase Data API grants
 
-Supabase has announced that beginning **October 30, 2026**, existing projects will no longer automatically receive Data API grants for newly created tables in the `public` schema. Encode the engineering rule now rather than relying on the historical default or the cutoff date.
+**Conditional guidance `supabase-data-api-grants`.** It applies when a change creates a table in a Supabase project, or changes the grants or Row Level Security of a table that the Supabase Data API exposes. It is canonical guidance, not configuration: it applies whenever that condition holds, and no project setting enables or disables it.
 
-When a change creates a Supabase table, readiness must **explicitly determine whether any Data API role should have access at all**.
+**Standing rule.** Supabase does not grant Data API access to a new table automatically. Never rely on automatic or historical grants. The migration that creates a table establishes any Data API access explicitly, or none.
+
+When this guidance applies, readiness must **explicitly determine whether any Data API role should have access at all**.
 
 If Data API access is required:
 

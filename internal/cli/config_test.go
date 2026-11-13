@@ -72,8 +72,6 @@ func TestValidateAcceptsCompleteConfiguration(t *testing.T) {
     manuals:
       - name: go
         version: "0.1"
-    conditional:
-      - supabase
 tooling:
   skill_targets:
     - harness: codex

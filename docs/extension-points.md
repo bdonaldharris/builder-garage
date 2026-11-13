@@ -1,6 +1,6 @@
 # Extension-Point Registry
 
-**Version:** 1
+**Version:** 2. Version 1 also declared conditional stack or provider guidance at E10; it was retired under [#59](https://github.com/bdonaldharris/builder-garage/issues/59).
 **Status:** Canonical. Defined under [#32](https://github.com/bdonaldharris/builder-garage/issues/32), following the [#16 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788). That decision established the registry's role and its precedence. The entries below, including their allowed values and defaults, are accepted through this change's independent review and maintainer approval.
 
 This registry lists every point at which a project adopting Builder Garage may adapt the framework. For each point, it gives the values a project may choose, the canonical default, and the constraint the choice must keep. A project may adapt only what this registry declares. The rules no choice may weaken are in the [responsibility floor](responsibility-floor.md).
@@ -106,14 +106,14 @@ The human responsibilities are:
 | **Constraint** | A trigger evaluated by the human acceptor. It is not a universal step and not an agent gate. Whether a project may turn the trigger off is not decided, so this registry declares only the canonical trigger and project additions to it. |
 | **Source** | [#8 decision](https://github.com/bdonaldharris/builder-garage/issues/8#issuecomment-6817923896) item 3, [GOVERNANCE: Product-intent acceptance](../GOVERNANCE.md#product-intent-acceptance) |
 
-### E10: Manuals and conditional stack or provider guidance
+### E10: Manuals
 
 | | |
 | --- | --- |
-| **Allowed values** | A list of adopted [manuals](../manuals/README.md), each with the version adopted, and a list of enabled conditional stack or provider guidance. |
-| **Default** | No manual adopted. Conditional guidance carried in the canonical skills applies only when its own stated condition holds. An example is the Supabase guidance, which applies when a change creates a Supabase table. |
-| **Constraint** | Guidance only, never a requirement. Adopting guidance never relaxes a floor rule or a canonical skill gate. |
-| **Source** | [Manuals: How manuals are used](../manuals/README.md#how-manuals-are-used), [architecture: Conceptual components](architecture.md#conceptual-components), [#6 direction](https://github.com/bdonaldharris/builder-garage/issues/6#issuecomment-6817083027) item 3 |
+| **Allowed values** | A list of adopted [manuals](../manuals/README.md), each with the version adopted. |
+| **Default** | No manual adopted. |
+| **Constraint** | Guidance only, never a requirement. Adopting a manual never relaxes a floor rule or a canonical skill gate. |
+| **Source** | [Manuals: How manuals are used](../manuals/README.md#how-manuals-are-used), [architecture: Conceptual components](architecture.md#conceptual-components), [#6 direction](https://github.com/bdonaldharris/builder-garage/issues/6#issuecomment-6817083027) item 3, [#56 decision](https://github.com/bdonaldharris/builder-garage/issues/56#issuecomment-6859392233) |
 
 ## Not configurable
 
@@ -124,6 +124,7 @@ These are deliberately not extension points:
 - **The three-question review contract** ([F13](responsibility-floor.md#rules)).
 - **The two minimum PR-review triggers** ([F10](responsibility-floor.md#rules)).
 - **Which vendor, model, or tool fills a role.** Any may fill a role that it can carry out, so there is nothing to configure ([F9](responsibility-floor.md#rules)).
+- **Conditional stack or provider guidance.** Some guidance in the canonical skills applies only to a particular stack or provider, such as the Supabase Data API grants guidance (`supabase-data-api-grants`). It applies whenever its own stated condition holds; a project neither selects nor disables it ([#56 decision](https://github.com/bdonaldharris/builder-garage/issues/56#issuecomment-6859392233)). `garage config validate` refuses a `project.guidance.conditional` value.
 
 ## Not registered in this version
 

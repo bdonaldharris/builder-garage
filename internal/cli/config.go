@@ -91,8 +91,11 @@ type inspectionChoice struct {
 }
 
 type guidanceChoice struct {
-	Manuals     []manualChoice `yaml:"manuals,omitempty"`
-	Conditional []string       `yaml:"conditional,omitempty"`
+	Manuals []manualChoice `yaml:"manuals,omitempty"`
+	// Conditional is retired (#59): conditional stack or provider guidance
+	// is not configurable. It is decoded only so that validateConfig can
+	// refuse a value with a clear correction.
+	Conditional []string `yaml:"conditional,omitempty"`
 }
 
 type manualChoice struct {
@@ -330,7 +333,9 @@ func validateConfig(cfg projectConfig) configProblems {
 			}
 			seen[m.Name] = true
 		}
-		checkUniqueLines(&p, "project.guidance.conditional (E10)", g.Conditional)
+		if len(g.Conditional) > 0 {
+			add("project.guidance.conditional is not configurable: conditional stack or provider guidance in the canonical skills applies whenever its own stated condition holds, and no project selects or disables it; remove project.guidance.conditional")
+		}
 	}
 
 	if t := cfg.Tooling; t != nil && t.SkillTargets != nil {

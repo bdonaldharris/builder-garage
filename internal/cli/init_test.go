@@ -112,7 +112,6 @@ func desiredFrom(t *testing.T, args ...string) projectConfig {
 	f.SmallCorrectionClassifier = read("small-correction-classifier")
 	f.InspectionConditions = readAll("inspection-condition")
 	f.Manuals = readAll("manual")
-	f.ConditionalGuidance = readAll("conditional-guidance")
 	f.SkillTargets = readAll("skill-target")
 	cfg, err := configFromFlags(f, cmd.Flags().Changed)
 	if err != nil {
