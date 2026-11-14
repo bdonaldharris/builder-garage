@@ -132,8 +132,10 @@ func TestGuidedSetupSuggestsTheRepositoryDefaultBranch(t *testing.T) {
 }
 
 // Every choice made through the menus produces exactly the file that the
-// equivalent flags produce.
+// equivalent flags produce. The manual catalog is fixed, so the pick-list
+// position of the Go Manual does not change as manuals are added.
 func TestGuidedSetupMatchesTheEquivalentFlags(t *testing.T) {
+	useManualCatalog(t, testCatalog())
 	noDefaultBranch(t)
 	guided := t.TempDir()
 	ask := &scriptedPrompter{answers: []string{
@@ -265,6 +267,9 @@ func TestGuideMenusAskAgainOnInvalidAnswers(t *testing.T) {
 // either path through its manuals step, and its summary does not mention it
 // when none is configured (#58).
 func TestGuidedSetupNeverAsksForConditionalGuidance(t *testing.T) {
+	// A fixed catalog keeps the Go Manual at pick-list position 1 as manuals
+	// are added.
+	useManualCatalog(t, testCatalog())
 	adoptManual := append(append([]string(nil), defaultAnswers[:len(defaultAnswers)-2]...),
 		"1", // manuals: the Go Manual, from the catalog
 		"",  // agent tools: none

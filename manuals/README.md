@@ -6,6 +6,7 @@ Manuals are maintained technical guidance on how software built with a particula
 
 | Manual | Version | Adopted by Builder Garage in |
 | --- | --- | --- |
+| [C# / .NET](dotnet.md) | 0.1 (provisional) | Not adopted by Builder Garage |
 | [Go](go.md) | 0.1 (provisional) | [Builder Garage Go Manual](../docs/go-manual.md) |
 
 ## How manuals are used
