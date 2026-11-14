@@ -135,7 +135,7 @@ The user-facing inspection trigger (E9) is evaluated by the human product-intent
 
 Agent #2 performs two distinct review sequences:
 
-- **Implementation review.** Before commit, Agent #2 independently reviews the complete implementation under `independent-implementation-review` and records its disposition on the **originating issue**. That record is authoritative. It determines whether the implementation may be committed and proposed as a PR.
+- **Implementation review.** Before the change is proposed for integration, Agent #2 independently reviews the complete implementation under `independent-implementation-review` and records its disposition on the **originating issue**. The reviewed artifact is usually an uncommitted working tree, or, under commit-stage review, a pushed head that is not yet proposed. That record is authoritative. It determines whether the implementation may be proposed as a PR.
 - **PR review.** When a PR-review trigger applies (see [PR-review triggers](#pr-review-triggers)), Agent #2 separately reviews the PR artifact under `independent-implementation-review` and records its disposition on the **PR itself**. This skill governs the PR sequence and is executed by Agent #1. Agent #2 never performs its review under this skill.
 
 A PR review is **supplemental**. It never replaces, substitutes for, or retroactively satisfies the issue-recorded implementation review. A PR whose change has no approving issue-recorded implementation review is not eligible for a PR review. It returns to the implementation workflow.
@@ -155,7 +155,7 @@ When neither minimum trigger applies and no configured trigger applies, no Agent
 
 ## Artifact equivalence
 
-Agent #2 approves an artifact, and usually an uncommitted one: the implementation reviewed on the issue, or a correction re-reviewed on the PR. Committing and pushing that artifact creates a new head SHA that Agent #2 never saw. An approval therefore rests on **artifact equivalence**, not on head-SHA identity.
+Agent #2 approves an artifact, and usually an uncommitted one: the implementation reviewed on the issue, or a correction re-reviewed on the PR. Committing and pushing that artifact creates a new head SHA that Agent #2 never saw. Under commit-stage review, Agent #2 approved a pushed head, and a rebase before the PR opens creates a new head SHA too. An approval therefore rests on **artifact equivalence**, not on head-SHA identity.
 
 A head is **artifact-equivalent** to an approved artifact when the head's `changeset`, computed under [`garage-artifact-v1`](#artifact-identity-garage-artifact-v1) at the `commit` stage, equals the `changeset` recorded in the approving Agent #2 disposition: the head's changed files and their content match the approved artifact exactly.
 
@@ -402,6 +402,11 @@ When no integration PR exists and a durable approving Agent #2 implementation re
 3. commit;
 4. push;
 5. open the PR against the configured integration branch (E1);
+
+When the approval is of a commit-stage artifact (`application-implementation-workflow`, "Commit-stage review"), the approved head already exists. Steps 2–4 do not apply. Agent #1 verifies that the head to be proposed has a commit-stage `changeset` equal to the approval's, makes no new commit, and continues from step 5. The head to be proposed is the reviewed head, or one rebased onto the integration branch without changing the `changeset`.
+
+After either case:
+
 6. record the applicable `[AGENT #1 — IMPLEMENTATION]` state on the PR as the [equivalence record](#artifact-equivalence) for the pushed head, stating in its human-readable sections which PR-review triggers apply, then verify it;
 7. if any PR-review trigger applies, post the [Agent #2 PR Review Request](#agent-2-pr-review-request), then STOP.
 

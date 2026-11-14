@@ -246,7 +246,7 @@ Agents should read the governing Issue/PR, identify the latest relevant workflow
 
 For Agent #2 review, the durable record is mandatory. Agent #2 performs two distinct review sequences:
 
-- **Implementation review** → write `[AGENT #2 — INDEPENDENT REVIEW]` to the **originating Issue**. Agent #2 reviews the complete implementation before it is committed. The issue record is the authoritative record of that review, and it governs whether the implementation may advance.
+- **Implementation review** → write `[AGENT #2 — INDEPENDENT REVIEW]` to the **originating Issue**. Agent #2 reviews the complete implementation before it is proposed as a pull request: the uncommitted working tree by default, or a pushed commit under commit-stage review. The issue record is the authoritative record of that review, and it governs whether the implementation may advance.
 - **PR review**, when a PR-review trigger applies → write `[AGENT #2 — INDEPENDENT REVIEW]` to the **PR itself**. The PR record is supplemental. It never replaces the issue-recorded implementation review. The canonical skills define two minimum PR-review triggers: the PR cannot be shown to be artifact-equivalent to the latest Agent #2-approved artifact, or an optional automated reviewer has reported findings on the current head. A project may record additional triggers. Approvals rest on recorded artifact equivalence, not on head-SHA identity. When no trigger applies, the PR proceeds on the issue-recorded review and the remaining merge gates.
 
 The Agent #2 invocation is not complete until that durable comment has been successfully written and verified. A review returned only in the agent response does not satisfy the workflow. If the durable write fails, Agent #2 must report the failure rather than claim the review state was recorded.
@@ -365,7 +365,7 @@ Builder Garage is maintainer-led and community-contributed. Contributions are we
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — expected conduct.
 - **[SECURITY.md](SECURITY.md)** — how to report a vulnerability privately.
 
-A substantive change passes two distinct gates: **independent engineering review** before it is committed, and **maintainer approval** of the pull request before it is merged. Neither replaces the other.
+A substantive change passes two distinct gates: **independent engineering review** before it is proposed as a pull request, and **maintainer approval** of the pull request before it is merged. Neither replaces the other.
 
 ## Contributors
 

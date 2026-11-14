@@ -38,7 +38,7 @@ Gates 7 to 11 are conditions of the merge decision. They hold together on the cu
 
 | | |
 | --- | --- |
-| **Question** | Is the implementation complete and ready for independent review, with nothing committed, pushed, or proposed? |
+| **Question** | Is the implementation complete and ready for independent review, and not proposed? By default it is uncommitted; under commit-stage review it is pushed to a branch with no pull request. |
 | **Who acts** | Agent #1, the implementer. Reaching review is a terminal handoff: Agent #1 stops ([F3](../docs/responsibility-floor.md#rules)). |
 | **Record** | `[AGENT #1 — IMPLEMENTATION]`, with its evidence block identifying the artifact, on the governing issue. |
 | **Source kind** | Floor rules [F3, F4, F5, F7](../docs/responsibility-floor.md#rules). |
@@ -50,7 +50,7 @@ Gates 7 to 11 are conditions of the merge decision. They hold together on the cu
 | --- | --- |
 | **Question** | The three questions: acceptance criteria met? New bug or regression introduced? Does it work? `Yes -> No -> Yes` is approval. |
 | **Who acts** | Agent #2, the reviewer, in an execution context separate from the implementation. It is never the implementer. |
-| **Record** | `[AGENT #2 — INDEPENDENT REVIEW]` on the originating issue. This record is authoritative, and it decides whether the change may be committed. Where review is recorded is not configurable. |
+| **Record** | `[AGENT #2 — INDEPENDENT REVIEW]` on the originating issue. This record is authoritative, and it decides whether the change may be proposed as a pull request. Where review is recorded is not configurable. |
 | **Source kind** | Floor rules [F1, F2, F5, F7, F13](../docs/responsibility-floor.md#rules). The one exception to F5 is a small correction that the configured human authority explicitly classifies as one ([E4](../docs/extension-points.md#e4-small-correction-entry-path)). An agent may never classify a change, or exempt itself. |
 | **Defined in** | [independent-implementation-review: Review record](../skills/independent-implementation-review/SKILL.md#review-record), [GOVERNANCE: Review requirements](../GOVERNANCE.md#review-requirements), [CONTRIBUTING: Obtain independent review](../CONTRIBUTING.md#4-obtain-independent-review) |
 
@@ -68,7 +68,7 @@ Gates 7 to 11 are conditions of the merge decision. They hold together on the cu
 
 | | |
 | --- | --- |
-| **Question** | Is exactly the approved artifact what is committed and proposed? |
+| **Question** | Is exactly the approved artifact what is proposed, whether it is committed now or was already committed under commit-stage review? |
 | **Who acts** | Agent #1, in a new invocation after the approval is recorded. |
 | **Record** | The pull request, against the configured integration branch, linking the issue and its review record. For each pushed head, an Agent #1 equivalence record on the pull request. |
 | **Source kind** | Floor rules [F5, F7](../docs/responsibility-floor.md#rules). [E1](../docs/extension-points.md#e1-integration-branch) sets the destination only. |
@@ -138,7 +138,7 @@ Gates 7 to 11 are conditions of the merge decision. They hold together on the cu
 
 Independent engineering review (gate 3), change-acceptor approval (gate 10), and product-intent acceptance (gate 11) answer different questions, and none substitutes for another.
 
-- Independent review asks whether the change is correct for its written issue. Its approval permits a commit and a pull request. It does not authorize merge.
+- Independent review asks whether the change is correct for its written issue. Its approval permits a pull request. It does not authorize merge.
 - Change acceptance asks whether the project accepts the change. It does not stand in for a missing independent review ([F11](../docs/responsibility-floor.md#rules)).
 - Product-intent acceptance asks whether the result is what was intended for its user. Intent that the issue states is checked by independent review. Intent that it does not state is the human acceptor's to judge, never an agent's ([F12](../docs/responsibility-floor.md#rules)).
 
@@ -148,7 +148,7 @@ A project may name the same governance role for more than one of these human res
 
 An external contributor follows the review path decided in the [#98 D1 decision](https://github.com/bdonaldharris/builder-garage/issues/98#issuecomment-6873371683), option A: contributor-held separation. The decision defines that path. This map does not.
 
-Option B, commit-stage review of a pushed branch, is under consideration in [#99](https://github.com/bdonaldharris/builder-garage/issues/99). It is not available. Nothing in F5 or the skills changes until that change is reviewed and accepted.
+Option B, commit-stage review of a pushed branch, is available under the [#99 decision](https://github.com/bdonaldharris/builder-garage/issues/99#issuecomment-6883827812). When the reviewer cannot reach the contributor's workspace, the contributor pushes the change to a branch without opening a pull request, and the reviewer reviews that commit. It is used only when the invocation or the issue asks for it ([application-implementation-workflow: Commit-stage review](../skills/application-implementation-workflow/SKILL.md#commit-stage-review)).
 
 ## Builder Garage example
 

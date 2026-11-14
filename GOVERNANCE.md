@@ -50,11 +50,11 @@ A substantive change passes two distinct gates. They answer different questions,
 
 | Gate | Question it answers | Performed by | When | Recorded |
 | --- | --- | --- | --- | --- |
-| **Independent engineering review** | Is the change correct for its issue? | A reviewer independent of the implementation; need not be a maintainer | After implementation, before the change is committed | On the originating issue |
+| **Independent engineering review** | Is the change correct for its issue? | A reviewer independent of the implementation; need not be a maintainer | After implementation, before the change is proposed for integration | On the originating issue |
 | **Maintainer approval** | Does the project accept the change? | A maintainer | On the pull request, before merge | As an approving review on the pull request, except as described under [Pull requests authored by a sole maintainer](#pull-requests-authored-by-a-sole-maintainer) |
 
 - The implementer of a change never performs its independent engineering review. Corrections made in response to review findings are independently re-reviewed before the change proceeds.
-- Independent approval permits a change to be committed and proposed as a pull request. It does not authorize merge.
+- Independent approval permits a change to be proposed as a pull request. It does not authorize merge. A change may be committed and pushed to a branch before review only to make it available for review, and it is not proposed until it is approved. Opening a pull request, including a draft, proposes it.
 - Maintainer approval does not stand in for a missing independent engineering review.
 - The record on the originating issue is the authoritative record of the independent engineering review. A review of the pull request, where one is required, supplements it and never replaces it. Review authority comes from the reviewer's independence and role, not from the tool used, and no GitHub-hosted agent reviewer or vendor integration is required.
 

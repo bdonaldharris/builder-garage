@@ -18,7 +18,7 @@ Every substantive change passes two gates. They answer different questions at di
 | | Independent engineering review | Maintainer approval |
 | --- | --- | --- |
 | **Question** | Is this change correct for its issue? | Does the project accept this change? |
-| **When** | After implementation, before anything is committed | On the pull request, before merge |
+| **When** | After implementation, before the change is proposed as a pull request | On the pull request, before merge |
 | **Who** | A reviewer independent of the implementation; need not be a maintainer | A project maintainer |
 | **Recorded** | On the originating issue | As a GitHub approving review on the pull request, except for [pull requests authored by a sole maintainer](#pull-requests-authored-by-a-sole-maintainer) |
 | **Standard** | The review contract in [independent-implementation-review](skills/independent-implementation-review/SKILL.md) | Maintainer judgment under [GOVERNANCE.md](GOVERNANCE.md), plus required checks |
@@ -59,19 +59,24 @@ Not every change needs a separate discovery pass. Depth should be proportional t
 
 ### 3. Implement
 
-Implement the change within the scope of its issue. **Do not commit yet.**
+Implement the change within the scope of its issue. **Do not commit yet**, by default. Under [commit-stage review](skills/application-implementation-workflow/SKILL.md#commit-stage-review), when the issue or the person running the implementation asks for it, commit the change and push it to a branch without opening a pull request.
 
 - Procedure: [application-implementation-workflow](skills/application-implementation-workflow/SKILL.md)
 
 ### 4. Obtain independent review
 
-Before anything is committed, the complete change is reviewed by someone independent of its implementation. The implementer never reviews their own work.
+Before the change is proposed as a pull request, including a draft, the complete change is reviewed by someone independent of its implementation. The implementer never reviews their own work.
 
-The review result is recorded on the originating issue. That issue record is the authoritative record of the independent review, and it governs whether the change may be committed. A review of the pull request, where one is required, supplements it and never replaces it.
+The change is reviewed in one of two forms:
+
+- **Uncommitted, the default.** The reviewer inspects the implementer's working tree, so the reviewer must be able to reach it.
+- **Committed, when asked for.** Under [commit-stage review](skills/application-implementation-workflow/SKILL.md#commit-stage-review), the implementer commits the change and pushes it to a branch without opening a pull request, for example in their fork. A reviewer who cannot reach the implementer's workspace reviews that commit. Use this path only when the issue or the person running the implementation asks for it.
+
+The review result is recorded on the originating issue. That issue record is the authoritative record of the independent review, and it governs whether the change may be proposed as a pull request. A review of the pull request, where one is required, supplements it and never replaces it.
 
 - Procedure and review contract: [independent-implementation-review](skills/independent-implementation-review/SKILL.md)
 
-**Contributors outside the project.** You may hold this separation yourself. Run the implementation and the independent review as separate invocations, in separate execution contexts, in your own workspace, and post both records on the originating issue ([F1, F2](docs/responsibility-floor.md#rules)). This path is set by the [#98 D1 decision](https://github.com/bdonaldharris/builder-garage/issues/98#issuecomment-6873371683). [Contributor-held separation](crew/filling-roles.md#contributor-held-separation) explains it, and [Your first contribution](docs/first-contribution.md#4-implement-and-review-in-separate-execution-contexts) walks through it. If you cannot run separate execution contexts, for example because you work entirely by hand, ask on the issue before implementing.
+**Contributors outside the project.** You may hold this separation yourself. Run the implementation and the independent review as separate invocations, in separate execution contexts, in your own workspace, and post both records on the originating issue ([F1, F2](docs/responsibility-floor.md#rules)). This path is set by the [#98 D1 decision](https://github.com/bdonaldharris/builder-garage/issues/98#issuecomment-6873371683). [Contributor-held separation](crew/filling-roles.md#contributor-held-separation) explains it, and [Your first contribution](docs/first-contribution.md#4-implement-and-review-in-separate-execution-contexts) walks through it. If you cannot run separate execution contexts, for example because you work entirely by hand, ask on the issue before implementing. Someone outside your workspace may then review a pushed commit under commit-stage review, as described above.
 
 ### 5. Correct and re-review
 
@@ -84,6 +89,8 @@ Only after independent approval:
 1. commit the change that was approved, and nothing else;
 2. push it to a branch (in your fork, or in this repository if you have access);
 3. open a pull request against `main`, completing the [pull request template](.github/PULL_REQUEST_TEMPLATE.md) and linking the issue and its review record.
+
+Under commit-stage review, the approved change is already committed and pushed: skip steps 1 and 2, and open the pull request from the reviewed commit, or from one whose change is identical.
 
 If the change is modified after approval, it returns to independent review.
 

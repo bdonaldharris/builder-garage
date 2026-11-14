@@ -15,7 +15,8 @@ See CONTRIBUTING.md.
 ## Independent engineering review
 
 <!--
-Completed BEFORE this change was committed, by a reviewer independent of the implementation.
+Completed BEFORE this pull request was opened, by a reviewer independent of the implementation.
+The reviewed artifact was either the uncommitted change or, under commit-stage review, a pushed commit.
 Not required for a small correction; write "Not applicable - small correction".
 -->
 

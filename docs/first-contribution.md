@@ -20,7 +20,7 @@ Read the issue's acceptance criteria and scope before starting. The issue is the
 
 A change goes from issue to implementation, independent review, any correction and re-review, commit and pull request, and maintainer approval and merge. [How a substantive change proceeds](../CONTRIBUTING.md#how-a-substantive-change-proceeds) defines each step, and the [gate map](../inspection/gate-map.md) shows the gates in order.
 
-Two gates are separate: independent engineering review before anything is committed, and maintainer approval of the pull request before merge. Neither replaces the other ([Two separate gates](../CONTRIBUTING.md#two-separate-gates)).
+Two gates are separate: independent engineering review before the change is proposed as a pull request, and maintainer approval of the pull request before merge. Neither replaces the other ([Two separate gates](../CONTRIBUTING.md#two-separate-gates)).
 
 ## 4. Implement and review in separate execution contexts
 
@@ -28,7 +28,7 @@ You hold the separation between implementation and independent review yourself. 
 
 - **What separation means.** [Separate execution contexts](../crew/filling-roles.md#separate-execution-contexts) and [Contributor-held separation](../crew/filling-roles.md#contributor-held-separation) explain it, including why the reviewer starts in a new context that has not seen the implementation conversation.
 - **Ways to do it.** [Collaboration patterns](../crew/filling-roles.md#collaboration-patterns) describes them.
-- **If you cannot run separate contexts,** for example because you are working entirely by hand, ask on the issue before implementing.
+- **If you cannot run separate contexts,** for example because you are working entirely by hand, ask on the issue before implementing. Someone outside your workspace may then review a pushed commit under [commit-stage review](../skills/application-implementation-workflow/SKILL.md#commit-stage-review).
 
 The procedures are [application-implementation-workflow](../skills/application-implementation-workflow/SKILL.md) for implementation and [independent-implementation-review](../skills/independent-implementation-review/SKILL.md) for the review. README's [Skill shorthand](../README.md#skill-shorthand) lists their short names. No particular AI model, vendor, or tool is required.
 
@@ -36,7 +36,7 @@ The procedures are [application-implementation-workflow](../skills/application-i
 
 Two records go on the originating issue:
 
-1. The **implementation record**, `[AGENT #1 — IMPLEMENTATION]`, posted when the change is ready for review and still uncommitted. See [Agent #1 completion record](review-evidence.md#agent-1-completion-record).
+1. The **implementation record**, `[AGENT #1 — IMPLEMENTATION]`, posted when the change is ready for review. By default the change is still uncommitted. Under commit-stage review, it is pushed to a branch with no pull request. See [Agent #1 completion record](review-evidence.md#agent-1-completion-record).
 2. The **review record**, `[AGENT #2 — INDEPENDENT REVIEW]`, posted by the separate review context. See [Agent #2 review record](review-evidence.md#agent-2-review-record).
 
 Each carries a `garage-evidence` block that identifies the exact change with its `garage-artifact-v1` identity. Compute it with the [reference procedure](review-evidence.md#reference-procedure). [Where each record lives](review-evidence.md#where-each-record-lives) lists every record, including the one that goes on the pull request.
@@ -47,7 +47,7 @@ Each carries a `garage-evidence` block that identifies the exact change with its
 
 ## 7. Open the pull request
 
-After the review record approves the change, commit exactly the approved change, push it to a branch in your fork, and open a pull request against `main` ([Commit, push, and open a pull request](../CONTRIBUTING.md#6-commit-push-and-open-a-pull-request)).
+After the review record approves the change, commit exactly the approved change, push it to a branch in your fork, and open a pull request against `main`. If the change was already pushed for commit-stage review, open the pull request from that reviewed commit instead ([Commit, push, and open a pull request](../CONTRIBUTING.md#6-commit-push-and-open-a-pull-request)).
 
 - **The template.** Complete the [pull request template](../.github/PULL_REQUEST_TEMPLATE.md), and link the issue and its approving review record.
 - **The equivalence record.** The pull-request stage also asks for an [equivalence record on the pull request](review-evidence.md#equivalence-record-on-a-pr), as [integration-pr-review](../skills/integration-pr-review/SKILL.md) defines.

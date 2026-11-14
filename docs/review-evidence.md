@@ -19,13 +19,13 @@ An artifact is a change: the difference between a **base commit** `B` and a **re
 | Input | Working-tree artifact: an uncommitted change | Committed artifact: a pushed head `H` |
 | --- | --- | --- |
 | Integration reference `I` | The project's configured integration branch tip, as fetched. Builder Garage: `origin/main`. | Same |
-| Base `B` | `git merge-base I HEAD` | `git merge-base I H` while the PR is open. After merge, `git merge-base M^1 M^2`, where `M` is the merge commit. |
+| Base `B` | `git merge-base I HEAD` | `git merge-base I H` before the PR opens and while it is open. After merge, `git merge-base M^1 M^2`, where `M` is the merge commit. |
 | Result tree `T` | The working tree, staged into a **temporary** index (procedure below) | `H^{tree}` |
 
 An artifact's **stage** is either `working-tree` or `commit`. The stage is set by what the reviewer inspects, not by where the record is posted:
 
-- **Working tree.** An implementation reviewed on the issue before commit. Also a correction that Agent #2 re-reviews on the PR before Agent #1 commits it ([integration-pr-review: Artifact equivalence](../skills/integration-pr-review/SKILL.md#artifact-equivalence)).
-- **Commit.** A pushed PR head, such as one reviewed in a triggered PR review.
+- **Working tree.** An implementation reviewed on the issue before commit, which is the default. Also a correction that Agent #2 re-reviews on the PR before Agent #1 commits it ([integration-pr-review: Artifact equivalence](../skills/integration-pr-review/SKILL.md#artifact-equivalence)).
+- **Commit.** A pushed PR head, such as one reviewed in a triggered PR review. Also an implementation or correction under commit-stage review: a pushed branch head that is not yet proposed for integration, reviewed on the issue so that a reviewer outside the implementer's workspace can recompute it ([application-implementation-workflow: Commit-stage review](../skills/application-implementation-workflow/SKILL.md#commit-stage-review)).
 
 For a working-tree artifact, the working tree is the artifact, because it is what the reviewer inspects. The developer's real index is never read or changed.
 
