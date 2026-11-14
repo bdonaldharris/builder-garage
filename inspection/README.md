@@ -10,7 +10,7 @@ The governing application review contract asks:
 
 `Yes -> No -> Yes` is the approval disposition under the current contract. Testing requirements remain specific to the application and change. A review is not complete until its required durable Issue/PR record is written and verified.
 
-See [Independent Implementation Review](../skills/independent-implementation-review/SKILL.md) and the [root review contract](../README.md#review-contract).
+See [Independent Implementation Review](../skills/independent-implementation-review/SKILL.md) and the [root review contract](../README.md#review-contract). The [gate map](gate-map.md) traces every gate between an issue and a merge, in lifecycle order, and links each to its defining source.
 
 ## Boundary
 
