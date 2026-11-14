@@ -359,6 +359,7 @@ Application engineering should follow the relevant skill and durable GitHub work
 Builder Garage is maintainer-led and community-contributed. Contributions are welcome.
 
 - **[CONTRIBUTING.md](CONTRIBUTING.md)** — how a change is proposed, reviewed, and merged.
+- **[Your first contribution](docs/first-contribution.md)** — a walkthrough of one change, from finding an issue to an open pull request.
 - **[Open an issue](https://github.com/bdonaldharris/builder-garage/issues/new/choose)** — report a problem, propose a change, or request discovery. Substantive changes start from an issue.
 - **[GOVERNANCE.md](GOVERNANCE.md)** — maintainer authority and how decisions are made.
 - **[CODE_OF_CONDUCT.md](CODE_OF_CONDUCT.md)** — expected conduct.

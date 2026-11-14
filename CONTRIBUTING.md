@@ -9,6 +9,7 @@ Builder Garage is maintainer-led and community-contributed, and contributions ar
 - **Security.** Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md), never in a public issue.
 - **License.** Builder Garage is released under the [MIT License](LICENSE). Contributions you submit are licensed under the same terms.
 - **Authority.** [GOVERNANCE.md](GOVERNANCE.md) describes who decides what.
+- **First contribution.** [Your first contribution](docs/first-contribution.md) walks a first-time contributor through one change, from finding an issue to an open pull request.
 
 ## Two separate gates
 
@@ -69,6 +70,8 @@ Before anything is committed, the complete change is reviewed by someone indepen
 The review result is recorded on the originating issue. That issue record is the authoritative record of the independent review, and it governs whether the change may be committed. A review of the pull request, where one is required, supplements it and never replaces it.
 
 - Procedure and review contract: [independent-implementation-review](skills/independent-implementation-review/SKILL.md)
+
+**Contributors outside the project.** You may hold this separation yourself. Run the implementation and the independent review as separate invocations, in separate execution contexts, in your own workspace, and post both records on the originating issue ([F1, F2](docs/responsibility-floor.md#rules)). This path is set by the [#98 D1 decision](https://github.com/bdonaldharris/builder-garage/issues/98#issuecomment-6873371683). [Contributor-held separation](crew/filling-roles.md#contributor-held-separation) explains it, and [Your first contribution](docs/first-contribution.md#4-implement-and-review-in-separate-execution-contexts) walks through it. If you cannot run separate execution contexts, for example because you work entirely by hand, ask on the issue before implementing.
 
 ### 5. Correct and re-review
 
