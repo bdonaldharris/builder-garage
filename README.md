@@ -12,7 +12,7 @@ Builder Garage is at its foundation stage.
 
 **What exists today** is the initial `garage` command-line foundation and the project's engineering documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, the [engineering principles](docs/principles.md) and [history](docs/history.md) behind them, and governance and contribution process.
 
-The CLI can display help and version information, initialize, upgrade, validate, show, and change a project's `.garage/config.yaml`, record private developer-local workflow events, and install and verify the canonical skills at a project's harness targets. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, release automation, or runtime for the conceptual components has been implemented.
+The CLI can display help and version information, initialize, upgrade, validate, show, and change a project's `.garage/config.yaml`, record private developer-local workflow events, install and verify the canonical skills and the manuals a project adopts at a project's harness targets, and show the read-only workflow status of an issue or pull request from GitHub. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, release automation, or runtime for the conceptual components has been implemented.
 
 ## Architectural direction
 
@@ -149,7 +149,7 @@ make check
 
 - There are no published releases or installation packages yet.
 - GoReleaser is an approved future direction, but it is not configured.
-- The CLI initializes, shows, and changes configuration, records local workflow history, installs and verifies skills, and shows read-only workflow status only; it does not implement Workbench, Crew, Inspection, Shipping, or Manuals capabilities.
+- The CLI initializes, shows, and changes configuration, records local workflow history, installs and verifies skills and the manuals a project adopts, and shows read-only workflow status only. It does not implement Workbench, Crew, Inspection, or Shipping capabilities, and its only Manuals capability is delivering adopted manuals to agents as skills.
 - `garage status` needs the `gh` command, installed and authenticated, to read GitHub.
 - The canonical skills read `.garage/config.yaml` only through `garage config validate`, so an agent needs a `garage` binary on its `PATH` to resolve a configured value; there is no installation package yet. The configuration configures no agents, plugins, providers, or remote services.
 
@@ -179,7 +179,7 @@ Builder Garage is the home for an evolving, builder-centered engineering system.
 
 This is a **conceptual map**, not a required directory hierarchy or a new orchestration mechanism. Existing skill names, paths, invocation aliases, role boundaries, durable Issue/PR records, review contracts, and approval gates remain authoritative. The Garage can adopt automation selectively as practical needs and resources allow.
 
-Each shop area's directory currently contains documentation of its responsibility and boundary; none contains an implementation. The Manuals directory also contains the baseline manuals themselves, which are guidance, not configuration. Builder Garage's own adoption of the Go Manual is recorded in [docs/go-manual.md](docs/go-manual.md).
+Each shop area's directory currently contains documentation of its responsibility and boundary. The Manuals directory also contains the baseline manuals themselves, which are guidance, not configuration, and `embed.go`, which embeds them in the `garage` binary so that `garage skills install` can deliver the ones a project adopts. No other shop area contains an implementation. Builder Garage's own adoption of the Go Manual is recorded in [docs/go-manual.md](docs/go-manual.md).
 
 ## Operating model
 
@@ -295,6 +295,7 @@ Shorthand is an invocation alias only. The canonical skill remains the single so
 | `readiness-workflow` | `implementation-readiness-workflow` |
 | `eng-discovery` | `engineering-discovery-workflow` |
 | `pr-review` | `integration-pr-review` |
+| `author-issue` | `issue-authoring-workflow` |
 
 ## Skills
 
