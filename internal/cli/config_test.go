@@ -106,6 +106,8 @@ func TestValidateReportsEachInvalidValue(t *testing.T) {
 		{"E2 duplicate", validConfigYAML + "  pr_review_triggers:\n    - {name: a, applies_when: x}\n    - {name: a, applies_when: y}\n", "duplicate name"},
 		{"E2 empty", validConfigYAML + "  pr_review_triggers:\n    - {name: a, applies_when: \"\"}\n", "applies_when must not be empty"},
 		{"E3 request", validConfigYAML + "  automated_reviewer:\n    name: codex\n    request: \"\"\n", "automated_reviewer.request (E3)"},
+		{"E3 placeholder name", validConfigYAML + "  automated_reviewer:\n    name: none\n    request: review\n", "placeholder, not an actual name"},
+		{"E3 bracketed name", validConfigYAML + "  automated_reviewer:\n    name: \"<name>\"\n    request: review\n", "placeholder, not an actual name"},
 		{"E4 enabled missing", validConfigYAML + "  small_corrections:\n    without_issue: true\n", "enabled (E4) is required"},
 		{"E4 without issue", validConfigYAML + "  small_corrections:\n    enabled: false\n    without_issue: true\n", "applies only when small corrections are enabled"},
 		{"E4 classifier missing", validConfigYAML + "  small_corrections:\n    enabled: true\n", "small_correction_classifier (E8) is required"},
@@ -269,5 +271,42 @@ func TestConfigCommandRequiresASubcommand(t *testing.T) {
 	}
 	if !strings.Contains(stdout, "validate") {
 		t.Errorf("config help does not list validate:\n%s", stdout)
+	}
+}
+
+// TestValidateRefusesPlaceholderReviewerNames pins the reviewer-name rule to
+// guided setup's: every answer guided setup refuses is also refused by
+// validation, and every answer it accepts is accepted by both.
+func TestValidateRefusesPlaceholderReviewerNames(t *testing.T) {
+	problemsFor := func(name string) configProblems {
+		content := validConfigYAML + "  automated_reviewer:\n    name: \"" + name + "\"\n    request: review\n"
+		return validateConfig(decodeOrFail(t, content))
+	}
+	for answer := range placeholderAnswers {
+		t.Run("refused/"+answer, func(t *testing.T) {
+			if err := checkNotPlaceholder(answer); err == nil {
+				t.Fatalf("guided setup accepts %q", answer)
+			}
+			problems := problemsFor(answer)
+			if problems == nil {
+				t.Fatalf("validation accepts %q", answer)
+			}
+			if !strings.Contains(problems.Error(), "placeholder") {
+				t.Errorf("problems do not call %q a placeholder:\n%v", answer, problems)
+			}
+			if !strings.Contains(problems.Error(), "garage config unset automated-reviewer") {
+				t.Errorf("problems do not say how to have no automated reviewer:\n%v", problems)
+			}
+		})
+	}
+	for _, answer := range []string{"codex", "nonesuch"} {
+		t.Run("accepted/"+answer, func(t *testing.T) {
+			if err := checkNotPlaceholder(answer); err != nil {
+				t.Fatalf("guided setup refuses %q: %v", answer, err)
+			}
+			if problems := problemsFor(answer); problems != nil {
+				t.Errorf("validation refuses %q:\n%v", answer, problems)
+			}
+		})
 	}
 }

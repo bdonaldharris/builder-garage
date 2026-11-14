@@ -67,7 +67,7 @@ Builder Garage's CI runs it against Builder Garage's own configuration on every 
 | --- | --- |
 | The schema: known keys only, correct types, one YAML document, a supported schema version | Whether a configured authority is human. That is a governance responsibility and a durable maintainer assertion. |
 | That every required value is present | Agent sessions, or whether agents worked independently |
-| Each value's form: branch-name rules, non-empty and unique names, issue-reference form, the discovery mode and its triggers, the E4/E8 classifier dependency | Any workflow state. Validation never authorizes work or advances a workflow. |
+| Each value's form: branch-name rules, non-empty and unique names, a reviewer name that is not a placeholder (guided setup applies the same rule), issue-reference form, the discovery mode and its triggers, the E4/E8 classifier dependency | Any workflow state. Validation never authorizes work or advances a workflow. |
 | That each adopted manual is one this `garage` binary carries ([#60 decision](https://github.com/bdonaldharris/builder-garage/issues/60#issuecomment-6860594142)). A known manual at another version is valid; the output reports the version the binary delivers. | Whether a configured branch or issue exists |
 | Tooling values, as described in [Tooling configuration](tooling-configuration.md) | |
 
