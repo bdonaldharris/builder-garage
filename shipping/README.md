@@ -6,10 +6,12 @@ Changes must satisfy the governing implementation and integration skills, includ
 
 See [Integration PR Review](../skills/integration-pr-review/SKILL.md) and [Application Implementation Workflow](../skills/application-implementation-workflow/SKILL.md). This directory documents the responsibility area; it does not replace the canonical workflow.
 
+For worked examples of an Environment / Deployment Requirements section, release evidence through E6, and Promotion Protection, see [Deployment Requirements and Promotion](deployment-requirements.md). The guide is non-normative; the skills govern.
+
 ## Boundary
 
 Shipping owns *how accepted work reaches its destination*: integration, release readiness, and promotion. It begins once a change has passed independent review and is proposed as a pull request. Review performed at the pull-request stage remains governed by the [Inspection](../inspection/) review contract.
 
 ## Status
 
-This directory contains documentation only. No release or deployment tooling has been implemented. See the [architectural direction](../docs/architecture.md).
+This directory contains documentation only, including one non-normative guide. No release or deployment tooling has been implemented. See the [architectural direction](../docs/architecture.md).
