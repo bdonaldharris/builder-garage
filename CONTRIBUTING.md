@@ -36,6 +36,15 @@ The change-proposal template also has an optional **Intended outcome** field. Us
 
 Before investing in implementation, give a maintainer the chance to respond on the issue. This avoids work on a change the project would not accept.
 
+#### Working on an existing issue
+
+An issue's assignee shows who is working on it, so that the same change is not implemented twice in parallel.
+
+- **Requesting assignment.** If you are not a maintainer, ask to work on an existing issue in a comment on that issue, rather than assigning yourself. A maintainer assigns one primary owner.
+- **Inactive assignments.** A maintainer may release an assignment that has become inactive, so that others can take up the issue.
+- **What assignment means.** Assignment coordinates work. It does not approve a change or authorize its implementation, and it does not replace independent review or maintainer approval. Every substantive change still passes the [two separate gates](#two-separate-gates).
+- **When the work ends.** A merged pull request that closes the issue ends the assignment. If a pull request is rejected or withdrawn while work remains, the work may be revised, and the issue unassigned, reassigned, or reopened, as appropriate.
+
 ### 2. Discover when warranted
 
 When a change depends on questions that are not yet answered, investigate before implementing. Discovery investigates; it does not implement.
