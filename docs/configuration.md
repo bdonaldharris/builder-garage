@@ -135,6 +135,8 @@ Each canonical skill cites the extension points it uses and states their canonic
 
 `garage init` migrates version 1 to version 2. Any other version is refused. A later incompatible change increments the version and adds an explicit migration.
 
+**Migration promise.** Before 1.0, Garage does not promise stable commands, skill contracts, or configuration semantics. It does promise that every configuration-schema change provides an in-place `garage init` upgrade path. That path preserves existing human choices, validates the result, and never silently discards configuration ([ADR 0002](adr/0002-semantic-versioning.md#4-configuration-migration-is-promised-broad-pre-10-compatibility-is-not)).
+
 ## Builder Garage's own configuration
 
 Builder Garage's [`.garage/config.yaml`](../.garage/config.yaml) was generated, not hand-authored, by the noninteractive command recorded in its [skill-adoption profile](skill-adoption.md#configuration). It is single-project evidence of the configuration in use, not proof that it suits other projects.

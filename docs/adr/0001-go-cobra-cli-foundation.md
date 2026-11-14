@@ -61,6 +61,6 @@ This record does not decide:
 
 - commands and behavior beyond `--help`, `version`, and `init`;
 - configuration content beyond `schema_version` (since decided under #35; see [Project configuration](../configuration.md));
-- how releases are versioned, built, signed, and published;
+- how releases are versioned (since decided under [ADR 0002](0002-semantic-versioning.md)), built, signed, and published;
 - whether the conceptual components become packages, modules, or commands;
 - adapter and extension interfaces, and the execution model.
