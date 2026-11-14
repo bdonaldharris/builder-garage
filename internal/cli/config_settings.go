@@ -152,6 +152,9 @@ var configSettings = []configSetting{
 					return nil
 				},
 				set: func(c *projectConfig, v string) error {
+					if err := checkNotPlaceholder(v); err != nil {
+						return err
+					}
 					r := automatedReviewer{Name: v}
 					if old := proj(c).AutomatedReviewer; old != nil {
 						r.Request = old.Request

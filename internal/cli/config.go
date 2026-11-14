@@ -238,6 +238,9 @@ func validateConfig(cfg projectConfig) configProblems {
 	}
 	if r := pc.AutomatedReviewer; r != nil {
 		checkLine(&p, "project.automated_reviewer.name (E3)", r.Name)
+		if err := checkNotPlaceholder(r.Name); err != nil {
+			add("project.automated_reviewer.name (E3): %v", err)
+		}
 		checkText(&p, "project.automated_reviewer.request (E3)", r.Request)
 	}
 

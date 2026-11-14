@@ -106,6 +106,7 @@ func TestValidateReportsEachInvalidValue(t *testing.T) {
 		{"E2 duplicate", validConfigYAML + "  pr_review_triggers:\n    - {name: a, applies_when: x}\n    - {name: a, applies_when: y}\n", "duplicate name"},
 		{"E2 empty", validConfigYAML + "  pr_review_triggers:\n    - {name: a, applies_when: \"\"}\n", "applies_when must not be empty"},
 		{"E3 request", validConfigYAML + "  automated_reviewer:\n    name: codex\n    request: \"\"\n", "automated_reviewer.request (E3)"},
+		{"E3 placeholder name", validConfigYAML + "  automated_reviewer:\n    name: none\n    request: x\n", "looks like a placeholder"},
 		{"E4 enabled missing", validConfigYAML + "  small_corrections:\n    without_issue: true\n", "enabled (E4) is required"},
 		{"E4 without issue", validConfigYAML + "  small_corrections:\n    enabled: false\n    without_issue: true\n", "applies only when small corrections are enabled"},
 		{"E4 classifier missing", validConfigYAML + "  small_corrections:\n    enabled: true\n", "small_correction_classifier (E8) is required"},
