@@ -42,7 +42,7 @@ func TestEmbeddedManualCatalogMatchesTheManualsReadme(t *testing.T) {
 	if err != nil {
 		t.Fatalf("embedded catalog: %v", err)
 	}
-	for _, name := range []string{"dotnet", "go"} {
+	for _, name := range []string{"dotnet", "go", "python"} {
 		if findManual(catalog, name) == nil {
 			t.Fatalf("the embedded catalog %v has no %s manual", manualNames(catalog), name)
 		}
