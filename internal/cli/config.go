@@ -237,7 +237,7 @@ func validateConfig(cfg projectConfig) configProblems {
 		checkNamedConditions(&p, "project.pr_review_triggers (E2)", *pc.PRReviewTriggers)
 	}
 	if r := pc.AutomatedReviewer; r != nil {
-		checkLine(&p, "project.automated_reviewer.name (E3)", r.Name)
+		checkReviewerName(&p, r.Name)
 		checkText(&p, "project.automated_reviewer.request (E3)", r.Request)
 	}
 
@@ -389,6 +389,20 @@ func checkLine(p *configProblems, field, value string) {
 		*p = append(*p, field+" must not be empty")
 	} else if strings.ContainsAny(value, "\r\n") {
 		*p = append(*p, field+" must be a single line")
+	}
+}
+
+// checkReviewerName validates the automated reviewer's name: one line, and a
+// real name rather than a placeholder. Guided setup already refuses placeholder
+// answers, through the same checkNotPlaceholder rule.
+func checkReviewerName(p *configProblems, value string) {
+	const field = "project.automated_reviewer.name (E3)"
+	checkLine(p, field, value)
+	if strings.TrimSpace(value) == "" || strings.ContainsAny(value, "\r\n") {
+		return
+	}
+	if err := checkNotPlaceholder(value); err != nil {
+		*p = append(*p, fmt.Sprintf("%s: %v; to have no automated reviewer, omit the setting or run \"garage config unset automated-reviewer\"", field, err))
 	}
 }
 
