@@ -42,8 +42,10 @@ func TestEmbeddedManualCatalogMatchesTheManualsReadme(t *testing.T) {
 	if err != nil {
 		t.Fatalf("embedded catalog: %v", err)
 	}
-	if findManual(catalog, "go") == nil {
-		t.Fatalf("the embedded catalog %v has no go manual", manualNames(catalog))
+	for _, name := range []string{"dotnet", "go"} {
+		if findManual(catalog, name) == nil {
+			t.Fatalf("the embedded catalog %v has no %s manual", manualNames(catalog), name)
+		}
 	}
 	readme := readFile(t, filepath.Join("..", "..", "manuals", "README.md"))
 	table := readme[strings.Index(readme, "## Current manuals"):]
@@ -65,6 +67,61 @@ func TestEmbeddedManualCatalogMatchesTheManualsReadme(t *testing.T) {
 		if !found {
 			t.Errorf("manuals/README.md does not list %s", m.File)
 		}
+	}
+}
+
+// Every manual this garage carries satisfies the E10 contract end to end: its
+// catalog entry parses, it yields a delivered skill whose frontmatter
+// round-trips, "garage config validate" accepts a project that adopts it at the
+// delivered version, and "garage skills verify" reports it Current after
+// "garage skills install". The test reads the real embedded catalog, so it
+// covers each manual as it is added.
+func TestEveryEmbeddedManualIsAdoptableDeliveredAndVerified(t *testing.T) {
+	catalog, err := embeddedManualCatalog()
+	if err != nil {
+		t.Fatalf("embedded catalog: %v", err)
+	}
+	if len(catalog) == 0 {
+		t.Fatal("the embedded catalog is empty")
+	}
+	for _, m := range catalog {
+		t.Run(m.Name, func(t *testing.T) {
+			if m.File != m.Name+".md" || m.Version == "" || m.Status == "" || m.Description == "" || len(m.Body) == 0 {
+				t.Fatalf("catalog entry = %+v", m)
+			}
+
+			skill, err := manualSkill(m)
+			if err != nil {
+				t.Fatalf("manualSkill: %v", err)
+			}
+			if skill.Name != manualSkillName(m.Name) || len(skill.Files) != 1 {
+				t.Fatalf("skill = %s with %d files", skill.Name, len(skill.Files))
+			}
+			fm, err := parseSkillFrontmatter(skill.Files[0].Data)
+			if err != nil {
+				t.Fatalf("delivered skill frontmatter: %v", err)
+			}
+			if fm.Name != skill.Name || fm.Metadata["garage-manual"] != m.Name || fm.Metadata["garage-manual-version"] != m.Version {
+				t.Errorf("delivered skill frontmatter = %+v", fm)
+			}
+
+			adopted := "  guidance:\n    manuals:\n      - {name: " + m.Name + ", version: \"" + m.Version + "\"}\n"
+			dir := newProjectDir(t)
+			writeFile(t, configPathIn(dir), validConfigYAML+adopted)
+			if stdout, _, err := runCLI(t, "dev", "config", "validate"); err != nil || !strings.Contains(stdout, "is valid") {
+				t.Errorf("config validate = %v\n%s", err, stdout)
+			}
+
+			f := newSkillsFixture(t)
+			f.writeConfigWithManuals([]string{m.Name + "@" + m.Version}, "claude-code")
+			if out := f.mustInstall(installOptions{}); !strings.Contains(out, skill.Name) {
+				t.Errorf("install output does not name %s:\n%s", skill.Name, out)
+			}
+			want := "Current (manual " + m.Name + " " + m.Version + ", adopted here)"
+			if vout, err := f.verify(); err != nil || !strings.Contains(vout, want) {
+				t.Errorf("verify = %v, want %q in:\n%s", err, want, vout)
+			}
+		})
 	}
 }
 
