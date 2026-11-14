@@ -42,7 +42,7 @@ Manuals are guidance that a project adopts explicitly. They are not configuratio
 | [`manuals/`](../manuals/) | Documentation of the Manuals component, and the Garage-maintained baseline manuals, beginning with the [Go Manual](../manuals/go.md). Its `embed.go` embeds them in the `garage` binary, which delivers adopted manuals as skills ([Skill installation](skill-installation.md#manuals)). |
 | [`docs/`](./) | Architectural direction, the [responsibility floor](responsibility-floor.md) and [extension-point registry](extension-points.md), the [project configuration](configuration.md) and [tooling configuration](tooling-configuration.md) formats, [engineering principles](principles.md), [project history](history.md), Builder Garage's adoption profiles for the [canonical skills](skill-adoption.md) and the [Go Manual](go-manual.md), the [revision-identifiable review evidence](review-evidence.md) design, and repository configuration notes. |
 | [`cmd/garage/`](../cmd/garage/) | Entry point for the `garage` executable and its build-time version value. |
-| [`internal/cli/`](../internal/cli/) | Cobra command wiring, project configuration initialization and validation, local event recording, and skill installation and verification. It does not implement the conceptual components. |
+| [`internal/cli/`](../internal/cli/) | Cobra command wiring; initializing, upgrading, validating, showing, and changing project configuration; local event recording; installing and verifying the canonical skills and the manuals a project adopts; and the read-only workflow status of an issue or pull request, read from GitHub. It does not implement the conceptual components. |
 | [`docs/adr/`](adr/) | Accepted architectural decision records, beginning with the [Go and Cobra CLI foundation](adr/0001-go-cobra-cli-foundation.md). |
 | [`.github/`](../.github/) | Issue and pull request templates, and the pull-request validation workflow and its source-installer test. |
 | Repository root | README, license, governance, contribution, conduct, and security documents, and the source installer, [`install.sh`](../install.sh). |
@@ -53,7 +53,7 @@ The repository now contains the initial Go CLI source, tests, build commands, an
 
 The following remain deliberately undecided:
 
-- commands and behavior beyond `garage --help`, `garage version`, `garage init`, `garage config validate`, `garage record`, `garage skills install` and `verify`, and `garage status`;
+- commands and behavior beyond `garage --help`, `garage version`, `garage init`, `garage config validate`, `show`, `get`, `set`, `unset`, `add`, and `remove`, `garage record`, `garage skills install` and `verify`, and `garage status`;
 - release channels for compiled executables, and installing a published release. Installing from source is decided: on macOS and Linux, [`install.sh`](../install.sh) builds `garage` from a checkout and installs it for the current user. Release installation is deferred until release automation exists, and a Windows installer is a separate follow-up ([#69 decision](https://github.com/bdonaldharris/builder-garage/issues/69#issuecomment-6867848834));
 - package and module layout for future conceptual-component implementations;
 - adapter and extension interfaces;
