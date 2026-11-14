@@ -39,7 +39,7 @@ These rules are not enforced by settings:
 | Governance rule | Enforced today? | Recommendation |
 | --- | --- | --- |
 | Maintainer approval before merge | No. The ruleset requires 0 approving reviews, so that the sole maintainer's own pull requests can merge. Approval of other contributors' pull requests is required by governance, not by settings. See [Sole maintainer](#sole-maintainer). | Once a second maintainer exists, require at least one approving review and dismiss stale approvals when new commits are pushed. |
-| Independent engineering review before commit | Not enforceable by repository settings. | No setting applies. The review is recorded on the originating issue, the pull request template asks for a link to it, and maintainers confirm it when approving or recording acceptance. |
+| Independent engineering review before the pull request | Not enforceable by repository settings. | No setting applies. The review is recorded on the originating issue, the pull request template asks for a link to it, and maintainers confirm it when approving or recording acceptance. |
 
 ## Recommended changes
 

@@ -152,7 +152,7 @@ Before reviewing, Agent #2 must:
 
 Agent #2 performs two distinct review sequences. Each has its own durable record:
 
-- **Implementation review.** Agent #2 independently reviews the complete implementation before it is committed, and records the disposition on the **originating Issue**. That issue record is the authoritative durable record of Agent #2's implementation review, and it governs whether the implementation may advance.
+- **Implementation review.** Agent #2 independently reviews the complete implementation before it is proposed for integration, and records the disposition on the **originating Issue**. That issue record is the authoritative durable record of Agent #2's implementation review, and it governs whether the implementation may advance.
 - **PR review.** When a PR-review trigger defined by `integration-pr-review` applies, Agent #2 separately reviews the pull-request or integration artifact, and records that disposition on the **PR itself**. The PR-review sequence is governed by `integration-pr-review`, which Agent #1 executes. Agent #2 performs its PR disposition under this skill, never under `integration-pr-review`. A PR record is supplemental. It never replaces, substitutes for, or retroactively satisfies the issue-recorded implementation review.
 
 The structured Agent #2 comment is part of workflow execution, not merely a report to the human. Producing the same review text in the agent response does not satisfy the durable-state requirement.
@@ -167,6 +167,7 @@ Every Agent #1 completion record, Agent #2 review record, and equivalence record
 
 - **Integration reference.** Fetch the configured integration branch (E1), then record the full object name of its tip, for example `git rev-parse origin/<branch>`. Record that resolved object name as `integration_ref`, never a bare branch name.
 - **Stage.** `working-tree` for an uncommitted artifact, and `commit` for a pushed head. The stage follows what was inspected, not where the record is posted.
+- **Commit-stage implementation review.** When Agent #1 used commit-stage review (`application-implementation-workflow`, "Commit-stage review"), its record names a pushed head that is not proposed for integration. Fetch that head from wherever it was pushed, for example the contributor's fork, and recompute its identity with the two-argument form of the reference procedure. Review that commit, and record `stage: commit` with its `commit`.
 - **The working tree is the artifact.** At the `working-tree` stage, every modified, deleted, and untracked non-ignored file is part of the artifact. Before computing it, make sure the working tree holds exactly the artifact. Anything else, such as stray untracked tool files, changes the identity. If the working tree cannot be made to hold exactly the artifact, compute the identity in a clean checkout that does.
 
 Compute the values with this reference procedure. Save it outside the repository, then run it from inside the repository, passing the `integration_ref` object name, and also the head commit for the `commit` stage:
@@ -251,7 +252,7 @@ asserted:
 ```
 
 Phase: INITIAL REVIEW | CORRECTION RE-REVIEW | PR REVIEW
-Artifact/Head: <current artifact/head reference; for a PR review, the full PR head SHA reviewed, or the working-tree state for an uncommitted correction>
+Artifact/Head: <current artifact/head reference; the full head SHA reviewed for a PR review or a commit-stage implementation review, or the working-tree state for an uncommitted artifact>
 Sequence: IMPLEMENTATION REVIEW (originating issue, authoritative) | PR REVIEW (PR, supplemental)
 Supplements: <PR review only: link to the approving issue-recorded implementation review>
 Trigger(s): <PR review only: artifact equivalence not shown | automated findings on this head | project-recorded trigger>

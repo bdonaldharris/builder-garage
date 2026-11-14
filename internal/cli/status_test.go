@@ -238,6 +238,12 @@ func TestStatusOpenNextActions(t *testing.T) {
 			it["closedAt"] = nil
 			it["closedByPullRequestsReferences"] = map[string]any{"nodes": []any{}}
 		}, "Agent #1 may commit the approved artifact and open a pull request"},
+		{"approved commit-stage issue with no pull request", "is47", func(it map[string]any) {
+			it["state"] = "OPEN"
+			it["closedAt"] = nil
+			it["closedByPullRequestsReferences"] = map[string]any{"nodes": []any{}}
+			commitStage(it)
+		}, "Agent #1 may open a pull request from the reviewed head 1111111, or from a head with the same changeset"},
 		{"awaiting review", "is47", func(it map[string]any) {
 			it["state"] = "OPEN"
 			it["closedByPullRequestsReferences"] = map[string]any{"nodes": []any{}}
@@ -253,6 +259,23 @@ func TestStatusOpenNextActions(t *testing.T) {
 			assertContains(t, next, "[information only]", tc.want)
 		})
 	}
+}
+
+// commitStage rewrites every record in an issue fixture to identify a
+// commit-stage artifact, as a commit-stage implementation review records it.
+func commitStage(item map[string]any) {
+	for _, c := range commentNodes(item) {
+		c := c.(map[string]any)
+		c["body"] = strings.ReplaceAll(c["body"].(string), "\n    stage: working-tree",
+			"\n    stage: commit\n    commit: "+strings.Repeat("1", 40))
+	}
+}
+
+func TestStatusReportsCommitStageIssueRecords(t *testing.T) {
+	data := editFixture(t, "is47", commitStage)
+	text := reportText(t, data, testConfig())
+	assertContains(t, text, "a commit-stage artifact names pushed commit 1111111; status compares the recorded values and does not recompute it")
+	assertNotContains(t, text, "a working-tree artifact can be recomputed only by a holder")
 }
 
 func TestStatusIgnoresRecordsFromUnassociatedAuthors(t *testing.T) {

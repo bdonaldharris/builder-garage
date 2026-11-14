@@ -48,7 +48,7 @@ These rules hold whatever the project configures, and no instruction can waive t
 - **F1.** The implementer of a change never performs its independent review.
 - **F3.** This invocation has one role, Agent #1, for its whole execution. Reaching Agent #2's responsibility is a terminal handoff: stop, and do not wait, poll, or continue in that role.
 - **F4.** Agent #1 writes only Agent #1 workflow-state markers, and never a record that represents Agent #2.
-- **F5.** Every change this skill produces goes to independent review before it is committed or advanced. Agent #1 never classifies a change as a small correction and never exempts its own work from review. Only the configured small-correction classifier (E8), a human, may classify a change as one, explicitly, when the project enables small corrections (E4).
+- **F5.** Every change this skill produces goes to independent review before it is proposed for integration or advanced on the integration branch. Opening a pull request, including a draft, proposes it. Agent #1 never classifies a change as a small correction and never exempts its own work from review. Only the configured small-correction classifier (E8), a human, may classify a change as one, explicitly, when the project enables small corrections (E4).
 - **F8.** Workflow evidence is durable on the governing GitHub Issue or PR, and is written and then verified. A conversation, a local file, or local history is never the record.
 - **F9.** Role, not vendor, model, or tool, determines responsibility and authority. An automated reviewer's output is review input only.
 
@@ -188,6 +188,19 @@ Every Agent #1 completion record, Agent #2 review record, and equivalence record
 - **Stage.** `working-tree` for an uncommitted artifact, and `commit` for a pushed head. The stage follows what was inspected, not where the record is posted.
 - **The working tree is the artifact.** At the `working-tree` stage, every modified, deleted, and untracked non-ignored file is part of the artifact. Before computing it, make sure the working tree holds exactly the artifact. Anything else, such as stray untracked tool files, changes the identity. If the working tree cannot be made to hold exactly the artifact, compute the identity in a clean checkout that does.
 
+## Commit-stage review
+
+The working-tree stage is the default. **When the invocation or the governing issue asks for commit-stage review**, Agent #1 instead commits the artifact to the issue branch and pushes that branch, so that a reviewer outside this workspace can recompute it. Agent #1 never chooses the commit stage on its own ([#99 decision](https://github.com/bdonaldharris/builder-garage/issues/99#issuecomment-6885140249)).
+
+On this path:
+
+- Agent #1 opens no pull request, draft or otherwise, before approval. A pushed branch that is not proposed for integration does not advance the change (F5).
+- The completion record uses `stage: commit` and names the pushed head in `commit`. The identity is computed for that head, with the two-argument form of the reference procedure.
+- A correction is one or more new commits pushed to the same branch, recorded in a `correction` record at `stage: commit` that names the new head.
+- After approval, the pull request opens from the reviewed head, or from a head whose `changeset` equals the approval's ([Phase 4](#phase-4--commit-push-and-integration-pr)).
+
+Everything else in this skill applies unchanged, including the hold point, independent review, and the correction loop.
+
 Compute the values with this reference procedure. Save it outside the repository, then run it from inside the repository, passing the `integration_ref` object name, and also the head commit for the `commit` stage:
 
 ```sh
@@ -224,7 +237,7 @@ Record `object_format` from `git rev-parse --show-object-format`. Two artifacts 
 
 Each workflow record carries one fenced YAML block after its marker line. The block separates values a verifier can recompute or confirm (`checkable`) from claims no verifier can confirm (`asserted`). The record's human-readable sections follow the block. Role, separate execution context, the three answers, and the verdict are always assertions; no record or tool certifies them.
 
-Agent #1 computes the artifact identity after the universal pre-return completion gate, from the final working tree it hands off. Any later change to the artifact changes its `changeset`, so recompute it if the artifact changes before the record is posted.
+Agent #1 computes the artifact identity after the universal pre-return completion gate, from the final artifact it hands off: the working tree, or under [commit-stage review](#commit-stage-review), the pushed head. Any later change to the artifact changes its `changeset`, so recompute it if the artifact changes before the record is posted.
 
 For initial implementation, use:
 
@@ -239,12 +252,13 @@ checkable:
   artifact:
     method: garage-artifact-v1
     object_format: <sha1 | sha256>
-    stage: working-tree
+    stage: working-tree       # working-tree | commit (commit-stage review only)
     integration_ref: <full object name of the integration branch tip>
     base: <full object name>
     tree: <full object name>
     changeset: sha256:<64 hex>
     paths: <number of changed paths>
+    commit: "<commit-stage review only: full object name of the pushed head>"
 asserted:
   status: ready-for-review    # ready-for-review | material-blocker
   validation_run: true        # the listed validation was run; its output is not reproduced here
@@ -277,12 +291,13 @@ checkable:
   artifact:
     method: garage-artifact-v1
     object_format: <sha1 | sha256>
-    stage: working-tree
+    stage: working-tree       # working-tree | commit (commit-stage review only)
     integration_ref: <full object name of the integration branch tip>
     base: <full object name>
     tree: <full object name>
     changeset: sha256:<64 hex>
     paths: <number of changed paths>
+    commit: "<commit-stage review only: full object name of the pushed head>"
 asserted:
   status: ready-for-re-review # ready-for-re-review | material-blocker
   validation_run: true
@@ -302,6 +317,8 @@ Environment / Deployment Requirements: None
 Notes:
 - <material blocker or concise relevant state, if any>
 ````
+
+Omit `commit` at the `working-tree` stage.
 
 A correction record is posted where the disposition it addresses was posted: on the governing issue after an implementation review, or on the PR after a PR review.
 
@@ -398,7 +415,7 @@ Use this state after initial implementation only when:
 - acceptance criteria have been checked against the current artifact;
 - any issue-scoped or current-artifact build/test failures have been resolved;
 - unrelated pre-existing failures, if any, are evidenced separately rather than absorbed into scope;
-- the work remains uncommitted and unpushed;
+- the work remains uncommitted and unpushed, or, under [commit-stage review](#commit-stage-review), is committed and pushed to the issue branch with no pull request opened;
 - the authoritative Environment / Deployment Requirements have been surfaced, including `None` when no actions are required;
 - the artifact is ready for independent review.
 
@@ -481,7 +498,7 @@ Agent #1:
 7. reuses established owning abstractions where appropriate;
 8. adds/updates tests and contracts needed for the changed behavior;
 9. runs focused validation;
-10. inspects the full working-tree diff;
+10. inspects the full diff of the artifact;
 11. identifies and maintains the authoritative Environment / Deployment Requirements for the current artifact;
 12. computes the artifact identity and posts the structured `[AGENT #1 — IMPLEMENTATION]` workflow-state comment, with its evidence block, to the governing Issue or PR with implementation, validation, environment/deployment requirements, and terminal status, then verifies it.
 
@@ -537,11 +554,11 @@ Agent #1 owns keeping this list current. Readiness may identify anticipated requ
 
 ## Mandatory hold point
 
-Agent #1 must **not** commit, push, open a PR, or self-satisfy Agent #2 review.
+Agent #1 must **not** commit, push, open a PR, or self-satisfy Agent #2 review. Under [commit-stage review](#commit-stage-review), Agent #1 commits and pushes the issue branch, and still opens no pull request, draft or otherwise.
 
 This hold point is reached only after the universal pre-return completion gate produces `READY FOR AGENT #2 REVIEW`.
 
-Agent #1 posts the structured `[AGENT #1 — IMPLEMENTATION]` comment, then returns control for separate Agent #2 review with the artifact still uncommitted and unpushed. That GitHub comment is the durable implementation handoff.
+Agent #1 posts the structured `[AGENT #1 — IMPLEMENTATION]` comment, then returns control for separate Agent #2 review with the artifact still uncommitted and unpushed, or, under commit-stage review, pushed to the issue branch and not proposed. That GitHub comment is the durable implementation handoff.
 
 ---
 # Phase 2 — Agent #2 review boundary
@@ -589,7 +606,7 @@ If Agent #2 identifies a genuine current-implementation blocker, correction begi
 7. unrelated pre-existing failures are evidenced and reported separately without expanding correction scope;
 8. Agent #1 runs relevant validation;
 9. Agent #1 applies the universal pre-return completion gate;
-10. Agent #1 posts a new `[AGENT #1 — CORRECTION]` workflow-state comment to the same Issue/PR;
+10. Agent #1 posts a new `[AGENT #1 — CORRECTION]` workflow-state comment to the same Issue/PR; under [commit-stage review](#commit-stage-review), it first pushes the correction as new commits to the same branch, and the record names the new head;
 11. only `READY FOR AGENT #2 RE-REVIEW` or `MATERIAL BLOCKER` may return control;
 12. after `READY FOR AGENT #2 RE-REVIEW`, Agent #1 stops immediately; the current invocation ends, and a separately invoked Agent #2 performs the re-review and answers the same three questions again. Agent #1 must not wait or poll for that re-review.
 
@@ -664,6 +681,11 @@ After Agent #2 returns `APPROVED`, Agent #1 may:
 3. commit;
 4. push the issue branch;
 5. open the integration PR against the configured integration branch (E1);
+
+Under [commit-stage review](#commit-stage-review), the reviewed artifact is already committed and pushed. Steps 1–4 become one step: verify that the head to be proposed has a commit-stage `changeset` equal to the one in the approving disposition. That head is the reviewed head, or one rebased onto the integration branch without changing the `changeset`. No new commit is made. Then continue from step 5.
+
+After either path:
+
 6. post the current `[AGENT #1 — IMPLEMENTATION]` workflow-state comment on the PR, carrying the equivalence record defined by `integration-pr-review`, so the PR's workflow state is durable on the PR itself.
 
 The PR should accurately describe:
@@ -859,7 +881,7 @@ This rule does not prohibit normal code diffs used during engineering review. It
 
 In particular:
 
-- Agent #1 prompts preserve the no-commit/no-push/no-PR hold point;
+- Agent #1 prompts preserve the no-commit/no-push/no-PR hold point, or, when they ask for commit-stage review, the push-but-no-PR hold point;
 - Agent #1 prompts do not need to repeat the global continuation invariant, universal pre-return completion gate, or valid terminal states; this skill owns those rules;
 - Agent #1 inspects existing architecture before inventing new structures;
 - material ambiguity is clarified instead of guessed through;
@@ -974,6 +996,7 @@ An implementation follows this skill only when:
 - the authoritative Environment / Deployment Requirements are maintained and surfaced before handoff, with `None` stated explicitly when no actions are required;
 - copy/paste operational handoffs are delivered as complete current authoritative artifacts unless a diff/patch/changed section is explicitly requested;
 - Agent #1 returns for independent Agent #2 review/re-review only after the applicable ready state is reached;
+- Agent #1 uses commit-stage review only when the invocation or the governing issue asks for it, and opens no pull request, draft or otherwise, before approval;
 - Agent #2 is separately invoked;
 - Agent #1 advances only from an Agent #2 disposition that is durably recorded on the governing Issue/PR; an agent-response-only review does not satisfy the handoff;
 - the issue-recorded Agent #2 implementation review is authoritative for advancing the implementation; a PR record is supplemental, and no tool or vendor integration establishes review authority;

@@ -234,8 +234,16 @@ func evaluateImplementationReview(s *statusSection, records []workflowRecord) st
 			shortChangeset(rb.artifact().Changeset), shortChangeset(cb.artifact().Changeset))
 	}
 	s.add(labelAsserted, "  verdict %s", rb.verdict())
-	s.add(labelInfo, "  a working-tree artifact can be recomputed only by a holder of that working tree; status compares the recorded values")
+	committed := cb.artifact().Stage == "commit"
+	if committed {
+		s.add(labelInfo, "  a commit-stage artifact names pushed commit %s; status compares the recorded values and does not recompute it", shortSHA(cb.artifact().Commit))
+	} else {
+		s.add(labelInfo, "  a working-tree artifact can be recomputed only by a holder of that working tree; status compares the recorded values")
+	}
 	if rb.verdict() == "approved" {
+		if committed {
+			return "Agent #1 may open a pull request from the reviewed head " + shortSHA(cb.artifact().Commit) + ", or from a head with the same changeset (integration-pr-review)"
+		}
 		return "Agent #1 may commit the approved artifact and open a pull request (integration-pr-review)"
 	}
 	return "Agent #1 correction (application-implementation-workflow)"
