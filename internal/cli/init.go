@@ -322,6 +322,11 @@ func configFromFlags(f initFlags, changed func(string) bool) (projectConfig, err
 		pc.PRReviewTriggers = &list
 	}
 	if changed("automated-reviewer") || changed("automated-reviewer-request") {
+		if changed("automated-reviewer") {
+			if err := checkNotPlaceholder(f.AutomatedReviewer); err != nil {
+				fail("--automated-reviewer %q: %v", f.AutomatedReviewer, err)
+			}
+		}
 		pc.AutomatedReviewer = &automatedReviewer{Name: f.AutomatedReviewer, Request: f.AutomatedReviewerRequest}
 	}
 	if changed("small-corrections") || changed("small-corrections-without-issue") {
