@@ -44,8 +44,8 @@ Manuals are guidance that a project adopts explicitly. They are not configuratio
 | [`cmd/garage/`](../cmd/garage/) | Entry point for the `garage` executable and its build-time version value. |
 | [`internal/cli/`](../internal/cli/) | Cobra command wiring, project configuration initialization and validation, local event recording, and skill installation and verification. It does not implement the conceptual components. |
 | [`docs/adr/`](adr/) | Accepted architectural decision records, beginning with the [Go and Cobra CLI foundation](adr/0001-go-cobra-cli-foundation.md). |
-| [`.github/`](../.github/) | Issue and pull request templates and pull-request validation workflow. |
-| Repository root | README, license, governance, contribution, conduct, and security documents. |
+| [`.github/`](../.github/) | Issue and pull request templates, and the pull-request validation workflow and its source-installer test. |
+| Repository root | README, license, governance, contribution, conduct, and security documents, and the source installer, [`install.sh`](../install.sh). |
 
 The repository now contains the initial Go CLI source, tests, build commands, and pull-request validation alongside its documentation. The Workbench, Crew, Inspection, Shipping, and Manuals directories remain documentation of conceptual boundaries, not implemented packages or runtime components.
 
@@ -54,7 +54,7 @@ The repository now contains the initial Go CLI source, tests, build commands, an
 The following remain deliberately undecided:
 
 - commands and behavior beyond `garage --help`, `garage version`, `garage init`, `garage config validate`, `garage record`, `garage skills install` and `verify`, and `garage status`;
-- installation and release channels for compiled executables;
+- release channels for compiled executables, and installing a published release. Installing from source is decided: on macOS and Linux, [`install.sh`](../install.sh) builds `garage` from a checkout and installs it for the current user. Release installation is deferred until release automation exists, and a Windows installer is a separate follow-up ([#69 decision](https://github.com/bdonaldharris/builder-garage/issues/69#issuecomment-6867848834));
 - package and module layout for future conceptual-component implementations;
 - adapter and extension interfaces;
 - the execution model for independent or distributed execution.

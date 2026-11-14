@@ -50,3 +50,18 @@ jobs:
           go-version-file: go.mod
       - name: Test
         run: go test ./...
+
+  install:
+    name: Source installer (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - name: Exercise install.sh
+        run: sh .github/scripts/test-install.sh

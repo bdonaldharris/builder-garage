@@ -40,7 +40,7 @@ garage init \
   --skill-target copilot-cli@1.0.93-1@2026-11-12
 ```
 
-The canonical skills read these values from the configuration, at the extension points they cite ([How the skills read the configuration](configuration.md#how-the-skills-read-the-configuration)). An agent needs a `garage` binary built from this repository on its `PATH` to resolve them. The table explains what each configured choice means for Builder Garage.
+The canonical skills read these values from the configuration, at the extension points they cite ([How the skills read the configuration](configuration.md#how-the-skills-read-the-configuration)). An agent needs a `garage` binary built from this repository on its `PATH` to resolve them; [`install.sh`](../README.md#install-from-source) builds and installs one. The table explains what each configured choice means for Builder Garage.
 
 | Configured choice | What it means here | Source |
 | --- | --- | --- |
