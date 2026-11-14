@@ -10,10 +10,11 @@ const rootLong = `Builder Garage is an agentic engineering system for builders: 
 practices, standards, roles, contracts, and workflows for responsible software
 construction with AI agents.
 
-The garage CLI is at its foundation stage. It initializes and validates a
-project's Builder Garage configuration, records private developer-local
-workflow events, installs and verifies the canonical skills at a project's
-harness targets, shows the workflow status of an issue or pull request read
+The garage CLI is at its foundation stage. It initializes, upgrades,
+validates, shows, and changes a project's Builder Garage configuration,
+records private developer-local workflow events, installs and verifies the
+canonical skills and the manuals a project adopts at a project's harness
+targets, shows the read-only workflow status of an issue or pull request
 from GitHub, and reports its own version.`
 
 // NewRootCommand builds the garage command tree. The version argument is the

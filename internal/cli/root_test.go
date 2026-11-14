@@ -56,6 +56,29 @@ func TestHelpDescribesPurposeAndCommands(t *testing.T) {
 	}
 }
 
+// TestHelpSummaryNamesCapabilities checks that the summary garage --help prints
+// names what the CLI does today, consistent with the README's Project status.
+func TestHelpSummaryNamesCapabilities(t *testing.T) {
+	stdout, _, err := runCLI(t, "dev", "--help")
+	if err != nil {
+		t.Fatalf("garage --help: unexpected error: %v", err)
+	}
+	// Compare with whitespace collapsed, so line wrapping cannot split a phrase.
+	summary := strings.Join(strings.Fields(stdout), " ")
+
+	for _, want := range []string{
+		"initializes, upgrades, validates, shows, and changes a project's Builder Garage configuration",
+		"records private developer-local workflow events",
+		"installs and verifies the canonical skills and the manuals a project adopts at a project's harness targets",
+		"shows the read-only workflow status of an issue or pull request from GitHub",
+		"reports its own version",
+	} {
+		if !strings.Contains(summary, want) {
+			t.Errorf("help summary does not contain %q:\n%s", want, stdout)
+		}
+	}
+}
+
 func TestRegisteredCommands(t *testing.T) {
 	var got []string
 	for _, cmd := range NewRootCommand("dev").Commands() {
