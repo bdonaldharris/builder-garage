@@ -113,6 +113,56 @@ func TestAuthoringSkillsShareOneProcedureAndTemplate(t *testing.T) {
 	}
 }
 
+const (
+	readinessSkill         = "implementation-readiness-workflow"
+	readinessOutputSection = "# Readiness output\n"
+	readinessTemplate      = "templates/readiness-report.md"
+	readinessFenceOpen     = "```markdown\n"
+	readinessFenceClose    = "\n```\n"
+)
+
+// The readiness report template is a copy of the structure the skill embeds
+// under "Readiness output", which stays authoritative so the installed skill
+// stands alone (#103). The template holds exactly the lines inside that
+// fence, each ending in a newline, so it ends with one trailing newline.
+func TestReadinessTemplateMatchesTheReadinessOutputStructure(t *testing.T) {
+	set, err := loadSkillSet(skills.FS())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var skill *canonicalSkill
+	for i := range set {
+		if set[i].Name == readinessSkill {
+			skill = &set[i]
+		}
+	}
+	if skill == nil {
+		t.Fatalf("no embedded %s skill", readinessSkill)
+	}
+	text := string(findSkillFile(skill.Files, skillEntryFile).Data)
+	section := strings.Index(text, readinessOutputSection)
+	if section < 0 {
+		t.Fatalf("%s: no %q section", readinessSkill, strings.TrimSpace(readinessOutputSection))
+	}
+	open := strings.Index(text[section:], readinessFenceOpen)
+	if open < 0 {
+		t.Fatalf("%s: no %q fence under %q", readinessSkill, strings.TrimSpace(readinessFenceOpen), strings.TrimSpace(readinessOutputSection))
+	}
+	body := text[section+open+len(readinessFenceOpen):]
+	end := strings.Index(body, readinessFenceClose)
+	if end < 0 {
+		t.Fatalf("%s: the readiness output fence is not closed", readinessSkill)
+	}
+	want := body[:end+1]
+	tf := findSkillFile(skill.Files, readinessTemplate)
+	if tf == nil {
+		t.Fatalf("%s: no %s", readinessSkill, readinessTemplate)
+	}
+	if got := string(tf.Data); got != want {
+		t.Errorf("%s: %s differs from the structure under %q; keep the two identical", readinessSkill, readinessTemplate, strings.TrimSpace(readinessOutputSection))
+	}
+}
+
 func TestCanonicalSkillsDoNotNameAWorkflowOrchestrator(t *testing.T) {
 	set, err := loadSkillSet(skills.FS())
 	if err != nil {

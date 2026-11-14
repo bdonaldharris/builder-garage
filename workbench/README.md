@@ -9,6 +9,7 @@ Engineering skills currently remain in [`../skills/`](../skills/) to preserve ex
 - [Application implementation](../skills/application-implementation-workflow/SKILL.md)
 - [Engineering discovery](../skills/engineering-discovery-workflow/SKILL.md)
 - [Implementation readiness](../skills/implementation-readiness-workflow/SKILL.md)
+  - [Readiness report template](../skills/implementation-readiness-workflow/templates/readiness-report.md): an optional starting point for planning a change, with the sections of the skill's [readiness output](../skills/implementation-readiness-workflow/SKILL.md#readiness-output). Filling it in is not a readiness assessment.
 - [Independent implementation review](../skills/independent-implementation-review/SKILL.md)
 - [Integration PR review](../skills/integration-pr-review/SKILL.md)
 - [Issue authoring](../skills/issue-authoring-workflow/SKILL.md)

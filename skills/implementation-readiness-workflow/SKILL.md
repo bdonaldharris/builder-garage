@@ -420,6 +420,8 @@ If an adjacent problem materially prevents correct implementation, identify it e
 
 The readiness report should be concise enough to guide implementation but complete enough to prevent major rediscovery during coding.
 
+This skill's template, `templates/readiness-report.md`, carries the structure below as a file to copy. Using it is optional, and it adds no step. The structure below is authoritative, and the template is kept identical to it.
+
 Use the following structure when appropriate:
 
 ```markdown
