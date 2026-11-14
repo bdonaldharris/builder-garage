@@ -42,6 +42,10 @@ The separation rule holds whichever Technicians fill the positions: **the same e
 
 These are separate invocations, not interchangeable personas or phases of one invocation. The [root operating model](../README.md#agent-identity-and-role-boundaries) and the canonical skills govern behavior.
 
+## Filling the roles
+
+[Filling Crew Roles](filling-roles.md) is a non-normative guide to how people, agents, or a mix fill each Technician role and workflow position: where each role stops, which record it leaves, and common collaboration patterns.
+
 ## Boundary
 
 The Crew owns *who* does the work and where each role's responsibility ends. The procedures a role follows belong to the [Workbench](../workbench/); the standard its output is held to belongs to [Inspection](../inspection/).
