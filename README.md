@@ -85,6 +85,28 @@ Run `garage record --help` for the accepted event types and outcomes. The design
 
 Source builds require **Go 1.27.4**, the version declared in [`go.mod`](go.mod). Compiled executables are standalone and do not require a Go installation at run time.
 
+#### Install from source
+
+On macOS and Linux, the supported way to install `garage` is to build it from a checkout with [`install.sh`](install.sh):
+
+```sh
+git clone https://github.com/bdonaldharris/builder-garage.git
+cd builder-garage
+./install.sh
+garage version
+```
+
+The installer builds `garage` with the same flags as `make build`, and installs it in `~/.local/bin`. To install it somewhere else, use `--install-dir PATH`. To set the version it reports, set `VERSION`, as with `make build`. Running it again, for example after `git pull`, upgrades the installed binary in place.
+
+- It may create the install directory. It never edits shell startup files or `PATH`. When the install directory isn't on `PATH`, it says what to add.
+- It stops, and installs nothing, when the Go version in `go.mod` isn't available. It never lets Go download a toolchain.
+- Apart from Go's own build and module caches, and a temporary build directory it removes, it writes nothing outside the install directory: not the checkout, and not any project.
+- It does not install skills. Skills are installed separately, per project, with [`garage skills install`](docs/skill-installation.md).
+
+Installing a published release is deferred until release automation exists ([#69](https://github.com/bdonaldharris/builder-garage/issues/69#issuecomment-6867848834)). A Windows installer is a separate follow-up; on Windows, build with `go build` as below.
+
+#### Build by hand
+
 Clone the repository, then build from its root:
 
 ```sh
@@ -143,15 +165,21 @@ Run the full local validation, including a native build and cross-compilation:
 make check
 ```
 
+Exercise the source installer, which installs only into temporary directories:
+
+```sh
+sh .github/scripts/test-install.sh
+```
+
 `make cross` writes executables for macOS, Linux, and Windows on amd64 and arm64 to `dist/`. On environments without `make`, the underlying commands are standard `go test`, `go vet`, `gofmt`, and `go build` commands; see [`Makefile`](Makefile) for the exact cross-compilation matrix. Pull requests run the same categories of validation in [GitHub Actions](.github/workflows/ci.yml), with tests on Linux, macOS, and Windows.
 
 ### Current limitations
 
-- There are no published releases or installation packages yet.
+- There are no published releases or installation packages yet. `garage` installs from source with [`install.sh`](#install-from-source), on macOS and Linux only; installing a published release is deferred until release automation exists.
 - GoReleaser is an approved future direction, but it is not configured.
 - The CLI initializes, shows, and changes configuration, records local workflow history, installs and verifies skills and the manuals a project adopts, and shows read-only workflow status only. It does not implement Workbench, Crew, Inspection, or Shipping capabilities, and its only Manuals capability is delivering adopted manuals to agents as skills.
 - `garage status` needs the `gh` command, installed and authenticated, to read GitHub.
-- The canonical skills read `.garage/config.yaml` only through `garage config validate`, so an agent needs a `garage` binary on its `PATH` to resolve a configured value; there is no installation package yet. The configuration configures no agents, plugins, providers, or remote services.
+- The canonical skills read `.garage/config.yaml` only through `garage config validate`, so an agent needs a `garage` binary on its `PATH` to resolve a configured value; [`install.sh`](#install-from-source) puts one there. The configuration configures no agents, plugins, providers, or remote services.
 
 ## An engineering discovery journey, built in public
 
