@@ -65,3 +65,5 @@ jobs:
           go-version-file: go.mod
       - name: Exercise install.sh
         run: sh .github/scripts/test-install.sh
+      - name: Exercise version derivation
+        run: sh .github/scripts/test-version.sh

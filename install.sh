@@ -5,8 +5,13 @@
 #
 # The installer builds garage with the same flags as "make build", and
 # installs it in ~/.local/bin, or in the directory given with --install-dir.
-# Set VERSION to choose the version "garage version" reports, as with
-# "make build VERSION=1.2.3". The default is "dev".
+# The version "garage version" reports is derived from this checkout's Git
+# state, as with "make build" (docs/adr/0002-semantic-versioning.md):
+# the tag at a clean tagged commit, such as v0.1.0; Git's descriptive form
+# after it, such as v0.1.0-3-gabc1234; the abbreviated commit when no version
+# tag is reachable; "-dirty" appended when the checkout has local changes; and
+# "dev" without Git metadata. Set VERSION to override it, as with
+# "make build VERSION=1.2.3".
 #
 # It may create the install directory. Apart from Go's own build and module
 # caches and a temporary build directory it removes, it writes nothing outside
@@ -36,7 +41,9 @@ Options:
   -h, --help           show this help
 
 Environment:
-  VERSION              version reported by "garage version" (default: dev)
+  VERSION              version reported by "garage version" (default: derived
+                       from this checkout's Git tags, for example v0.1.0;
+                       "dev" without Git metadata)
 
 The installer may create the install directory. It never edits shell startup
 files or PATH, and it never runs "garage skills install".
@@ -142,7 +149,37 @@ trap 'exit 1' HUP INT TERM
 build_dir=$(mktemp -d "${TMPDIR:-/tmp}/garage-install.XXXXXX") ||
 	die "cannot create a temporary build directory"
 
-version=${VERSION:-dev}
+# derive_version prints the version to report when VERSION is unset. It
+# matches the Makefile's derivation, and never writes to the checkout:
+# "git describe --dirty" would rewrite the index, so modifications are
+# detected with "git status" and GIT_OPTIONAL_LOCKS=0 instead. Untracked
+# files count as modifications, as they do for Go's own vcs.modified.
+derive_version() {
+	command -v git >/dev/null 2>&1 || {
+		echo dev
+		return 0
+	}
+	top=$(git -C "$root" rev-parse --show-toplevel 2>/dev/null) || {
+		echo dev
+		return 0
+	}
+	# A checkout without its own Git metadata, such as an extracted source
+	# archive, must not report the version of an enclosing repository.
+	[ "$(cd "$top" && pwd -P)" = "$(cd "$root" && pwd -P)" ] || {
+		echo dev
+		return 0
+	}
+	v=$(git -C "$root" describe --tags --match 'v[0-9]*' --always 2>/dev/null) || {
+		echo dev
+		return 0
+	}
+	if [ -n "$(GIT_OPTIONAL_LOCKS=0 git -C "$root" status --porcelain 2>/dev/null)" ]; then
+		v=$v-dirty
+	fi
+	echo "$v"
+}
+
+version=${VERSION:-$(derive_version)}
 printf 'Building garage %s with Go %s\n' "$version" "$found"
 (
 	cd "$root"

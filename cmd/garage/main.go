@@ -9,7 +9,10 @@ import (
 
 // version is the CLI version reported by "garage version".
 //
-// It defaults to a development value. Release builds replace it at link time:
+// It defaults to a development value, which a plain "go build" keeps. The
+// Makefile and install.sh replace it at link time with a version derived from
+// the checkout's Git tags, such as v0.1.0 (docs/adr/0002-semantic-versioning.md),
+// and a VERSION setting overrides that:
 //
 //	go build -ldflags "-X main.version=1.2.3" ./cmd/garage
 var version = "dev"

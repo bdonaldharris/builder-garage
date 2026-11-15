@@ -4,8 +4,9 @@
 #   .github/scripts/test-install.sh
 #
 # Every install goes into a temporary directory, which is removed afterwards.
-# It needs Go (the version go.mod declares) and git, and runs on macOS and
-# Linux. CI runs it on both.
+# It needs Go (the version go.mod declares), git, and make, and runs on macOS
+# and Linux. CI runs it on both. .github/scripts/test-version.sh covers how the
+# version is derived.
 
 set -eu
 
@@ -44,7 +45,11 @@ if sh "$installer" --install-dir "$dir" >"$out" 2>&1; then pass "installs into -
 fi
 check "creates the install directory" test -d "$dir"
 check "installed garage runs garage version" "$dir/garage" version
-check "reports the version" contains "$out" "garage version dev"
+# The version is derived from the checkout, exactly as "make build" derives it.
+# In CI's shallow clone, without tags, that is the abbreviated commit.
+derived=$(make -s -C "$root" version)
+check "reports the derived version" contains "$out" "garage version $derived"
+check "the derived version is not empty" test -n "$derived"
 check "explains the PATH change" contains "$out" "is not on your PATH"
 check "says skills are installed separately" contains "$out" "Skills are installed separately, per project."
 check "leaves only garage in the install directory" test "$(ls -A "$dir")" = garage

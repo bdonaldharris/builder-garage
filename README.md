@@ -33,7 +33,7 @@ The initial executable provides these entry points:
 | Command | Behavior |
 | --- | --- |
 | `garage --help` | Describes Builder Garage and lists the available commands. |
-| `garage version` | Reports the build version. Source builds report `dev` unless a version is supplied at link time. |
+| `garage version` | Reports the build version. `install.sh` and `make build` derive it from Git tags, for example `v0.1.0`; a plain `go build` reports `dev`. See [Versions](#versions). |
 | `garage init` | Creates or upgrades `.garage/config.yaml` in the current project directory. See [Project configuration](#project-configuration). |
 | `garage config validate` | Checks `.garage/config.yaml` against the configuration schema, read-only, and reports every problem. |
 | `garage config show`, `get` | Show every setting in plain language, or print one setting's value. |
@@ -85,6 +85,22 @@ Run `garage record --help` for the accepted event types and outcomes. The design
 
 Source builds require **Go 1.27.4**, the version declared in [`go.mod`](go.mod). Compiled executables are standalone and do not require a Go installation at run time.
 
+#### Versions
+
+`garage` follows Semantic Versioning, starting at `v0.1.0`. Versions are Git tags; no release artifacts are published yet ([ADR 0002](docs/adr/0002-semantic-versioning.md)).
+
+`install.sh` and `make build` derive the version `garage version` reports from the checkout:
+
+| Checkout | Reported version |
+| --- | --- |
+| Exactly at a version tag, with no local changes | The tag, for example `v0.1.0` |
+| Commits after the tag | Git's descriptive form, for example `v0.1.0-3-gabc1234` |
+| No version tag reachable, for example a shallow clone without tags | The abbreviated commit, for example `abc1234` |
+| Local changes, untracked files included | Any of the above with `-dirty` appended |
+| No Git metadata, for example an extracted source archive | `dev` |
+
+Set `VERSION` to override it, for example `make build VERSION=1.2.3` or `VERSION=1.2.3 ./install.sh`. A plain `go build` derives nothing and reports `dev`, unless a version is supplied at link time, as in [Build by hand](#build-by-hand).
+
 #### Install from source
 
 On macOS and Linux, the supported way to install `garage` is to build it from a checkout with [`install.sh`](install.sh):
@@ -96,7 +112,7 @@ cd builder-garage
 garage version
 ```
 
-The installer builds `garage` with the same flags as `make build`, and installs it in `~/.local/bin`. To install it somewhere else, use `--install-dir PATH`. To set the version it reports, set `VERSION`, as with `make build`. Running it again, for example after `git pull`, upgrades the installed binary in place.
+The installer builds `garage` with the same flags as `make build`, and installs it in `~/.local/bin`. To install it somewhere else, use `--install-dir PATH`. It reports the version derived from the checkout, as described under [Versions](#versions); set `VERSION` to override it, as with `make build`. Running it again, for example after `git pull`, upgrades the installed binary in place.
 
 - It may create the install directory. It never edits shell startup files or `PATH`. When the install directory isn't on `PATH`, it says what to add.
 - It stops, and installs nothing, when the Go version in `go.mod` isn't available. It never lets Go download a toolchain.
@@ -115,14 +131,14 @@ go build ./cmd/garage
 ./garage version
 ```
 
-The default version is `dev`. To supply a release-style version without adding a metadata framework:
+A plain `go build` reports `dev`. To supply a version without adding a metadata framework:
 
 ```sh
 go build -ldflags "-X main.version=1.2.3" ./cmd/garage
 ./garage version
 ```
 
-The `Makefile` provides equivalent commands:
+The `Makefile` provides the same build, and derives the version from Git tags as described under [Versions](#versions) unless `VERSION` is set:
 
 ```sh
 make build
@@ -175,7 +191,7 @@ sh .github/scripts/test-install.sh
 
 ### Current limitations
 
-- There are no published releases or installation packages yet. `garage` installs from source with [`install.sh`](#install-from-source), on macOS and Linux only; installing a published release is deferred until release automation exists.
+- There are no published releases or installation packages yet. Versions are Git tags only ([Versions](#versions)). `garage` installs from source with [`install.sh`](#install-from-source), on macOS and Linux only; installing a published release is deferred until release automation exists.
 - GoReleaser is an approved future direction, but it is not configured.
 - The CLI initializes, shows, and changes configuration, records local workflow history, installs and verifies skills and the manuals a project adopts, and shows read-only workflow status only. It does not implement Workbench, Crew, Inspection, or Shipping capabilities, and its only Manuals capability is delivering adopted manuals to agents as skills.
 - `garage status` needs the `gh` command, installed and authenticated, to read GitHub.
