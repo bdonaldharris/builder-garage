@@ -2,3 +2,6 @@
 /garage
 /garage.exe
 /dist/
+
+# macOS Finder metadata
+.DS_Store
