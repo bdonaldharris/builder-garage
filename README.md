@@ -12,7 +12,7 @@ Builder Garage is at its foundation stage.
 
 **What exists today** is the initial `garage` command-line foundation and the project's engineering documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, the [engineering principles](docs/principles.md) and [history](docs/history.md) behind them, and governance and contribution process.
 
-The CLI can display help and version information, initialize, upgrade, validate, show, and change a project's `.garage/config.yaml`, record private developer-local workflow events, install and verify the canonical skills and the manuals a project adopts at a project's harness targets, and show the read-only workflow status of an issue or pull request from GitHub. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, release automation, or runtime for the conceptual components has been implemented.
+The CLI can display help and version information, initialize, upgrade, validate, show, and change a project's `.garage/config.yaml`, record private developer-local workflow events, install and verify the canonical skills and the manuals a project adopts at a project's harness targets, and show the read-only workflow status of an issue or pull request from GitHub. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, or runtime for the conceptual components has been implemented. Release automation builds signed, attested archives of the CLI itself ([ADR 0003](docs/adr/0003-release-distribution.md)); no release is published yet.
 
 ## Architectural direction
 
@@ -87,7 +87,7 @@ Source builds require **Go 1.27.4**, the version declared in [`go.mod`](go.mod).
 
 #### Versions
 
-`garage` follows Semantic Versioning, starting at `v0.1.0`. Versions are Git tags; no release artifacts are published yet ([ADR 0002](docs/adr/0002-semantic-versioning.md)).
+`garage` follows Semantic Versioning, starting at `v0.1.0`. Versions are Git tags ([ADR 0002](docs/adr/0002-semantic-versioning.md)). `v0.1.0` is a tag-only source snapshot. Release archives are built from version tags by the [release workflow](.github/workflows/release.yml), and the first published release will be `v0.1.1` ([ADR 0003](docs/adr/0003-release-distribution.md)); none is published yet.
 
 `install.sh` and `make build` derive the version `garage version` reports from the checkout:
 
@@ -119,7 +119,7 @@ The installer builds `garage` with the same flags as `make build`, and installs 
 - Apart from Go's own build and module caches, and a temporary build directory it removes, it writes nothing outside the install directory: not the checkout, and not any project.
 - It does not install skills. Skills are installed separately, per project, with [`garage skills install`](docs/skill-installation.md).
 
-Installing a published release is deferred until release automation exists ([#69](https://github.com/bdonaldharris/builder-garage/issues/69#issuecomment-6867848834)). A Windows installer is a separate follow-up; on Windows, build with `go build` as below.
+Release archives for macOS, Linux, and Windows, with a signed checksum manifest and attestations, are published from `v0.1.1` onwards. Download one from the [Releases page](https://github.com/bdonaldharris/builder-garage/releases) and verify it as described in [Verifying a release](docs/release-verification.md). Until then, build from source: with `install.sh` on macOS and Linux, or with `go build` on Windows, as below. Installers that download and verify a release are a separate follow-up ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)).
 
 #### Build by hand
 
@@ -191,8 +191,7 @@ sh .github/scripts/test-install.sh
 
 ### Current limitations
 
-- There are no published releases or installation packages yet. Versions are Git tags only ([Versions](#versions)). `garage` installs from source with [`install.sh`](#install-from-source), on macOS and Linux only; installing a published release is deferred until release automation exists.
-- GoReleaser is an approved future direction, but it is not configured.
+- No release is published yet. The [release workflow](.github/workflows/release.yml) builds signed, attested archives with GoReleaser, and the first published release, `v0.1.1`, waits for macOS and Windows platform signing ([#122](https://github.com/bdonaldharris/builder-garage/issues/122); [ADR 0003](docs/adr/0003-release-distribution.md)). Until then, `garage` installs from source with [`install.sh`](#install-from-source), on macOS and Linux only. Native packages, package-manager channels, and release installers are later tracks of [#120](https://github.com/bdonaldharris/builder-garage/issues/120).
 - The CLI initializes, shows, and changes configuration, records local workflow history, installs and verifies skills and the manuals a project adopts, and shows read-only workflow status only. It does not implement Workbench, Crew, Inspection, or Shipping capabilities, and its only Manuals capability is delivering adopted manuals to agents as skills.
 - `garage status` needs the `gh` command, installed and authenticated, to read GitHub.
 - The canonical skills read `.garage/config.yaml` only through `garage config validate`, so an agent needs a `garage` binary on its `PATH` to resolve a configured value; [`install.sh`](#install-from-source) puts one there. The configuration configures no agents, plugins, providers, or remote services.

@@ -54,12 +54,12 @@ The repository now contains the initial Go CLI source, tests, build commands, an
 The following remain deliberately undecided:
 
 - commands and behavior beyond `garage --help`, `garage version`, `garage init`, `garage config validate`, `show`, `get`, `set`, `unset`, `add`, and `remove`, `garage record`, `garage skills install` and `verify`, and `garage status`;
-- release channels for compiled executables, and installing a published release. Installing from source is decided: on macOS and Linux, [`install.sh`](../install.sh) builds `garage` from a checkout and installs it for the current user. Release installation is deferred until release automation exists, and a Windows installer is a separate follow-up ([#69 decision](https://github.com/bdonaldharris/builder-garage/issues/69#issuecomment-6867848834));
+- release channels beyond GitHub Releases, and installing a published release. Installing from source is decided: on macOS and Linux, [`install.sh`](../install.sh) builds `garage` from a checkout and installs it for the current user. Release archives, signed checksums, and attestations, published to GitHub Releases from a version tag, are decided in [ADR 0003](adr/0003-release-distribution.md). Native packages, package-manager channels, and release installers are later tracks of [#120](https://github.com/bdonaldharris/builder-garage/issues/120);
 - package and module layout for future conceptual-component implementations;
 - adapter and extension interfaces;
 - the execution model for independent or distributed execution.
 
-Go, Cobra, Go modules, YAML, standard-library testing, standalone executables, GitHub Actions, and future GoReleaser use are decided in [ADR 0001](adr/0001-go-cobra-cli-foundation.md). `garage status` reads GitHub through the external `gh` command, as the [#19 decision](https://github.com/bdonaldharris/builder-garage/issues/19#issuecomment-6837362562) chose. No additional technology is introduced until an established requirement calls for it.
+Go, Cobra, Go modules, YAML, standard-library testing, standalone executables, GitHub Actions, and GoReleaser are decided in [ADR 0001](adr/0001-go-cobra-cli-foundation.md). Release distribution, including Sigstore/cosign signing and GitHub artifact attestations, is decided in [ADR 0003](adr/0003-release-distribution.md). `garage status` reads GitHub through the external `gh` command, as the [#19 decision](https://github.com/bdonaldharris/builder-garage/issues/19#issuecomment-6837362562) chose. No additional technology is introduced until an established requirement calls for it.
 
 ## How the architecture evolves
 
