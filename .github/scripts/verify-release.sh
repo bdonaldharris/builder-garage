@@ -9,15 +9,16 @@
 #   REPOSITORY  owner/name; defaults to bdonaldharris/builder-garage
 #
 # It checks that:
-#   - DIR holds exactly the six archives, the checksum manifest, and its
-#     Sigstore bundle;
+#   - DIR holds exactly TAG's release inventory (release-inventory.sh): v1
+#     up to v0.1.x is the six archives, the checksum manifest, and its
+#     Sigstore bundle; v2 from v0.2.0 adds the Linux .deb and .rpm packages;
 #   - the manifest's cosign signature verifies, pinned to the release
 #     workflow at TAG and GitHub Actions' OIDC issuer;
 #   - the same signature does NOT verify for another identity (the release
 #     workflow on the main branch), so the pin is effective;
-#   - every archive matches the manifest;
-#   - every archive has a GitHub artifact attestation from the release
-#     workflow.
+#   - every archive and package matches the manifest;
+#   - every archive and package has a GitHub artifact attestation from the
+#     release workflow.
 #
 # It needs cosign, gh (authenticated), and sha256sum or shasum.
 
@@ -53,19 +54,17 @@ fail() {
 	failures=$((failures + 1))
 }
 
-archives=
-for t in darwin_amd64 darwin_arm64 linux_amd64 linux_arm64; do
-	archives="$archives garage_${version}_$t.tar.gz"
-done
-for t in windows_amd64 windows_arm64; do
-	archives="$archives garage_${version}_$t.zip"
-done
+# The release's inventory, selected by version (release-inventory.sh), so
+# every published release stays verifiable with this script.
+inventory=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/release-inventory.sh
+inv_id=$(sh "$inventory" "$version" id)
+files=$(sh "$inventory" "$version" manifest)
 
 # 1. Exactly the expected assets.
-want=$(printf '%s\n' $archives "$manifest" "$bundle" | sort | tr '\n' ' ')
-got=$(ls -1 "$dir" | sort | tr '\n' ' ')
-if [ "$got" = "$want" ]; then pass "the assets are exactly the six archives, the manifest, and its bundle"; else
-	fail "the assets are exactly the six archives, the manifest, and its bundle (got: $got)"
+want=$(sh "$inventory" "$version" all | tr '\n' ' ')
+got=$(ls -1 "$dir" | LC_ALL=C sort | tr '\n' ' ')
+if [ "$got" = "$want" ]; then pass "the assets are exactly release inventory $inv_id"; else
+	fail "the assets are exactly release inventory $inv_id (got: $got)"
 fi
 
 # 2. The manifest's signature, pinned to the release workflow at this tag.
@@ -85,16 +84,16 @@ else
 	pass "a signature check pinned to another identity ($other) fails"
 fi
 
-# 4. Every archive matches the signed manifest.
+# 4. Every archive and package matches the signed manifest.
 if command -v sha256sum >/dev/null 2>&1; then
 	sum() { sha256sum -c "$1"; }
 else
 	sum() { shasum -a 256 -c "$1"; }
 fi
-if (cd "$dir" && sum "$manifest"); then pass "every archive matches the manifest"; else fail "every archive matches the manifest"; fi
+if (cd "$dir" && sum "$manifest"); then pass "every listed file matches the manifest"; else fail "every listed file matches the manifest"; fi
 
-# 5. Every archive's attestation, from the release workflow.
-for a in $archives; do
+# 5. Every archive's and package's attestation, from the release workflow.
+for a in $files; do
 	if gh attestation verify "$dir/$a" --repo "$repo" --signer-workflow "$repo/$workflow" >/dev/null; then
 		pass "$a has an attestation from $workflow"
 	else

@@ -52,10 +52,21 @@ jobs:
         run: go test ./...
 
   release-config:
-    name: Release configuration (snapshot)
-    # Builds the release archives as a snapshot, exactly as the release
-    # workflow does, but publishes, signs, and attests nothing.
-    runs-on: ubuntu-latest
+    name: Release configuration (snapshot, ${{ matrix.arch }})
+    # Builds the release archives and Linux packages as a snapshot, exactly as
+    # the release workflow does, but publishes, signs, and attests nothing.
+    # Then installs, upgrades, and removes this architecture's .deb (apt) and
+    # .rpm (dnf, in Fedora) with their package managers.
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: ubuntu-latest, deb: linux_amd64.deb, rpm: x86_64.rpm }
+          - { arch: arm64, runner: ubuntu-24.04-arm, deb: linux_arm64.deb, rpm: aarch64.rpm }
+    env:
+      # Keep in step with FEDORA_IMAGE in release.yml.
+      FEDORA_IMAGE: fedora:45@sha256:a7d72ba2745b100a3351087472e5ee7b2450af7cf331e7673007e3817612839c
     steps:
       - uses: actions/checkout@v7
         with:
@@ -72,15 +83,43 @@ jobs:
           install-only: true
       - name: Check the GoReleaser configuration
         run: goreleaser check
+      - name: Build an older snapshot's packages, for the upgrade check
+        env:
+          GARAGE_RELEASE_MODE: snapshot
+          GARAGE_SNAPSHOT_BASE: 0.1.99
+        run: |
+          goreleaser release --snapshot --clean --skip=publish
+          # Moved out of the checkout, so the next build's tree stays clean.
+          mkdir "$RUNNER_TEMP/older"
+          mv dist/*.deb dist/*.rpm "$RUNNER_TEMP/older/"
+          rm -rf dist
       - name: Build a snapshot
         env:
           GARAGE_RELEASE_MODE: snapshot
         run: goreleaser release --snapshot --clean --skip=publish
-      - name: Check the snapshot's archives, manifest, and executables
+      - name: Check the snapshot's archives, packages, manifest, and executables
         run: |
           version=$(jq -r .version dist/metadata.json)
           sh .github/scripts/check-release-dist.sh dist "$version" "$version" "$(git rev-parse HEAD)"
-          sh .github/scripts/check-release-archive.sh "dist/garage_${version}_linux_amd64.tar.gz" "$version" "$(git rev-parse HEAD)"
+          sh .github/scripts/check-release-archive.sh "dist/garage_${version}_linux_${{ matrix.arch }}.tar.gz" "$version" "$(git rev-parse HEAD)"
+      - name: Install, upgrade, and remove the .deb with apt
+        env:
+          SUFFIX: ${{ matrix.deb }}
+        run: |
+          version=$(jq -r .version dist/metadata.json)
+          pkg=$(sh .github/scripts/release-inventory.sh "$version" packages | grep -F -- "$SUFFIX")
+          older=$(ls "$RUNNER_TEMP"/older/*"$SUFFIX")
+          GARAGE_PACKAGE_CHECK=1 sh .github/scripts/check-release-package.sh "dist/$pkg" "$version" "$(git rev-parse HEAD)" "$older"
+      - name: Install, upgrade, and remove the .rpm with dnf (Fedora)
+        env:
+          SUFFIX: ${{ matrix.rpm }}
+        run: |
+          version=$(jq -r .version dist/metadata.json)
+          pkg=$(sh .github/scripts/release-inventory.sh "$version" packages | grep -F -- "$SUFFIX")
+          older=$(cd "$RUNNER_TEMP/older" && ls *"$SUFFIX")
+          docker run --rm -e GARAGE_PACKAGE_CHECK=1 -v "$PWD:/w:ro" -v "$RUNNER_TEMP/older:/older:ro" -w /w "$FEDORA_IMAGE" \
+            sh -c 'dnf install -y -q git >/dev/null && sh .github/scripts/check-release-package.sh "$1" "$2" "$3" "$4"' \
+            sh "dist/$pkg" "$version" "$(git rev-parse HEAD)" "/older/$older"
 
   install:
     name: Source installer (${{ matrix.os }})

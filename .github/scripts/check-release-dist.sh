@@ -1,6 +1,7 @@
 #!/bin/sh
-# check-release-dist.sh: check the archives and checksum manifest GoReleaser
-# wrote to dist/, and how each executable was built (.goreleaser.yaml).
+# check-release-dist.sh: check the archives, packages, and checksum manifest
+# GoReleaser wrote to dist/, and how each executable was built
+# (.goreleaser.yaml). The expected file names come from release-inventory.sh.
 #
 #   check-release-dist.sh DIST ARCHIVE_VERSION BINARY_VERSION REVISION
 #
@@ -10,9 +11,11 @@
 #   REVISION         the full commit the release is built from
 #
 # It checks that:
-#   - there are exactly six archives, one per target, with the expected names;
-#   - each holds exactly the executable, LICENSE, and README.md;
-#   - the checksum manifest lists exactly those six archives, and matches them;
+#   - dist holds exactly the archives and packages of ARCHIVE_VERSION's
+#     release inventory, with the expected names, and no others;
+#   - each archive holds exactly the executable, LICENSE, and README.md;
+#   - the checksum manifest lists exactly those files, and matches them;
+#   (check-release-package.sh checks each package's contents on its platform)
 #   - each executable records CGO_ENABLED=0, -trimpath, and a clean build of
 #     REVISION (vcs.modified=false), which is what makes installed skills
 #     carry REVISION; is stripped (-s -w); and embeds BINARY_VERSION.
@@ -62,14 +65,16 @@ stripped() {
 work=$(mktemp -d "${TMPDIR:-/tmp}/garage-dist-check.XXXXXX")
 trap 'rm -rf -- "$work"' EXIT
 
+inventory=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/release-inventory.sh
+inv_id=$(sh "$inventory" "$aver" id)
+echo "release inventory $inv_id for $aver"
+
 # Archives: names and contents.
-expected_archives=
-for t in $targets; do
-	case $t in
-	windows_*) name=garage_${aver}_$t.zip exe=garage.exe ;;
-	*) name=garage_${aver}_$t.tar.gz exe=garage ;;
+for name in $(sh "$inventory" "$aver" archives); do
+	case $name in
+	*.zip) exe=garage.exe ;;
+	*) exe=garage ;;
 	esac
-	expected_archives="$expected_archives $name"
 	archive=$dist/$name
 	if [ ! -f "$archive" ]; then
 		fail "archive $name exists"
@@ -85,17 +90,24 @@ for t in $targets; do
 	if [ "$got" = "$want" ]; then pass "$name holds exactly $want"; else fail "$name holds exactly $want (got: $got)"; fi
 done
 
-found=$(cd "$dist" && ls -1 | grep -E '\.(tar\.gz|zip)$' | sort | tr '\n' ' ')
-want=$(printf '%s\n' $expected_archives | sort | tr '\n' ' ')
-if [ "$found" = "$want" ]; then pass "dist holds no other archives"; else fail "dist holds no other archives (got: $found)"; fi
+for name in $(sh "$inventory" "$aver" packages); do
+	if [ -f "$dist/$name" ]; then pass "package $name exists"; else fail "package $name exists"; fi
+done
+
+# Exactly the inventory's archives and packages, and no other.
+want=$(sh "$inventory" "$aver" manifest | tr '\n' ' ')
+found=$(cd "$dist" && ls -1 | grep -E '\.(tar\.gz|zip|deb|rpm)$' | LC_ALL=C sort | tr '\n' ' ')
+if [ "$found" = "$want" ]; then pass "dist holds exactly the inventory $inv_id archives and packages"; else
+	fail "dist holds exactly the inventory $inv_id archives and packages (got: $found)"
+fi
 
 # Checksum manifest.
 manifest=garage_${aver}_checksums.txt
 if [ -f "$dist/$manifest" ]; then
 	pass "manifest $manifest exists"
-	listed=$(awk '{ sub(/^\*/, "", $2); print $2 }' "$dist/$manifest" | sort | tr '\n' ' ')
-	if [ "$listed" = "$want" ]; then pass "manifest lists exactly the six archives"; else fail "manifest lists exactly the six archives (got: $listed)"; fi
-	if (cd "$dist" && sha256_check "$manifest" >/dev/null); then pass "manifest matches the archives"; else fail "manifest matches the archives"; fi
+	listed=$(awk '{ sub(/^\*/, "", $2); print $2 }' "$dist/$manifest" | LC_ALL=C sort | tr '\n' ' ')
+	if [ "$listed" = "$want" ]; then pass "manifest lists exactly the inventory $inv_id files"; else fail "manifest lists exactly the inventory $inv_id files (got: $listed)"; fi
+	if (cd "$dist" && sha256_check "$manifest" >/dev/null); then pass "manifest matches the files"; else fail "manifest matches the files"; fi
 else
 	fail "manifest $manifest exists"
 fi

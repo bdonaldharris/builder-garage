@@ -3,12 +3,13 @@
 Each `garage` release on the [Releases page](https://github.com/bdonaldharris/builder-garage/releases) carries:
 
 - **Six archives:** `garage_<version>_<os>_<arch>.tar.gz` for macOS and Linux, and `.zip` for Windows, on amd64 and arm64;
-- **`garage_<version>_checksums.txt`:** the SHA-256 checksum manifest of the six archives;
+- **From `v0.2.0`, four Linux packages:** `garage_<version>_linux_amd64.deb`, `garage_<version>_linux_arm64.deb`, `garage-<version>-1.x86_64.rpm`, and `garage-<version>-1.aarch64.rpm`;
+- **`garage_<version>_checksums.txt`:** the SHA-256 checksum manifest of the archives and packages;
 - **`garage_<version>_checksums.txt.sigstore.json`:** the manifest's [Sigstore](https://www.sigstore.dev/) bundle.
 
-Every archive also has a [GitHub artifact attestation](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations).
+Every archive and package also has a [GitHub artifact attestation](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations).
 
-`<version>` is the tag without its `v`. For tag `v0.1.1`, the manifest is `garage_0.1.1_checksums.txt`.
+`<version>` is the tag without its `v`. For tag `v0.1.1`, the manifest is `garage_0.1.1_checksums.txt`. Which files each release carries is its release inventory, recorded in [ADR 0003](adr/0003-release-distribution.md#release-inventory).
 
 There are no published releases until `v0.1.1`. The design is recorded in [ADR 0003](adr/0003-release-distribution.md).
 
@@ -85,6 +86,43 @@ tar -xzf "garage_${VERSION}_linux_amd64.tar.gz" garage
 
 It prints `garage version v0.1.1`. Move `garage` to a directory on your `PATH`.
 
+## Linux packages
+
+From `v0.2.0`, each release also carries `.deb` and `.rpm` packages for amd64 and arm64. A package installs `/usr/bin/garage` and its license file, and nothing else. `apt`, `dpkg`, `dnf`, and `rpm` own upgrades and removal. Installing, upgrading, or removing a package never touches project configuration, installed skills, manuals, or local history.
+
+The packages carry no PGP signature. Their integrity and origin come from the same signed checksum manifest and attestations as the archives, so **verify the package before installing it**:
+
+```sh
+TAG=v0.2.0
+VERSION=${TAG#v}
+PACKAGE="garage_${VERSION}_linux_amd64.deb"   # or garage_${VERSION}_linux_arm64.deb,
+                                                #    garage-${VERSION}-1.x86_64.rpm, garage-${VERSION}-1.aarch64.rpm
+gh release download "$TAG" --repo bdonaldharris/builder-garage \
+  --pattern "$PACKAGE" \
+  --pattern "garage_${VERSION}_checksums.txt" \
+  --pattern "garage_${VERSION}_checksums.txt.sigstore.json"
+
+cosign verify-blob "garage_${VERSION}_checksums.txt" \
+  --bundle "garage_${VERSION}_checksums.txt.sigstore.json" \
+  --certificate-identity "https://github.com/bdonaldharris/builder-garage/.github/workflows/release.yml@refs/tags/${TAG}" \
+  --certificate-oidc-issuer https://token.actions.githubusercontent.com
+sha256sum --check --ignore-missing "garage_${VERSION}_checksums.txt"
+
+# Optionally, the package's attestation:
+gh attestation verify "$PACKAGE" --repo bdonaldharris/builder-garage \
+  --signer-workflow bdonaldharris/builder-garage/.github/workflows/release.yml
+```
+
+`cosign` prints `Verified OK`, and `sha256sum` prints the package's name followed by `OK`. Only then install it from the file:
+
+```sh
+sudo apt install "./$PACKAGE"   # .deb (Debian, Ubuntu)
+sudo dnf install "./$PACKAGE"   # .rpm (Fedora, RHEL)
+garage version
+```
+
+Remove it with `sudo apt remove garage` or `sudo dnf remove garage`. The package installs `garage` system-wide in `/usr/bin`, while [`install.sh`](../install.sh) installs it for one user in `~/.local/bin`. Use one or the other, so that only one `garage` is on your `PATH`.
+
 ## Windows (PowerShell)
 
 ```powershell
@@ -146,4 +184,4 @@ Pinning the exact tag is stronger: it also proves that the manifest belongs to t
 
 ## For maintainers
 
-[`.github/scripts/verify-release.sh`](../.github/scripts/verify-release.sh) runs every check above against a directory of a release's assets. It also confirms that the assets are exactly the expected eight files, and that a signature check pinned to another identity fails. The release workflow runs it before publishing and again on the published release.
+[`.github/scripts/verify-release.sh`](../.github/scripts/verify-release.sh) runs every check above against a directory of a release's assets. It also confirms that the assets are exactly the release's inventory (selected by its tag, so every published release stays verifiable), and that a signature check pinned to another identity fails. The release workflow runs it before publishing and again on the published release.

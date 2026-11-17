@@ -1,6 +1,8 @@
-# GoReleaser configuration for garage release archives (#121).
+# GoReleaser configuration for garage release archives (#121) and Linux
+# packages (#123).
 #
-# GoReleaser builds, archives, and checksums. It never signs or publishes:
+# GoReleaser builds, archives, packages, and checksums. It never signs or
+# publishes:
 # signing, attestation, and publication are separate least-privilege jobs in
 # .github/workflows/release.yml (docs/adr/0003-release-distribution.md).
 #
@@ -49,12 +51,51 @@ archives:
       - LICENSE
       - README.md
 
+# Linux packages (#123). Each installs only /usr/bin/garage and its license
+# file. There are no maintainer scripts, configuration files, or
+# dependencies, so installing, upgrading, or removing a package never touches
+# project configuration, installed skills, manuals, or local history. The
+# file names are fixed by release inventory v2
+# (.github/scripts/release-inventory.sh); the signed checksum manifest and the
+# attestations cover them. The packages carry no PGP signature.
+nfpms:
+  - id: garage-deb
+    ids: [garage]
+    package_name: garage
+    formats: [deb]
+    file_name_template: "garage_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    vendor: Builder Garage
+    homepage: https://github.com/bdonaldharris/builder-garage
+    maintainer: Builder Garage maintainers <https://github.com/bdonaldharris/builder-garage>
+    description: Builder Garage command-line interface.
+    license: MIT
+    contents:
+      - src: LICENSE
+        dst: /usr/share/doc/garage/copyright
+  - id: garage-rpm
+    ids: [garage]
+    package_name: garage
+    formats: [rpm]
+    file_name_template: "{{ .ConventionalFileName }}"
+    vendor: Builder Garage
+    homepage: https://github.com/bdonaldharris/builder-garage
+    maintainer: Builder Garage maintainers <https://github.com/bdonaldharris/builder-garage>
+    description: Builder Garage command-line interface.
+    license: MIT
+    contents:
+      - src: LICENSE
+        dst: /usr/share/licenses/garage/LICENSE
+        type: license
+
 checksum:
   name_template: "garage_{{ .Version }}_checksums.txt"
   algorithm: sha256
 
+# Snapshots take the next minor version, so a snapshot selects the current
+# release inventory. GARAGE_SNAPSHOT_BASE overrides the base, for example to
+# build an older package for an upgrade test.
 snapshot:
-  version_template: "{{ incpatch .Version }}-snapshot+{{ .ShortCommit }}"
+  version_template: "{{ envOrDefault \"GARAGE_SNAPSHOT_BASE\" (incminor .Version) }}-snapshot+{{ .ShortCommit }}"
 
 changelog:
   disable: true
