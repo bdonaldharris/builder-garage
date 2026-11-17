@@ -1,8 +1,8 @@
-# GoReleaser configuration for garage release archives (#121) and Linux
-# packages (#123).
+# GoReleaser configuration for garage release archives (#121), Linux packages
+# (#123), and the Homebrew cask (#124).
 #
-# GoReleaser builds, archives, packages, and checksums. It never signs or
-# publishes:
+# GoReleaser builds, archives, packages, checksums, and generates the cask. It
+# never signs or publishes:
 # signing, attestation, and publication are separate least-privilege jobs in
 # .github/workflows/release.yml (docs/adr/0003-release-distribution.md).
 #
@@ -18,8 +18,13 @@ version: 2
 
 project_name: garage
 
+# Two builds with one definition (the YAML anchor): Linux, and the other
+# platforms. A channel can then select only the platforms it may serve: the
+# Homebrew cask serves Linux only until macOS executables are notarized (#122,
+# #124). The asset names are the same as with one build.
 builds:
-  - id: garage
+  - &build
+    id: garage-linux
     main: ./cmd/garage
     binary: garage
     env:
@@ -28,7 +33,7 @@ builds:
       - -trimpath
     ldflags:
       - -s -w -X main.version={{ if .IsSnapshot }}{{ .Version }}{{ else }}{{ .Tag }}{{ end }}
-    goos: [darwin, linux, windows]
+    goos: [linux]
     goarch: [amd64, arm64]
     mod_timestamp: "{{ .CommitTimestamp }}"
     hooks:
@@ -38,10 +43,20 @@ builds:
         # Nothing is platform-signed yet; #122 fills the hook.
         - cmd: sh .github/scripts/platform-sign.sh '{{ envOrDefault "GARAGE_RELEASE_MODE" "unset" }}' '{{ .Os }}' '{{ .Path }}'
           output: true
+  - <<: *build
+    id: garage-other
+    goos: [darwin, windows]
 
 archives:
-  - id: garage
-    ids: [garage]
+  - id: garage-linux
+    ids: [garage-linux]
+    formats: [tar.gz]
+    name_template: "garage_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+  - id: garage-other
+    ids: [garage-other]
     formats: [tar.gz]
     format_overrides:
       - goos: windows
@@ -60,7 +75,7 @@ archives:
 # attestations cover them. The packages carry no PGP signature.
 nfpms:
   - id: garage-deb
-    ids: [garage]
+    ids: [garage-linux]
     package_name: garage
     formats: [deb]
     file_name_template: "garage_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
@@ -73,7 +88,7 @@ nfpms:
       - src: LICENSE
         dst: /usr/share/doc/garage/copyright
   - id: garage-rpm
-    ids: [garage]
+    ids: [garage-linux]
     package_name: garage
     formats: [rpm]
     file_name_template: "{{ .ConventionalFileName }}"
@@ -86,6 +101,30 @@ nfpms:
       - src: LICENSE
         dst: /usr/share/licenses/garage/LICENSE
         type: license
+
+# Homebrew cask (#124), Linux only: it selects only the Linux archives, so
+# Homebrew on macOS refuses it ("This cask requires Linux.") until #122
+# notarizes the macOS executables. GoReleaser writes it to
+# dist/homebrew/Casks/garage.rb and never publishes it: the release
+# workflow's channel-publish job commits it to bdonaldharris/homebrew-tap,
+# after the release is published and verified. The URL template is needed
+# because GoReleaser's own release is disabled.
+homebrew_casks:
+  - name: garage
+    ids: [garage-linux]
+    url:
+      # v{{ .Version }} is the release tag (the guard accepts only vX.Y.Z tags),
+      # and in a snapshot it follows the snapshot version.
+      template: "https://github.com/bdonaldharris/builder-garage/releases/download/v{{ .Version }}/{{ .ArtifactName }}"
+    binaries: [garage]
+    homepage: https://github.com/bdonaldharris/builder-garage
+    description: Builder Garage command-line interface.
+    license: MIT
+    skip_upload: true
+    directory: Casks
+    repository:
+      owner: bdonaldharris
+      name: homebrew-tap
 
 checksum:
   name_template: "garage_{{ .Version }}_checksums.txt"

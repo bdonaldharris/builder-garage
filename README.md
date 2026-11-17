@@ -123,6 +123,8 @@ Release archives for macOS, Linux, and Windows, with a signed checksum manifest 
 
 From `v0.2.0`, releases also carry `.deb` and `.rpm` packages for Linux on amd64 and arm64. A package installs `garage` system-wide at `/usr/bin/garage`, and `apt` or `dnf` upgrades and removes it. Verify it before installing, as [Verifying a release](docs/release-verification.md#linux-packages) shows. `install.sh` installs for one user in `~/.local/bin` instead: use one or the other, so that only one `garage` is on your `PATH`.
 
+On Linux, Homebrew users can install the release from Builder Garage's tap: `brew tap bdonaldharris/tap`, `brew trust --tap bdonaldharris/tap`, then `brew install --cask garage` ([Homebrew (Linux)](docs/release-verification.md#homebrew-linux)). The cask is offered on Linux only until macOS executables are notarized ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)).
+
 #### Build by hand
 
 Clone the repository, then build from its root:
@@ -195,7 +197,7 @@ sh .github/scripts/test-install.sh
 
 - No release is published yet. The [release workflow](.github/workflows/release.yml) builds archives with GoReleaser, with a signed checksum manifest and attestations, and the first published release will be `v0.1.1` ([ADR 0003](docs/adr/0003-release-distribution.md)). Until then, `garage` installs from source with [`install.sh`](#install-from-source), on macOS and Linux only.
 - macOS executables are not yet Developer ID signed and notarized, and Windows executables are not yet Authenticode-signed ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)). Gatekeeper may restrict them, and SmartScreen may warn. Verifying a release establishes its integrity and origin, not operating-system publisher trust. See [Verifying a release](docs/release-verification.md#platform-trust).
-- Linux `.deb` and `.rpm` packages ship from `v0.2.0` ([#123](https://github.com/bdonaldharris/builder-garage/issues/123)). macOS `.pkg` and Windows `.msi` installers, package-manager channels, and release installers are later work of [#120](https://github.com/bdonaldharris/builder-garage/issues/120). They wait for platform signing.
+- Linux `.deb` and `.rpm` packages ship from `v0.2.0` ([#123](https://github.com/bdonaldharris/builder-garage/issues/123)). A Homebrew cask is offered on Linux from Builder Garage's tap ([#124](https://github.com/bdonaldharris/builder-garage/issues/124)). macOS `.pkg` and Windows `.msi` installers, Homebrew on macOS, Scoop, winget, and release installers are later work of [#120](https://github.com/bdonaldharris/builder-garage/issues/120). They wait for platform signing.
 - The CLI initializes, shows, and changes configuration, records local workflow history, installs and verifies skills and the manuals a project adopts, and shows read-only workflow status only. It does not implement Workbench, Crew, Inspection, or Shipping capabilities, and its only Manuals capability is delivering adopted manuals to agents as skills.
 - `garage status` needs the `gh` command, installed and authenticated, to read GitHub.
 - The canonical skills read `.garage/config.yaml` only through `garage config validate`, so an agent needs a `garage` binary on its `PATH` to resolve a configured value; [`install.sh`](#install-from-source) puts one there. The configuration configures no agents, plugins, providers, or remote services.

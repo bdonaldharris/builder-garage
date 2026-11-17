@@ -5,7 +5,8 @@
 - **Decision authority:** Lead maintainer, as Workflow Owner, under [GOVERNANCE.md](../../GOVERNANCE.md). Recorded in:
   - [#120](https://github.com/bdonaldharris/builder-garage/issues/120), its [correction](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6930428330), its [amendment to decision 5](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6935475192), and its [amendment to decision 4](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6938614931) (2026-11-17);
   - [#121's decisions](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935474831), and those recorded in its readiness reports, [the first](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935931327) and [the follow-up after the decision 4 amendment](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6938700447);
-  - [#123's decisions](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952041049), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952505748) (2026-11-17): Linux packages and the release inventory.
+  - [#123's decisions](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952041049), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952505748) (2026-11-17): Linux packages and the release inventory;
+  - [#124's decisions](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959529918), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959615104) (2026-11-17): package-manager channels, starting with the Homebrew cask on Linux.
 
 ## Context
 
@@ -24,7 +25,7 @@ This record covers the program's decisions and the foundation's design.
 
 | Area | Decision |
 | --- | --- |
-| Formats | Archives: `.tar.gz` for macOS and Linux, `.zip` for Windows, each holding the executable, `LICENSE`, and `README.md`. From `v0.2.0`, Linux `.deb` and `.rpm` packages, built with GoReleaser's free nfpm support (#123). macOS `.pkg` (`pkgbuild` and `productsign` on a macOS runner) and Windows `.msi` (WiX, if its license is compatible with MIT distribution) follow their platform-trust prerequisites. GoReleaser Pro is not used. Package-manager channels are a later track. |
+| Formats | Archives: `.tar.gz` for macOS and Linux, `.zip` for Windows, each holding the executable, `LICENSE`, and `README.md`. From `v0.2.0`, Linux `.deb` and `.rpm` packages, built with GoReleaser's free nfpm support (#123). macOS `.pkg` (`pkgbuild` and `productsign` on a macOS runner) and Windows `.msi` (WiX, if its license is compatible with MIT distribution) follow their platform-trust prerequisites. GoReleaser Pro is not used. Package-manager channels: see [Package-manager channels](#7-package-manager-channels). |
 | Platforms | macOS, Linux, and Windows, each on amd64 and arm64. |
 | Assets | Exactly the release's inventory (see [Release inventory](#6-release-inventory)). Inventory v1 (to `v0.1.x`) is the six archives, a SHA-256 checksum manifest, and its Sigstore bundle. Inventory v2 (from `v0.2.0`) adds the four Linux packages. No skills or manuals bundle. |
 | Integrity | The manifest is signed with keyless Sigstore/cosign. Every archive and package also gets a GitHub artifact attestation, as additional provenance. |
@@ -62,6 +63,8 @@ Every executable embeds the canonical skills and manuals from the tagged commit,
 | `verify` | `contents: read`, `attestations: read` | Verifies the signature (pinned identity, and rejection of another identity), the checksums, and every attestation. |
 | `publish` | `contents: write`, in the `release` environment | After the Workflow Owner approves, creates a draft with exactly the verified assets, checks it, and publishes it. |
 | `post-verify` | `contents: read`, `attestations: read` | Downloads the published assets and verifies them again. |
+| `channel-publish` | `contents: read`, `attestations: read`, in the `channel-publish` environment | After `post-verify`, re-verifies the published release, checks the GoReleaser-generated Homebrew cask against its manifest, and commits the cask to `bdonaldharris/homebrew-tap` with the tap's own token (see [Package-manager channels](#7-package-manager-channels)). |
+| `channel-verify` | `contents: read` | Installs the cask from the tap on amd64 and arm64 Linux, checks `garage`, and uninstalls it. |
 
 - **Dry runs.** `dry-run` mode stops after `build`. It signs, attests, uploads, and publishes nothing, so no public trust material exists for artifacts not meant for distribution. Pull-request CI also builds a GoReleaser snapshot on every pull request, read-only and without secrets.
 - **Platform signing.** Its place is a GoReleaser post-build hook ([`platform-sign.sh`](../../.github/scripts/platform-sign.sh)), before archiving, so the checksums, signature, and attestations cover signed executables.
@@ -116,17 +119,41 @@ The files a release publishes are its **release inventory**: a versioned, explic
   - Installing, upgrading, or removing it never creates, alters, or removes project configuration, installed skills, manuals, local history, or other user data.
   - [`check-release-package.sh`](../../.github/scripts/check-release-package.sh) checks all of this on both architectures, with sentinel user data, in pull-request CI (with an upgrade) and before every release is signed.
 
+### 7. Package-manager channels
+
+- **Phasing.**
+  - The Homebrew cask on **Linux** ships first. The release's signed checksum manifest and attestations are its trust, as for the Linux packages.
+  - Homebrew on **macOS** waits for notarized macOS executables (#122). Homebrew quarantines every cask download, and macOS kills a quarantined unsigned executable.
+  - **Scoop and winget** wait for Windows platform trust (#122).
+- **The cask.**
+  - GoReleaser generates it, as `homebrew_casks`, from the release's own Linux archives and checksums. There is no hand-maintained formula.
+  - It selects only the Linux archives: the build is defined once and split into Linux and other platforms with a YAML anchor, so asset names do not change. Homebrew on macOS therefore refuses it ("This cask requires Linux.").
+  - It is not a release asset, and the release inventory is unchanged.
+- **The publication boundary.**
+  - Channels are published only after the immutable release has passed `post-verify`, which follows the Workflow Owner's release approval.
+  - `channel-publish` first re-verifies the published release, then checks that the cask's downloads are exactly the inventory's Linux archives, with the manifest's checksums ([`check-channel-cask.sh`](../../.github/scripts/check-channel-cask.sh)).
+  - **A channel failure does not affect the release.** It is retried by re-running the failed job, within 30 days, against the same release; the generated cask is kept 30 days. After that, the next release updates the channel.
+- **Repositories and credentials.**
+  - Each channel has a dedicated, Builder Garage-owned repository: `bdonaldharris/homebrew-tap`, then `bdonaldharris/scoop-bucket` and a fork of `microsoft/winget-pkgs` when those phases begin.
+  - Each has its own fine-grained credential, held in the protected `channel-publish` environment. It is never the release workflow's token, and never has access to this repository.
+  - The tap and bucket receive direct commits. winget receives a pull request from the fork, and Microsoft's review is its own gate.
+- **Names.**
+  - Every channel uses the package name `garage`.
+  - winget's publisher metadata is "B Donald Harris", describing project ownership. It does not claim an Authenticode publisher identity for unsigned executables.
+- **Users trust the tap explicitly** (`brew trust --tap bdonaldharris/tap`), as Homebrew requires. Nothing bypasses tap trust.
+
 ## Consequences
 
 - **A tag that fails cannot be reused.** A defect found after a tag exists ships under the next tag, because protected tags are never moved. A release-mode run that fails after signing leaves a public signature for that tag.
 - **The release workflow can run only from a tag that contains it.** GitHub runs a dispatched workflow as it exists at the dispatched ref, so the first release follows the merge of this design.
 - **The asset names and the workflow path are a public contract.** Verification commands depend on them.
-- **The first releases are not platform-signed.** `v0.1.1` and later releases publish unsigned macOS and Windows executables until #122 is complete, with the platform-trust disclosure in their notes. macOS `.pkg` and Windows `.msi` packages (#123), package-manager channels (#124), and any OS-native installer (#125) wait for #122.
+- **The first releases are not platform-signed.** `v0.1.1` and later releases publish unsigned macOS and Windows executables until #122 is complete, with the platform-trust disclosure in their notes. macOS `.pkg` and Windows `.msi` packages (#123), Homebrew on macOS, Scoop, and winget (#124), and any OS-native installer (#125) wait for #122.
 - **The first package release must be `v0.2.0`.** A `v0.1.x` tag selects inventory v1, which has no packages, so a build that produces them fails its checks before anything is signed.
-- **Package names are public contract.** The package name `garage` and the path `/usr/bin/garage` carry upgrades between releases.
+- **Package names are public contract.** The package name `garage` and the path `/usr/bin/garage` carry upgrades between releases. So do the tap `bdonaldharris/tap` and its cask `garage`.
+- **A failed channel publication leaves a release without its channel update.** Re-run the job within 30 days, or the next release updates the channel.
 
 ## Still undecided
 
 - Platform-signing tooling and the Windows signing option (#122).
-- macOS `.pkg` and Windows `.msi` packaging readiness, including the WiX license review (#123); package-manager channels (#124); and release installers and update (#125).
+- macOS `.pkg` and Windows `.msi` packaging readiness, including the WiX license review (#123); Homebrew on macOS, Scoop, and winget, including whether a fine-grained credential can open the winget pull request (#124); and release installers and update (#125).
 - When a release is cut, and what moves the version (as in ADR 0002).

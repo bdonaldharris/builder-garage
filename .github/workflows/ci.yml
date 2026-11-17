@@ -102,6 +102,17 @@ jobs:
           version=$(jq -r .version dist/metadata.json)
           sh .github/scripts/check-release-dist.sh dist "$version" "$version" "$(git rev-parse HEAD)"
           sh .github/scripts/check-release-archive.sh "dist/garage_${version}_linux_${{ matrix.arch }}.tar.gz" "$version" "$(git rev-parse HEAD)"
+      - name: Check the Homebrew cask (Linux only)
+        run: |
+          version=$(jq -r .version dist/metadata.json)
+          sh .github/scripts/check-channel-cask.sh dist/homebrew/Casks/garage.rb "dist/garage_${version}_checksums.txt" "$version"
+      - name: Set up Homebrew
+        run: sh .github/scripts/setup-homebrew.sh
+      - name: Install and uninstall the cask from a local test tap
+        run: |
+          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          version=$(jq -r .version dist/metadata.json)
+          GARAGE_PACKAGE_CHECK=1 sh .github/scripts/check-brew-cask.sh --local dist/homebrew/Casks/garage.rb dist "$version" "$(git rev-parse HEAD)"
       - name: Install, upgrade, and remove the .deb with apt
         env:
           SUFFIX: ${{ matrix.deb }}
