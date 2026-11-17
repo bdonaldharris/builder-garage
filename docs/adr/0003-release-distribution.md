@@ -4,7 +4,8 @@
 - **Date:** 2026-11-16 (UTC)
 - **Decision authority:** Lead maintainer, as Workflow Owner, under [GOVERNANCE.md](../../GOVERNANCE.md). Recorded in:
   - [#120](https://github.com/bdonaldharris/builder-garage/issues/120), its [correction](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6930428330), its [amendment to decision 5](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6935475192), and its [amendment to decision 4](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6938614931) (2026-11-17);
-  - [#121's decisions](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935474831), and those recorded in its readiness reports, [the first](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935931327) and [the follow-up after the decision 4 amendment](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6938700447).
+  - [#121's decisions](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935474831), and those recorded in its readiness reports, [the first](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935931327) and [the follow-up after the decision 4 amendment](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6938700447);
+  - [#123's decisions](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952041049), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952505748) (2026-11-17): Linux packages and the release inventory.
 
 ## Context
 
@@ -23,12 +24,12 @@ This record covers the program's decisions and the foundation's design.
 
 | Area | Decision |
 | --- | --- |
-| Formats | Archives first: `.tar.gz` for macOS and Linux, `.zip` for Windows, each holding the executable, `LICENSE`, and `README.md`. Native packages and package-manager channels are later tracks. |
+| Formats | Archives: `.tar.gz` for macOS and Linux, `.zip` for Windows, each holding the executable, `LICENSE`, and `README.md`. From `v0.2.0`, Linux `.deb` and `.rpm` packages, built with GoReleaser's free nfpm support (#123). macOS `.pkg` (`pkgbuild` and `productsign` on a macOS runner) and Windows `.msi` (WiX, if its license is compatible with MIT distribution) follow their platform-trust prerequisites. GoReleaser Pro is not used. Package-manager channels are a later track. |
 | Platforms | macOS, Linux, and Windows, each on amd64 and arm64. |
-| Assets | Exactly the six archives, a SHA-256 checksum manifest, and its Sigstore bundle. No skills or manuals bundle. |
-| Integrity | The manifest is signed with keyless Sigstore/cosign. Every archive also gets a GitHub artifact attestation, as additional provenance. |
+| Assets | Exactly the release's inventory (see [Release inventory](#6-release-inventory)). Inventory v1 (to `v0.1.x`) is the six archives, a SHA-256 checksum manifest, and its Sigstore bundle. Inventory v2 (from `v0.2.0`) adds the four Linux packages. No skills or manuals bundle. |
+| Integrity | The manifest is signed with keyless Sigstore/cosign. Every archive and package also gets a GitHub artifact attestation, as additional provenance. |
 | Verification identity | `https://github.com/bdonaldharris/builder-garage/.github/workflows/release.yml@refs/tags/<tag>`, with issuer `https://token.actions.githubusercontent.com`. |
-| Platform trust | macOS signing and notarization, and Windows Authenticode signing (#122), are required before platform-native installers, packages, or package-manager channels are introduced. They are not required for the archive release. Until #122 is complete, release notes and verification docs disclose that macOS and Windows executables are not platform-signed. |
+| Platform trust | macOS signing and notarization, and Windows Authenticode signing (#122), are required before platform-native installers, packages, or package-manager channels are introduced. They are not required for the archive release. Until #122 is complete, release notes and verification docs disclose that macOS and Windows executables are not platform-signed. For the direct-download Linux `.deb` and `.rpm` packages, the signed checksum manifest and attestations are their platform trust: there is no PGP package-signing key, and the docs explain verifying a package before installing it. |
 | Trigger | Manual dispatch of the release workflow, from an existing `vMAJOR.MINOR.PATCH` tag only. |
 | First published release | `v0.1.1`. `v0.1.0` stays at `db2fcac` as a tag-only source snapshot. |
 | Permissions | Separate jobs, each with the least privilege it needs. |
@@ -53,10 +54,11 @@ Every executable embeds the canonical skills and manuals from the tagged commit,
 | Job | Permissions | Purpose |
 | --- | --- | --- |
 | `guard` | `contents: read` | Accepts only a `vMAJOR.MINOR.PATCH` tag and a known mode. |
-| `build` | `contents: read` | Builds, archives, checksums, and validates the archives and executables from the clean tagged commit. Runs the linux/amd64 archive. Uses no environment and no secrets. |
+| `build` | `contents: read` | Builds, archives, packages, checksums, and validates the release inventory's files and the executables from the clean tagged commit. Runs the linux/amd64 archive. Uses no environment and no secrets. |
 | `run-check` | `contents: read` | Release mode only. Runs every archive on its own platform: `garage version` reports the tag, and `garage skills install` installs skills whose revision is the tagged commit. |
+| `package-check` | `contents: read` | Release mode only, from inventory v2. Installs, checks, and removes each Linux package with its own package manager (`apt` on Ubuntu, `dnf` in a digest-pinned Fedora container), on amd64 and arm64. |
 | `sign` | `id-token: write` | Signs the manifest with keyless cosign. |
-| `attest` | `id-token: write`, `attestations: write` | Attests every archive listed in the manifest. |
+| `attest` | `id-token: write`, `attestations: write` | Attests every archive and package listed in the manifest. |
 | `verify` | `contents: read`, `attestations: read` | Verifies the signature (pinned identity, and rejection of another identity), the checksums, and every attestation. |
 | `publish` | `contents: write`, in the `release` environment | After the Workflow Owner approves, creates a draft with exactly the verified assets, checks it, and publishes it. |
 | `post-verify` | `contents: read`, `attestations: read` | Downloads the published assets and verifies them again. |
@@ -92,15 +94,39 @@ Every executable embeds the canonical skills and manuals from the tagged commit,
 - **[buildergarage.app](https://buildergarage.app)** remains the channel for individual skills and manuals, built from a pinned source revision it displays.
 - **Release notes** state the tag and the tagged commit. That commit is also the revision of the embedded skills and manuals, so a user can compare it with the site's "Source revision".
 
+### 6. Release inventory
+
+The files a release publishes are its **release inventory**: a versioned, explicit list. [`release-inventory.sh`](../../.github/scripts/release-inventory.sh) defines every inventory, and every check reads it, so no second list exists.
+
+| Inventory | Releases | Files |
+| --- | --- | --- |
+| v1 | to `v0.1.x` | Six archives, `garage_<version>_checksums.txt`, and its `.sigstore.json` bundle (8 files). |
+| v2 | from `v0.2.0` | v1, plus `garage_<version>_linux_amd64.deb`, `garage_<version>_linux_arm64.deb`, `garage-<version>-1.x86_64.rpm`, and `garage-<version>-1.aarch64.rpm` (12 files). |
+
+- **The inventory is selected by version.** [`verify-release.sh`](../../.github/scripts/verify-release.sh) verifies any published release against its own inventory. A snapshot uses its base version's inventory.
+- **Enforcement:**
+  - `build` and pull-request CI fail unless `dist` holds exactly the inventory's archives and packages, and the manifest lists exactly them;
+  - `publish` creates the release with exactly the verified files;
+  - pull-request CI validates the names on every change, before any immutable release.
+- **Adding to it.** A later `.pkg` or `.msi` needs an explicit inventory amendment, recorded here, before it is published.
+- **Linux packages.**
+  - A package installs only `/usr/bin/garage` and its license file (`/usr/share/doc/garage/copyright` for `.deb`, `/usr/share/licenses/garage/LICENSE` for `.rpm`).
+  - It has no maintainer scripts, configuration files, or dependencies.
+  - `apt`, `dpkg`, `dnf`, and `rpm` own upgrades and removal.
+  - Installing, upgrading, or removing it never creates, alters, or removes project configuration, installed skills, manuals, local history, or other user data.
+  - [`check-release-package.sh`](../../.github/scripts/check-release-package.sh) checks all of this on both architectures, with sentinel user data, in pull-request CI (with an upgrade) and before every release is signed.
+
 ## Consequences
 
 - **A tag that fails cannot be reused.** A defect found after a tag exists ships under the next tag, because protected tags are never moved. A release-mode run that fails after signing leaves a public signature for that tag.
 - **The release workflow can run only from a tag that contains it.** GitHub runs a dispatched workflow as it exists at the dispatched ref, so the first release follows the merge of this design.
 - **The asset names and the workflow path are a public contract.** Verification commands depend on them.
-- **The first releases are not platform-signed.** `v0.1.1` and later releases publish unsigned macOS and Windows executables until #122 is complete, with the platform-trust disclosure in their notes. Platform-native packages and channels (#123, #124), and any OS-native installer (#125), wait for #122.
+- **The first releases are not platform-signed.** `v0.1.1` and later releases publish unsigned macOS and Windows executables until #122 is complete, with the platform-trust disclosure in their notes. macOS `.pkg` and Windows `.msi` packages (#123), package-manager channels (#124), and any OS-native installer (#125) wait for #122.
+- **The first package release must be `v0.2.0`.** A `v0.1.x` tag selects inventory v1, which has no packages, so a build that produces them fails its checks before anything is signed.
+- **Package names are public contract.** The package name `garage` and the path `/usr/bin/garage` carry upgrades between releases.
 
 ## Still undecided
 
 - Platform-signing tooling and the Windows signing option (#122).
-- Native packages (#123), package-manager channels (#124), and release installers and update (#125).
+- macOS `.pkg` and Windows `.msi` packaging readiness, including the WiX license review (#123); package-manager channels (#124); and release installers and update (#125).
 - When a release is cut, and what moves the version (as in ADR 0002).
