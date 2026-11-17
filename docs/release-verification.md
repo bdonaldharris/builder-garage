@@ -123,6 +123,28 @@ garage version
 
 Remove it with `sudo apt remove garage` or `sudo dnf remove garage`. The package installs `garage` system-wide in `/usr/bin`, while [`install.sh`](../install.sh) installs it for one user in `~/.local/bin`. Use one or the other, so that only one `garage` is on your `PATH`.
 
+## Homebrew (Linux)
+
+On Linux, `garage` is also available as a Homebrew cask from Builder Garage's tap, [`bdonaldharris/homebrew-tap`](https://github.com/bdonaldharris/homebrew-tap):
+
+```sh
+brew tap bdonaldharris/tap
+brew trust --tap bdonaldharris/tap
+brew install --cask garage
+garage version
+```
+
+Homebrew requires you to trust a third-party tap before it uses its casks. `brew trust` is that explicit step: review the tap's [cask](https://github.com/bdonaldharris/homebrew-tap/blob/main/Casks/garage.rb) first if you want to see what it installs.
+
+- **What it installs.** The cask downloads the same Linux archive as the release, pinned to the SHA-256 in the release's signed checksum manifest, and installs `garage` on Homebrew's `bin`.
+- **How the tap is updated.** After each release passes its final verification, the release workflow commits the cask to the tap. Before committing, it checks the cask's checksums against the published, cosign-verified manifest.
+- **Upgrade and removal.** Upgrade with `brew upgrade --cask garage`, and remove it with `brew uninstall --cask garage`.
+- **macOS isn't offered yet.** The cask serves Linux only until macOS executables are notarized ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)). On macOS, Homebrew refuses it with "This cask requires Linux."
+
+To check the archive the cask uses yourself, verify the release's manifest as above. Then compare the cask's `sha256` for your architecture with the manifest's entry for `garage_<version>_linux_<arch>.tar.gz`.
+
+Use one installation method at a time: the Homebrew cask, a Linux package (`/usr/bin`), or [`install.sh`](../install.sh) (`~/.local/bin`), so that only one `garage` is on your `PATH`.
+
 ## Windows (PowerShell)
 
 ```powershell
