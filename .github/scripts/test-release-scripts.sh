@@ -6,9 +6,9 @@
 # It shows, without running a release, that:
 #   - release-guard.sh refuses every ref but a vMAJOR.MINOR.PATCH tag, and any
 #     unknown mode;
-#   - check-signing-credentials.sh refuses while any credential is missing;
-#   - platform-sign.sh fails closed in release mode for macOS and Windows,
-#     and for an unset or unknown mode.
+#   - platform-sign.sh leaves every binary unchanged in every known mode,
+#     since nothing is platform-signed until #122, and refuses an unset or
+#     unknown mode and a missing binary.
 # CI runs it on every pull request. It runs on macOS and Linux.
 
 set -eu
@@ -58,33 +58,16 @@ refuses "guard refuses a partial version" sh "$guard" tag v0.1 release
 refuses "guard refuses an unknown mode" sh "$guard" tag v0.1.1 publish
 refuses "guard refuses an empty mode" sh "$guard" tag v0.1.1 ""
 
-# check-signing-credentials.sh
-creds=$scripts/check-signing-credentials.sh
-names="MACOS_SIGN_P12 MACOS_SIGN_PASSWORD MACOS_NOTARY_KEY MACOS_NOTARY_KEY_ID MACOS_NOTARY_ISSUER_ID WINDOWS_SIGN_CERTIFICATE WINDOWS_SIGN_PASSWORD"
-all_set() { # all_set [EXCEPT]: NAME=set for every name but EXCEPT
-	for n in $names; do
-		[ "$n" = "${1:-}" ] || printf '%s=set\n' "$n"
-	done
-}
-refuses "credentials check refuses when none is configured" env -i PATH="$PATH" sh "$creds"
-# shellcheck disable=SC2046 # one NAME=set word per line
-accepts "credentials check passes when all are configured" env -i PATH="$PATH" $(all_set) sh "$creds"
-for n in $names; do
-	# shellcheck disable=SC2046
-	refuses "credentials check refuses when $n is missing" env -i PATH="$PATH" $(all_set "$n") sh "$creds"
-done
-refuses "credentials check refuses an empty value" env -i PATH="$PATH" $(all_set MACOS_SIGN_P12) MACOS_SIGN_P12= sh "$creds"
-
 # platform-sign.sh
 sign=$scripts/platform-sign.sh
 bin=$work/garage
 printf 'binary' >"$bin"
-accepts "hook leaves a snapshot binary unchanged" sh "$sign" snapshot darwin "$bin"
-accepts "hook leaves a dry-run binary unchanged" sh "$sign" dry-run windows "$bin"
+for mode in snapshot dry-run release; do
+	for os in darwin linux windows; do
+		accepts "hook passes a $os binary in $mode mode" sh "$sign" "$mode" "$os" "$bin"
+	done
+done
 if [ "$(cat "$bin")" = binary ]; then pass "hook did not modify the binary"; else fail "hook did not modify the binary"; fi
-refuses "hook refuses to release a macOS binary until #122" sh "$sign" release darwin "$bin"
-refuses "hook refuses to release a Windows binary until #122" sh "$sign" release windows "$bin"
-accepts "hook passes a Linux binary in release mode" sh "$sign" release linux "$bin"
 refuses "hook refuses an unset mode" sh "$sign" unset linux "$bin"
 refuses "hook refuses an unknown mode" sh "$sign" publish linux "$bin"
 refuses "hook refuses a missing binary" sh "$sign" dry-run linux "$work/absent"

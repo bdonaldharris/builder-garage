@@ -12,6 +12,19 @@ Every archive also has a [GitHub artifact attestation](https://docs.github.com/e
 
 There are no published releases until `v0.1.1`. The design is recorded in [ADR 0003](adr/0003-release-distribution.md).
 
+## Platform trust
+
+Until platform signing ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)) is complete:
+
+- **macOS:** the executables are not yet Developer ID signed and notarized. You may encounter Gatekeeper restrictions.
+- **Windows:** the executables are not yet Authenticode-signed. You may encounter SmartScreen warnings.
+- **What verification proves:** the signed checksum manifest and the provenance attestations establish a release's integrity and origin. They do not replace your operating system's publisher trust.
+
+Download, verify, and extract from a terminal, as the steps below show:
+- download with `gh release download` or `curl`;
+- verify the signature and checksum;
+- extract with `tar` on macOS and Linux, or `Expand-Archive` on Windows.
+
 ## What to verify
 
 1. **The manifest's signature.** It was signed by this repository's release workflow, run at that tag. This is the check that matters most: it ties the manifest to the release workflow, and the manifest ties every archive to it.
@@ -130,10 +143,6 @@ Pinning the exact tag is stronger: it also proves that the manifest belongs to t
 - **Embedded skills and manuals.** Every `garage` executable embeds the canonical skills and manuals from its tagged commit. `garage skills install` installs them with that commit as their revision. No separate skills download is published.
 - **Release notes** name the tag and the tagged commit.
 - **[buildergarage.app](https://buildergarage.app)** offers individual skills and manuals from a pinned source revision, shown on each artifact as "Source revision". When that revision is the release's commit, the site's artifacts are the same bytes the release embeds.
-
-## Platform signatures
-
-macOS executables are signed and notarized, and Windows executables are Authenticode-signed, before any release is published. Platform signing is tracked in [#122](https://github.com/bdonaldharris/builder-garage/issues/122). Its verification steps are added here when it is implemented.
 
 ## For maintainers
 
