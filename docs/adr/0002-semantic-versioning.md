@@ -62,7 +62,7 @@ Every configuration-schema change must provide an in-place `garage init` upgrade
 - **A pre-1.0 minor version may break things.** Under Semantic Versioning, a `0.y.z` version may change commands, skill contracts, or configuration semantics incompatibly, including in a minor version. Configuration upgrades remain migrated in place, as decision 4 requires.
 - **Deriving the version is separate work.** Implementing decision 3 in the `Makefile` and `install.sh`, and documenting it, is tracked separately. Until that lands, builds still report `dev` unless `VERSION` is set.
 - **The first tag waits for that work.** `v0.1.0` is created only after the derivation is merged, so that a checkout of the tag reports `v0.1.0`.
-- **Future release tooling fits.** `main.version` remains the link-time variable, which GoReleaser sets by default ([ADR 0001](0001-go-cobra-cli-foundation.md#what-is-approved-but-not-implemented)).
+- **Future release tooling fits.** `main.version` remains the link-time variable. GoReleaser does not set the `v`-prefixed version by default: its default `{{ .Version }}` drops the `v`. The release configuration sets `{{ .Tag }}` explicitly, so a release binary reports exactly its tag ([ADR 0003](0003-release-distribution.md)).
 
 ## Still undecided
 
@@ -73,3 +73,5 @@ This record does not decide:
 - signing;
 - when a release is cut, and what moves the version;
 - the criteria for 1.0.
+
+Since decided: release automation, signing, and the release channel for archives, under [ADR 0003](0003-release-distribution.md). Publication there amends decision 2's timing: `v0.1.0` stays a tag only, and the first published release is `v0.1.1`. Packaging, other channels, and published installation are later tracks of [#120](https://github.com/bdonaldharris/builder-garage/issues/120). When a release is cut, and the criteria for 1.0, remain undecided.

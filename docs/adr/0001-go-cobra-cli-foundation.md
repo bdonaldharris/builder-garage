@@ -21,7 +21,7 @@ Building the first executable required those choices to be made. The lead mainta
 | Testing | Go's standard `testing` package |
 | Distribution | Standalone compiled executables |
 | Continuous integration | GitHub Actions |
-| Release automation | GoReleaser, in the future |
+| Release automation | GoReleaser (configured under [ADR 0003](0003-release-distribution.md)) |
 
 ## What the CLI foundation implements
 
@@ -35,7 +35,7 @@ Building the first executable required those choices to be made. The lead mainta
 
 ## What is approved but not implemented
 
-- **GoReleaser.** No GoReleaser configuration exists. No release has been built, signed, or published, and the workflow publishes nothing. The version variable is `main.version`, which GoReleaser sets by default, so adopting it later does not require changing the CLI.
+- **GoReleaser.** When this record was accepted, no GoReleaser configuration existed, and no release had been built, signed, or published. It was expected that GoReleaser would set the version variable, `main.version`, by default. That holds for the variable, but not for the version's form: GoReleaser's default sets `{{ .Version }}`, which drops the leading `v`. The release configuration therefore sets `-X main.version={{ .Tag }}` explicitly, so a release reports exactly its tag, for example `v0.1.1`. GoReleaser is now configured, and releases are designed, under [ADR 0003](0003-release-distribution.md). The CLI did not change.
 
 ## Implementation choices made within this decision
 

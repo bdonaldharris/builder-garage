@@ -1,0 +1,64 @@
+# GoReleaser configuration for garage release archives (#121).
+#
+# GoReleaser builds, archives, and checksums. It never signs or publishes:
+# signing, attestation, and publication are separate least-privilege jobs in
+# .github/workflows/release.yml (docs/adr/0003-release-distribution.md).
+#
+# The build matches "make build", plus -s -w for distributed binaries:
+# CGO_ENABLED=0, -trimpath, and the tag as main.version. GoReleaser's default
+# {{ .Version }} drops the leading "v", so the tag is set explicitly.
+#
+# Validate locally (GARAGE_RELEASE_MODE is required by the platform-signing
+# hook; "snapshot" leaves binaries unchanged):
+#   goreleaser check
+#   GARAGE_RELEASE_MODE=snapshot goreleaser release --snapshot --clean --skip=publish
+version: 2
+
+project_name: garage
+
+builds:
+  - id: garage
+    main: ./cmd/garage
+    binary: garage
+    env:
+      - CGO_ENABLED=0
+    flags:
+      - -trimpath
+    ldflags:
+      - -s -w -X main.version={{ if .IsSnapshot }}{{ .Version }}{{ else }}{{ .Tag }}{{ end }}
+    goos: [darwin, linux, windows]
+    goarch: [amd64, arm64]
+    mod_timestamp: "{{ .CommitTimestamp }}"
+    hooks:
+      post:
+        # Platform signing happens here, after each build and before archiving,
+        # so the checksums, signature, and attestations cover signed binaries.
+        # The hook refuses to sign in this issue; #122 fills it.
+        - cmd: sh .github/scripts/platform-sign.sh '{{ envOrDefault "GARAGE_RELEASE_MODE" "unset" }}' '{{ .Os }}' '{{ .Path }}'
+          output: true
+
+archives:
+  - id: garage
+    ids: [garage]
+    formats: [tar.gz]
+    format_overrides:
+      - goos: windows
+        formats: [zip]
+    name_template: "garage_{{ .Version }}_{{ .Os }}_{{ .Arch }}"
+    files:
+      - LICENSE
+      - README.md
+
+checksum:
+  name_template: "garage_{{ .Version }}_checksums.txt"
+  algorithm: sha256
+
+snapshot:
+  version_template: "{{ incpatch .Version }}-snapshot+{{ .ShortCommit }}"
+
+changelog:
+  disable: true
+
+# Publication is a separate job with an explicit asset list.
+release:
+  disable: true
