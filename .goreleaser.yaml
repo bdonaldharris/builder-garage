@@ -33,7 +33,7 @@ builds:
       post:
         # Platform signing happens here, after each build and before archiving,
         # so the checksums, signature, and attestations cover signed binaries.
-        # The hook refuses to sign in this issue; #122 fills it.
+        # Nothing is platform-signed yet; #122 fills the hook.
         - cmd: sh .github/scripts/platform-sign.sh '{{ envOrDefault "GARAGE_RELEASE_MODE" "unset" }}' '{{ .Os }}' '{{ .Path }}'
           output: true
 

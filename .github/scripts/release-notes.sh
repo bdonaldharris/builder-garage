@@ -22,6 +22,14 @@ short=$(printf '%s' "$commit" | cut -c1-7)
 cat <<EOF
 \`garage\` $tag for macOS, Linux, and Windows, on amd64 and arm64.
 
+## Platform trust
+
+- **macOS:** the executables are not yet Developer ID signed and notarized. You may encounter Gatekeeper restrictions.
+- **Windows:** the executables are not yet Authenticode-signed. You may encounter SmartScreen warnings.
+- **What verification proves:** the signed checksum manifest and the provenance attestations below establish this release's integrity and origin. They do not replace your operating system's publisher trust.
+
+Platform signing is tracked in [#122]($url/issues/122). Until then, download and extract from a terminal, as [Verifying a release]($url/blob/$tag/docs/release-verification.md) shows: \`gh release download\` or \`curl\`, verify, then \`tar\` on macOS and Linux, or \`Expand-Archive\` on Windows.
+
 ## Provenance
 
 - **Release tag:** \`$tag\`

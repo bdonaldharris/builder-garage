@@ -10,9 +10,9 @@ name: Release
 #   release  also run every archive on its own platform, sign the checksum
 #            manifest (keyless cosign), attest every archive, verify all of
 #            it, and, after the Workflow Owner approves the protected release
-#            environment, publish exactly those assets. Platform signing of
-#            the macOS and Windows executables (#122) is required first: until
-#            then, release mode fails closed.
+#            environment, publish exactly those assets. The macOS and Windows
+#            executables are not yet platform-signed (#122); the release notes
+#            say so (amended #120 decision 4).
 #
 # Each job holds only the permissions its step needs (#120 decision 6).
 # Third-party actions are pinned by commit.
@@ -61,9 +61,6 @@ jobs:
     name: Build, archive, checksum, validate
     needs: guard
     runs-on: ubuntu-latest
-    # Holds the platform-signing credentials (#122). Its deployment rule
-    # allows only v* tags.
-    environment: release-signing
     permissions:
       contents: read
     env:
@@ -75,18 +72,6 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: false
-      - name: Refuse a release without platform-signing credentials
-        if: inputs.mode == 'release'
-        # The names must match .github/scripts/check-signing-credentials.sh.
-        env:
-          MACOS_SIGN_P12: ${{ secrets.MACOS_SIGN_P12 }}
-          MACOS_SIGN_PASSWORD: ${{ secrets.MACOS_SIGN_PASSWORD }}
-          MACOS_NOTARY_KEY: ${{ secrets.MACOS_NOTARY_KEY }}
-          MACOS_NOTARY_KEY_ID: ${{ secrets.MACOS_NOTARY_KEY_ID }}
-          MACOS_NOTARY_ISSUER_ID: ${{ secrets.MACOS_NOTARY_ISSUER_ID }}
-          WINDOWS_SIGN_CERTIFICATE: ${{ secrets.WINDOWS_SIGN_CERTIFICATE }}
-          WINDOWS_SIGN_PASSWORD: ${{ secrets.WINDOWS_SIGN_PASSWORD }}
-        run: sh .github/scripts/check-signing-credentials.sh
       - name: Check the checkout is the tagged commit
         run: |
           test "$(git rev-parse HEAD)" = "$(git rev-parse "refs/tags/$TAG^{commit}")"
