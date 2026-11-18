@@ -37,6 +37,7 @@ func TestHelpDescribesPurposeAndCommands(t *testing.T) {
 				"garage [command]",
 				"Available Commands:",
 				"config ",
+				"history ",
 				"init ",
 				"record ",
 				"status ",
@@ -69,7 +70,7 @@ func TestHelpSummaryNamesCapabilities(t *testing.T) {
 
 	for _, want := range []string{
 		"initializes, upgrades, validates, shows, and changes a project's Builder Garage configuration",
-		"records private developer-local workflow events",
+		"records and reads private developer-local workflow events",
 		"installs and verifies the canonical skills and the manuals a project adopts at a project's harness targets",
 		"shows the read-only workflow status of an issue or pull request from GitHub",
 		"reports its own version",
@@ -88,7 +89,7 @@ func TestRegisteredCommands(t *testing.T) {
 	}
 	slices.Sort(got)
 
-	want := []string{"config", "init", "record", "skills", "status", "update", "version"}
+	want := []string{"config", "history", "init", "record", "skills", "status", "update", "version"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("registered commands = %v, want %v", got, want)
 	}
