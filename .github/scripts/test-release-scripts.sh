@@ -86,6 +86,23 @@ refuses "inventory refuses a partial version" sh "$inv" 0.2
 refuses "inventory refuses two pre-release dashes" sh "$inv" 0.2.0-rc-1
 refuses "inventory refuses an unknown selection" sh "$inv" 0.2.0 binaries
 
+# install.sh's release mode names the archive with release-inventory.sh's
+# rule: the piped installer has no checkout, so it carries its own copy.
+installer=$scripts/../../install.sh
+if grep -F 'archive=garage_${version}_${os}_${arch}.tar.gz' "$installer" >/dev/null; then
+	pass "install.sh names the archive garage_<version>_<os>_<arch>.tar.gz"
+else
+	fail "install.sh names the archive garage_<version>_<os>_<arch>.tar.gz"
+fi
+for v in 0.1.1 0.2.1; do
+	for os in darwin linux; do
+		for arch in amd64 arm64; do
+			check_eq "inventory for $v lists install.sh's ${os}/${arch} archive" \
+				"$(sh "$inv" "$v" archives | grep -cFx "garage_${v}_${os}_${arch}.tar.gz")" 1
+		done
+	done
+done
+
 # platform-sign.sh
 sign=$scripts/platform-sign.sh
 bin=$work/garage

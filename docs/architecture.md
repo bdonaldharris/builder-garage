@@ -54,7 +54,12 @@ The repository now contains the initial Go CLI source, tests, build commands, an
 The following remain deliberately undecided:
 
 - commands and behavior beyond `garage --help`, `garage version`, `garage init`, `garage config validate`, `show`, `get`, `set`, `unset`, `add`, and `remove`, `garage record`, `garage skills install` and `verify`, and `garage status`;
-- release channels beyond GitHub Releases, and installing a published release. Installing from source is decided: on macOS and Linux, [`install.sh`](../install.sh) builds `garage` from a checkout and installs it for the current user. Release archives, signed checksums, and attestations, published to GitHub Releases from a version tag, are decided in [ADR 0003](adr/0003-release-distribution.md). Native packages, package-manager channels, and release installers are later tracks of [#120](https://github.com/bdonaldharris/builder-garage/issues/120);
+- the remaining release channels and installers. Decided so far:
+  - **Installing from source:** on macOS and Linux, [`install.sh`](../install.sh) builds `garage` from a checkout and installs it for the current user.
+  - **Installing a published release:** on macOS and Linux, `install.sh` also installs a release, after verifying its cosign-signed checksum manifest, pinned to the release workflow at that tag ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)).
+  - **Release archives, signed checksums, attestations, Linux packages, and the Linux Homebrew cask** are decided in [ADR 0003](adr/0003-release-distribution.md).
+
+  The Windows installer, auto-update, and the platform-native channels that wait for platform signing are later work of [#120](https://github.com/bdonaldharris/builder-garage/issues/120);
 - package and module layout for future conceptual-component implementations;
 - adapter and extension interfaces;
 - the execution model for independent or distributed execution.
