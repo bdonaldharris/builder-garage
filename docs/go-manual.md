@@ -19,9 +19,9 @@ Each row links to the source that owns the choice. Where a row and its source di
 | Durable evidence | GitHub Issue and pull request records are the durable collaborative evidence of workflow state. Go code should not treat local files or local history as authoritative workflow or review evidence. | [README: Operating model](../README.md#operating-model), [GOVERNANCE: Review requirements](../GOVERNANCE.md#review-requirements), [#6 decision comment](https://github.com/bdonaldharris/builder-garage/issues/6#issuecomment-6817083027) (item 9) |
 | No orchestration | Builder Garage does not build an orchestration engine. Agents run in their own harnesses. Garage's role is to define and distribute contracts and to validate project configuration and available evidence. Go code should not assign, schedule, or run agents. | [#6 decision comment](https://github.com/bdonaldharris/builder-garage/issues/6#issuecomment-6817083027) (item 8), a direction record, not an implemented specification |
 
-## Baseline guidance not yet exercised
+## Contexts, interfaces, and external boundaries
 
-The current code has no operations that block on an external system, and it defines no interfaces. The baseline's guidance on [contexts](../manuals/go.md#contexts), [interfaces](../manuals/go.md#interfaces), and network-facing [external boundaries](../manuals/go.md#external-boundaries) applies when the code gains such operations. Until then, this profile records no delta for them.
+`garage status` runs `gh`, and `garage update check` makes one HTTPS request to GitHub. Each takes a context and sets a timeout, and keeps its external system behind its own boundary, with a function or client seam that tests replace. The baseline's guidance on [contexts](../manuals/go.md#contexts), [interfaces](../manuals/go.md#interfaces), and network-facing [external boundaries](../manuals/go.md#external-boundaries) applies as written. This profile records no delta for them.
 
 ## Changing this profile
 

@@ -12,7 +12,7 @@ Builder Garage is at its foundation stage.
 
 **What exists today** is the initial `garage` command-line foundation and the project's engineering documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, the [engineering principles](docs/principles.md) and [history](docs/history.md) behind them, and governance and contribution process.
 
-The CLI can display help and version information, initialize, upgrade, validate, show, and change a project's `.garage/config.yaml`, record private developer-local workflow events, install and verify the canonical skills and the manuals a project adopts at a project's harness targets, and show the read-only workflow status of an issue or pull request from GitHub. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, or runtime for the conceptual components has been implemented. Release automation builds attested archives of the CLI itself, with a signed checksum manifest ([ADR 0003](docs/adr/0003-release-distribution.md)); releases are published from `v0.1.1`.
+The CLI can display help and version information, initialize, upgrade, validate, show, and change a project's `.garage/config.yaml`, record private developer-local workflow events, install and verify the canonical skills and the manuals a project adopts at a project's harness targets, show the read-only workflow status of an issue or pull request from GitHub, and, only when asked, check GitHub for a newer release. `garage update check` is the only command that contacts GitHub directly, and no command checks for updates on its own. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, or runtime for the conceptual components has been implemented. Release automation builds attested archives of the CLI itself, with a signed checksum manifest ([ADR 0003](docs/adr/0003-release-distribution.md)); releases are published from `v0.1.1`.
 
 ## Architectural direction
 
@@ -41,6 +41,7 @@ The initial executable provides these entry points:
 | `garage record` | Records a private workflow event, such as an implementation handoff or a review verdict, in this developer's local history. See [Local workflow history](#local-workflow-history). |
 | `garage skills install`, `garage skills verify` | Install or update the canonical skills embedded in the binary, and the manuals the project adopts, at the project's declared harness targets, and check them read-only. See [Skill installation](docs/skill-installation.md). |
 | `garage status` | Shows the workflow status of one issue or pull request, read once from GitHub. See [Workflow status](#workflow-status). |
+| `garage update check` | Reports this version and the latest published release, read once from GitHub, and, when the release is newer, lists the documented ways to update. It downloads and installs nothing. |
 
 ### Project configuration
 
@@ -121,6 +122,7 @@ garage version
 - **Without `--version`,** it installs the latest release.
 - **Like the source install below,** it installs in `~/.local/bin` (or `--install-dir PATH`) for the current user, never edits shell startup files or `PATH`, and does not install skills.
 - **Re-running it replaces the installed binary in place,** for example to move to a newer release.
+- **To find out whether a newer release exists,** run `garage update check`, from the first release after `v0.2.2`. It makes one request to GitHub, only when you run it, and lists the update command for each way of installing `garage`. It installs nothing itself.
 - **The macOS and Windows executables are not yet platform-signed** ([Platform trust](docs/release-verification.md#platform-trust)). A `curl` download is not quarantined, so macOS runs it.
 - **Windows:** a PowerShell installer follows platform signing ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)). On Windows, download and verify a release as [Verifying a release](docs/release-verification.md#windows-powershell) shows.
 
