@@ -4,8 +4,9 @@
 #   .github/scripts/test-release-scripts.sh
 #
 # It shows, without running a release, that:
-#   - release-guard.sh refuses every ref but a vMAJOR.MINOR.PATCH tag, and any
-#     unknown mode;
+#   - release-guard.sh refuses every ref but a vMAJOR.MINOR.PATCH tag, any
+#     unknown mode, and any tag whose commit is not on the released-code
+#     branch, in a throwaway repository;
 #   - release-inventory.sh selects inventory v1 up to v0.1.x and v2 from
 #     v0.2.0, names every file exactly, and refuses a malformed version;
 #   - platform-sign.sh leaves every binary unchanged in every known mode,
@@ -46,19 +47,58 @@ refuses() { # refuses NAME COMMAND...
 guard=$scripts/release-guard.sh
 
 # release-guard.sh
-accepts "guard accepts tag v0.1.1 in dry-run mode" sh "$guard" tag v0.1.1 dry-run
-accepts "guard accepts tag v10.20.30 in release mode" sh "$guard" tag v10.20.30 release
-out=$(sh "$guard" tag v0.1.1 release)
+# A throwaway repository: main holds v0.0.9 (an earlier commit), v0.1.1,
+# v10.20.30, and the annotated v0.4.0; a side branch, standing in for
+# staging or a release candidate, holds v0.3.0 and the annotated v0.5.0.
+repo=$work/repo
+g() {
+	git -C "$repo" -c user.name=test -c user.email=test@example.invalid \
+		-c commit.gpgsign=false -c tag.gpgsign=false -c core.hooksPath=/dev/null "$@"
+}
+git init -q "$repo"
+g symbolic-ref HEAD refs/heads/main
+g commit -q --allow-empty -m first
+g tag v0.0.9
+g commit -q --allow-empty -m second
+g tag v0.1.1
+g tag v10.20.30
+g tag -a v0.4.0 -m v0.4.0
+g switch -q -c side
+g commit -q --allow-empty -m "side only"
+g tag v0.3.0
+g tag -a v0.5.0 -m v0.5.0
+g switch -q main
+in_repo() { (cd "$repo" && "$@"); }
+
+accepts "guard accepts tag v0.1.1 on main in dry-run mode" in_repo sh "$guard" tag v0.1.1 dry-run main
+accepts "guard accepts tag v10.20.30 on main in release mode" in_repo sh "$guard" tag v10.20.30 release main
+accepts "guard accepts a tag on an earlier commit of main" in_repo sh "$guard" tag v0.0.9 release main
+accepts "guard accepts an annotated tag on main" in_repo sh "$guard" tag v0.4.0 release main
+out=$(in_repo sh "$guard" tag v0.1.1 release main)
 if [ "$out" = "tag=v0.1.1
 version=0.1.1" ]; then pass "guard outputs the tag and version"; else fail "guard outputs the tag and version (got: $out)"; fi
-refuses "guard refuses the main branch" sh "$guard" branch main release
-refuses "guard refuses a branch named like a tag" sh "$guard" branch v0.1.1 dry-run
-refuses "guard refuses a tag without v" sh "$guard" tag 0.1.1 release
-refuses "guard refuses a pre-release tag" sh "$guard" tag v0.1.1-rc.1 release
-refuses "guard refuses a tag with leading zeros" sh "$guard" tag v0.01.1 release
-refuses "guard refuses a partial version" sh "$guard" tag v0.1 release
-refuses "guard refuses an unknown mode" sh "$guard" tag v0.1.1 publish
-refuses "guard refuses an empty mode" sh "$guard" tag v0.1.1 ""
+refuses "guard refuses a tag off main in release mode" in_repo sh "$guard" tag v0.3.0 release main
+refuses "guard refuses a tag off main in dry-run mode" in_repo sh "$guard" tag v0.3.0 dry-run main
+refuses "guard refuses an annotated tag off main" in_repo sh "$guard" tag v0.5.0 release main
+if in_repo sh "$guard" tag v0.3.0 release main 2>&1 | grep -F "tag 'v0.3.0' points to commit" | grep -Fq "not on 'main'"; then
+	pass "guard names the tag, its commit, and the rule when the tag is off main"
+else
+	fail "guard names the tag, its commit, and the rule when the tag is off main"
+fi
+refuses "guard refuses a tag that is not in the repository" in_repo sh "$guard" tag v9.9.9 release main
+refuses "guard refuses a released-code ref that is not in the repository" in_repo sh "$guard" tag v0.1.1 release origin/main
+refuses "guard refuses an empty released-code ref" in_repo sh "$guard" tag v0.1.1 release ""
+outside() { (cd "$work" && GIT_CEILING_DIRECTORIES=$work "$@"); }
+refuses "guard refuses outside a Git repository" outside sh "$guard" tag v0.1.1 release main
+refuses "guard refuses a missing released-code argument" in_repo sh "$guard" tag v0.1.1 release
+refuses "guard refuses the main branch" in_repo sh "$guard" branch main release main
+refuses "guard refuses a branch named like a tag" in_repo sh "$guard" branch v0.1.1 dry-run main
+refuses "guard refuses a tag without v" in_repo sh "$guard" tag 0.1.1 release main
+refuses "guard refuses a pre-release tag" in_repo sh "$guard" tag v0.1.1-rc.1 release main
+refuses "guard refuses a tag with leading zeros" in_repo sh "$guard" tag v0.01.1 release main
+refuses "guard refuses a partial version" in_repo sh "$guard" tag v0.1 release main
+refuses "guard refuses an unknown mode" in_repo sh "$guard" tag v0.1.1 publish main
+refuses "guard refuses an empty mode" in_repo sh "$guard" tag v0.1.1 "" main
 
 # release-inventory.sh
 inv=$scripts/release-inventory.sh

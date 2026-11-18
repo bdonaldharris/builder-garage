@@ -31,7 +31,7 @@ This record covers the program's decisions and the foundation's design.
 | Integrity | The manifest is signed with keyless Sigstore/cosign. Every archive and package also gets a GitHub artifact attestation, as additional provenance. |
 | Verification identity | `https://github.com/bdonaldharris/builder-garage/.github/workflows/release.yml@refs/tags/<tag>`, with issuer `https://token.actions.githubusercontent.com`. |
 | Platform trust | macOS signing and notarization, and Windows Authenticode signing (#122), are required before platform-native installers, packages, or package-manager channels are introduced. They are not required for the archive release. Until #122 is complete, release notes and verification docs disclose that macOS and Windows executables are not platform-signed. For the direct-download Linux `.deb` and `.rpm` packages, the signed checksum manifest and attestations are their platform trust: there is no PGP package-signing key, and the docs explain verifying a package before installing it. |
-| Trigger | Manual dispatch of the release workflow, from an existing `vMAJOR.MINOR.PATCH` tag only. |
+| Trigger | Manual dispatch of the release workflow, from an existing `vMAJOR.MINOR.PATCH` tag whose commit is on `main` only. |
 | First published release | `v0.1.1`. `v0.1.0` stays at `db2fcac` as a tag-only source snapshot. |
 | Permissions | Separate jobs, each with the least privilege it needs. |
 | Repository protection | Immutable releases. `v*` tags cannot be updated or deleted. |
@@ -50,11 +50,11 @@ Every executable embeds the canonical skills and manuals from the tagged commit,
 
 ### 3. The release workflow
 
-[`.github/workflows/release.yml`](../../.github/workflows/release.yml) is dispatched with a `mode`. It refuses any ref but a version tag, and an unknown mode, before building anything.
+[`.github/workflows/release.yml`](../../.github/workflows/release.yml) is dispatched with a `mode`. It refuses any ref but a version tag, a tag whose commit is not reachable from `main`, and an unknown mode, before building anything. `main` is the public released-code branch ([#120 decision](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6962490422), item 8), so a release is built only from a commit on it (#138). The check runs in both modes, and refuses when it cannot be decided.
 
 | Job | Permissions | Purpose |
 | --- | --- | --- |
-| `guard` | `contents: read` | Accepts only a `vMAJOR.MINOR.PATCH` tag and a known mode. |
+| `guard` | `contents: read` | Accepts only a `vMAJOR.MINOR.PATCH` tag whose commit is on `main`, and a known mode. |
 | `build` | `contents: read` | Builds, archives, packages, checksums, and validates the release inventory's files and the executables from the clean tagged commit. Runs the linux/amd64 archive. Uses no environment and no secrets. |
 | `run-check` | `contents: read` | Release mode only. Runs every archive on its own platform: `garage version` reports the tag, and `garage skills install` installs skills whose revision is the tagged commit. |
 | `package-check` | `contents: read` | Release mode only, from inventory v2. Installs, checks, and removes each Linux package with its own package manager (`apt` on Ubuntu, `dnf` in a digest-pinned Fedora container), on amd64 and arm64. |
