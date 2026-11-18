@@ -148,3 +148,9 @@ jobs:
         run: sh .github/scripts/test-install.sh
       - name: Exercise version derivation
         run: sh .github/scripts/test-version.sh
+      - uses: sigstore/cosign-installer@756fe2d284c7292c4e9b62c8a28f1e5629c59532 # v4.1.3
+        with:
+          cosign-release: v3.1.4
+      - name: Exercise install.sh's release mode
+        # Installs published releases, and refuses tampered or mis-signed ones.
+        run: sh .github/scripts/test-install-release.sh

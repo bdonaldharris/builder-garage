@@ -34,6 +34,10 @@ Download, verify, and extract from a terminal, as the steps below show:
 
 You need [cosign](https://docs.sigstore.dev/cosign/system_config/installation/) v3 or later for step 1, and the [GitHub CLI](https://cli.github.com/) (`gh`) for step 3.
 
+## Installing with install.sh
+
+On macOS and Linux, [`install.sh`](../install.sh) performs the signature and checksum steps below for you, then installs `garage` for the current user. It installs nothing if a check fails or cannot run. See [Install a release](../README.md#install-a-release). It needs cosign v3 or later. It does not verify the attestation, which is optional provenance (step 3) and needs an authenticated `gh`.
+
 ## macOS and Linux
 
 Download the archive for your platform, the manifest, and its bundle into one directory, for example:

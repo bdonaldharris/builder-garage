@@ -101,9 +101,32 @@ Source builds require **Go 1.27.4**, the version declared in [`go.mod`](go.mod).
 
 Set `VERSION` to override it, for example `make build VERSION=1.2.3` or `VERSION=1.2.3 ./install.sh`. A plain `go build` derives nothing and reports `dev`, unless a version is supplied at link time, as in [Build by hand](#build-by-hand).
 
+#### Install a release
+
+On macOS and Linux, [`install.sh`](install.sh) can install a published release without Git or Go. It downloads the release's archive for your platform, its checksum manifest, and the manifest's signature. Then, **before installing anything**, it checks two things:
+- the manifest's signature, with [cosign](https://docs.sigstore.dev/cosign/system_config/installation/), pinned to this repository's release workflow at that tag;
+- the archive, against the manifest.
+
+If either check fails or cannot run, it installs nothing. It requires `curl`, `tar`, and **cosign v3 or later**.
+
+Fetch the installer from a release tag, and install that same release:
+
+```sh
+TAG=vX.Y.Z   # a release tag; install.sh's release mode ships from the first release after v0.2.1
+curl -fsSL "https://raw.githubusercontent.com/bdonaldharris/builder-garage/$TAG/install.sh" | sh -s -- --version "$TAG"
+garage version
+```
+
+- **Tags are immutable**, so that URL always serves the same installer. Read it first if you like, as with any piped installer.
+- **Without `--version`,** it installs the latest release.
+- **Like the source install below,** it installs in `~/.local/bin` (or `--install-dir PATH`) for the current user, never edits shell startup files or `PATH`, and does not install skills.
+- **Re-running it replaces the installed binary in place,** for example to move to a newer release.
+- **The macOS and Windows executables are not yet platform-signed** ([Platform trust](docs/release-verification.md#platform-trust)). A `curl` download is not quarantined, so macOS runs it.
+- **Windows:** a PowerShell installer follows platform signing ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)). On Windows, download and verify a release as [Verifying a release](docs/release-verification.md#windows-powershell) shows.
+
 #### Install from source
 
-On macOS and Linux, the supported way to install `garage` is to build it from a checkout with [`install.sh`](install.sh):
+On macOS and Linux, `install.sh` also builds `garage` from a checkout. Run as a file in a checkout, that is what it does, unless you pass `--release`:
 
 ```sh
 git clone https://github.com/bdonaldharris/builder-garage.git
@@ -119,7 +142,7 @@ The installer builds `garage` with the same flags as `make build`, and installs 
 - Apart from Go's own build and module caches, and a temporary build directory it removes, it writes nothing outside the install directory: not the checkout, and not any project.
 - It does not install skills. Skills are installed separately, per project, with [`garage skills install`](docs/skill-installation.md).
 
-Release archives for macOS, Linux, and Windows, with a signed checksum manifest and attestations, are published from `v0.1.1` onwards. Download one from the [Releases page](https://github.com/bdonaldharris/builder-garage/releases) and verify it as described in [Verifying a release](docs/release-verification.md). Installers that download and verify a release are a separate follow-up ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)).
+Release archives for macOS, Linux, and Windows, with a signed checksum manifest and attestations, are published from `v0.1.1` onwards. Download one from the [Releases page](https://github.com/bdonaldharris/builder-garage/releases) and verify it as described in [Verifying a release](docs/release-verification.md), or let [`install.sh`](#install-a-release) do both on macOS and Linux.
 
 From `v0.2.0`, releases also carry `.deb` and `.rpm` packages for Linux on amd64 and arm64. A package installs `garage` system-wide at `/usr/bin/garage`, and `apt` or `dnf` upgrades and removes it. Verify it before installing, as [Verifying a release](docs/release-verification.md#linux-packages) shows. `install.sh` installs for one user in `~/.local/bin` instead: use one or the other, so that only one `garage` is on your `PATH`.
 
