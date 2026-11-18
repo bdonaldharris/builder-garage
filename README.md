@@ -123,7 +123,7 @@ Release archives for macOS, Linux, and Windows, with a signed checksum manifest 
 
 From `v0.2.0`, releases also carry `.deb` and `.rpm` packages for Linux on amd64 and arm64. A package installs `garage` system-wide at `/usr/bin/garage`, and `apt` or `dnf` upgrades and removes it. Verify it before installing, as [Verifying a release](docs/release-verification.md#linux-packages) shows. `install.sh` installs for one user in `~/.local/bin` instead: use one or the other, so that only one `garage` is on your `PATH`.
 
-On Linux, Homebrew users can install the release from Builder Garage's tap: `brew tap bdonaldharris/tap`, `brew trust --tap bdonaldharris/tap`, then `brew install --cask garage` ([Homebrew (Linux)](docs/release-verification.md#homebrew-linux)). The cask is offered on Linux only until macOS executables are notarized ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)).
+On Linux, Homebrew users can install the release from Builder Garage's tap: `brew tap bdonaldharris/tap`, `brew trust --tap bdonaldharris/tap`, then `brew install --cask bdonaldharris/tap/garage` ([Homebrew (Linux)](docs/release-verification.md#homebrew-linux)). Use the full name: homebrew/core has an unrelated formula also called `garage`. The cask is offered on Linux only until macOS executables are notarized ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)).
 
 #### Build by hand
 

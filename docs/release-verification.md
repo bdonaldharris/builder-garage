@@ -130,15 +130,17 @@ On Linux, `garage` is also available as a Homebrew cask from Builder Garage's ta
 ```sh
 brew tap bdonaldharris/tap
 brew trust --tap bdonaldharris/tap
-brew install --cask garage
+brew install --cask bdonaldharris/tap/garage
 garage version
 ```
+
+**Always use the full name, `bdonaldharris/tap/garage`.** homebrew/core has an unrelated formula also called `garage` (the Garage object store), which installs a different `garage` command. `brew install garage` would install that one instead, and it conflicts with this cask on Homebrew's `bin`.
 
 Homebrew requires you to trust a third-party tap before it uses its casks. `brew trust` is that explicit step: review the tap's [cask](https://github.com/bdonaldharris/homebrew-tap/blob/main/Casks/garage.rb) first if you want to see what it installs.
 
 - **What it installs.** The cask downloads the same Linux archive as the release, pinned to the SHA-256 in the release's signed checksum manifest, and installs `garage` on Homebrew's `bin`.
 - **How the tap is updated.** After each release passes its final verification, the release workflow commits the cask to the tap. Before committing, it checks the cask's checksums against the published, cosign-verified manifest.
-- **Upgrade and removal.** Upgrade with `brew upgrade --cask garage`, and remove it with `brew uninstall --cask garage`.
+- **Upgrade and removal.** Upgrade with `brew upgrade --cask bdonaldharris/tap/garage`, and remove it with `brew uninstall --cask bdonaldharris/tap/garage`.
 - **macOS isn't offered yet.** The cask serves Linux only until macOS executables are notarized ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)). On macOS, Homebrew refuses it with "This cask requires Linux."
 
 To check the archive the cask uses yourself, verify the release's manifest as above. Then compare the cask's `sha256` for your architecture with the manifest's entry for `garage_<version>_linux_<arch>.tar.gz`.
