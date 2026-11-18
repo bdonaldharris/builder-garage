@@ -41,7 +41,7 @@ The initial executable provides these entry points:
 | `garage record` | Records a private workflow event, such as an implementation handoff or a review verdict, in this developer's local history. See [Local workflow history](#local-workflow-history). |
 | `garage history list`, `garage history path` | List this repository's local workflow events, or every local history file with `--all-local`, and show where the history is stored. Offline and read-only. See [Local workflow history](#local-workflow-history). |
 | `garage skills install`, `garage skills verify` | Install or update the canonical skills embedded in the binary, and the manuals the project adopts, at the project's declared harness targets, and check them read-only. See [Skill installation](docs/skill-installation.md). |
-| `garage status` | Shows the workflow status of one issue or pull request, read once from GitHub. See [Workflow status](#workflow-status). |
+| `garage status` | Shows the workflow status of one issue or pull request, read from GitHub in one query, and at most one follow-up. See [Workflow status](#workflow-status). |
 | `garage update check` | Reports this version and the latest published release, read once from GitHub, and, when the release is newer, lists the documented ways to update. It downloads and installs nothing. |
 
 ### Project configuration
@@ -95,10 +95,37 @@ garage history list --format jsonl   # one JSON object per line, for scripts
 
 `garage status 48` shows the workflow status of issue or pull request #48 in the repository's GitHub repository, including closed and merged ones:
 
-- **GitHub is the authority.** Status reads GitHub once, through the [`gh`](https://cli.github.com/) command, and writes nothing. Garage never stores a token. It never polls or waits, and it never assigns, invokes, or advances an agent. The next eligible action it shows is information only.
+- **GitHub is the authority.** Status reads GitHub through the [`gh`](https://cli.github.com/) command, in one read-only query, plus at most one follow-up query when a pull request's governing issues must be read separately (below; [#137 decision](https://github.com/bdonaldharris/builder-garage/issues/137#issuecomment-6992337101)). It writes nothing. Garage never stores a token. It never polls or waits, and it never assigns, invokes, or advances an agent. The next eligible action it shows is information only.
 - **Evidence, labeled.** Each line names its source and basis. A fact read from GitHub, or a comparison of recorded values, is *checked*. A verdict or a claim of separate execution contexts is *asserted*. A pull request head's [artifact identity](docs/review-evidence.md) is recomputed only when the commit is already local. Nothing is fetched. In a partial clone, where git fetches missing objects on demand, status does not recompute and says so.
 - **Whose records count.** A workflow record counts only when its author's GitHub association is owner, member, or collaborator. A record edited after posting is flagged. Human acceptance is evidenced only by an approving GitHub review. These rules are recorded in the [#40 decision](https://github.com/bdonaldharris/builder-garage/issues/40#issuecomment-6853390215).
 - **Degrades clearly.** Without `gh`, or without `gh` authentication, status says that GitHub was not consulted, reports no workflow state, and exits with an error. Local history is shown as a separate annotation, and is never used for any gate.
+
+#### Governing issues and pull-request kinds
+
+A pull request's description declares its governing issues and its kind in two sections, which the [pull request template](.github/PULL_REQUEST_TEMPLATE.md) provides:
+
+- **`## Governing issue`.** Issue references in this repository, written as `#N`, `Closes #N`, `Fixes #N`, `Resolves #N`, or `Refs #N`.
+  - A reference outside the section, one qualified with another repository (`owner/repo#N`), or a malformed one is not a governing issue.
+  - GitHub links a closing keyword to its issue only when the pull request targets the default branch. So status reads the section whenever the base is another branch, or the pull request closes no issue. The issues the section names that its closing references do not supply are read in the follow-up query, with their workflow records, up to five.
+  - For an issue, status also lists the pull requests in this repository whose Governing issue section names it.
+- **`## Pull request kind`.** Exactly one of `implementation`, `promotion`, `hotfix`, `clean synchronization`, or `conflicted synchronization`.
+
+Status reads the declared kind first, then checks it against the base and head the kind permits. E1 is the configured integration branch; the release branch is E11 ([extension points](docs/extension-points.md#e11-release-branch)).
+
+| Kind | Base | Head |
+| --- | --- | --- |
+| implementation | E1 | an issue branch |
+| promotion | the release branch | `release/vX.Y.Z-rc.N` |
+| hotfix | the release branch | a hotfix branch, for an issue carrying a [hotfix designation](docs/extension-points.md#e11-release-branch) |
+| clean synchronization | E1 | the release branch |
+| conflicted synchronization | E1 | `backmerge/vX.Y.Z` |
+
+- **A declared kind whose base and head fit** is reported as that kind. A declared promotion's head must be exactly `release/vX.Y.Z-rc.N`, and a declared conflicted synchronization's exactly `backmerge/vX.Y.Z`, with `X.Y.Z` written as a release tag is and `N` from 1.
+  - Only a declared **promotion** or **clean synchronization** is exempt from implementation-review gates. Its governing issues, checks, human acceptance, and Environment / Deployment Requirements are still reported.
+  - Every other kind is evaluated with every gate.
+- **A declared kind that does not fit,** or an unrecognized one, is reported as a mismatch, and every implementation gate is evaluated. A mismatch never relaxes a gate.
+- **No declared kind, with E1 as the base:** status infers clean synchronization when the head is the release branch, conflicted synchronization when it is a `backmerge/` branch, and implementation otherwise. An inferred kind is evaluated with every gate.
+- **No declared kind, with any other base:** status infers nothing, never a hotfix or a promotion. It reports that the base is not E1, and evaluates every gate.
 
 ### Build from source
 
