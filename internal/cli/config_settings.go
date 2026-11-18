@@ -443,6 +443,24 @@ var configSettings = []configSetting{
 		},
 	},
 	{
+		path:  []string{"project", "release_branch"},
+		label: "Release branch for hotfixes",
+		get:   func(c *projectConfig) any { return present(proj(c).ReleaseBranch) },
+		set:   func(d, s *projectConfig) { projectOf(d).ReleaseBranch = projectOf(s).ReleaseBranch },
+		options: []configOption{{
+			name: "release-branch", format: "BRANCH",
+			about:  "the released branch a hotfix-designated issue branches from and targets",
+			def:    "none; no hotfix path",
+			fields: []string{"project.release_branch"},
+			get:    func(c *projectConfig) []string { return stringValue(proj(c).ReleaseBranch) },
+			set: func(c *projectConfig, v string) error {
+				projectOf(c).ReleaseBranch = &v
+				return nil
+			},
+			unset: func(c *projectConfig) { projectOf(c).ReleaseBranch = nil },
+		}},
+	},
+	{
 		path:  []string{"tooling", "skill_targets"},
 		label: "Skills installed for",
 		get: func(c *projectConfig) any {

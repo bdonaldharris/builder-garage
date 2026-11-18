@@ -176,3 +176,68 @@ func TestCanonicalSkillsDoNotNameAWorkflowOrchestrator(t *testing.T) {
 		}
 	}
 }
+
+// hotfixSkills apply the release branch (E11) to a hotfix-designated issue
+// (#139). Each carries the same Hotfixes section, so the designation rule
+// has one wording wherever it is checked.
+var hotfixSkills = []string{
+	"application-implementation-workflow",
+	"independent-implementation-review",
+	"integration-pr-review",
+}
+
+const (
+	hotfixSectionStart = "# Hotfixes (E11)\n"
+	hotfixSectionEnd   = "\n---\n"
+)
+
+func TestHotfixSkillsShareOneHotfixSection(t *testing.T) {
+	set, err := loadSkillSet(skills.FS())
+	if err != nil {
+		t.Fatal(err)
+	}
+	var section string
+	seen := 0
+	for _, s := range set {
+		text := string(findSkillFile(s.Files, skillEntryFile).Data)
+		start := strings.Index(text, hotfixSectionStart)
+		applies := false
+		for _, name := range hotfixSkills {
+			applies = applies || name == s.Name
+		}
+		if !applies {
+			if start >= 0 || strings.Contains(text, "release_branch") {
+				t.Errorf("%s does not apply the release branch, but carries the Hotfixes section or E11", s.Name)
+			}
+			continue
+		}
+		seen++
+		if start < 0 {
+			t.Errorf("%s: no %q section", s.Name, strings.TrimSpace(hotfixSectionStart))
+			continue
+		}
+		end := strings.Index(text[start:], hotfixSectionEnd)
+		if end < 0 {
+			t.Errorf("%s: the Hotfixes section does not end with a rule", s.Name)
+			continue
+		}
+		got := text[start : start+end]
+		switch {
+		case section == "":
+			section = got
+		case got != section:
+			t.Errorf("%s: the Hotfixes section differs from the other hotfix skills'", s.Name)
+		}
+		for _, want := range []string{
+			"| E11 release branch (`release_branch`) |",
+			"[WORKFLOW OWNER — HOTFIX DESIGNATION]",
+		} {
+			if !strings.Contains(text, want) {
+				t.Errorf("%s does not contain %q", s.Name, want)
+			}
+		}
+	}
+	if seen != len(hotfixSkills) {
+		t.Errorf("found %d of the %d hotfix skills", seen, len(hotfixSkills))
+	}
+}

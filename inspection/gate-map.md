@@ -9,7 +9,7 @@ This page traces, in lifecycle order, every gate a change passes between its iss
 Each entry names its source by kind, one or more of:
 
 - **Floor rule** (F1–F14): fixed or extend-only, whatever a project configures. See the [responsibility floor](../docs/responsibility-floor.md#rules).
-- **Extension point** (E1–E10): a value a project may configure, within the constraint the registry states. See the [extension-point registry](../docs/extension-points.md).
+- **Extension point** (E1–E11): a value a project may configure, within the constraint the registry states. See the [extension-point registry](../docs/extension-points.md).
 - **Skill or governance rule**: set by a canonical skill or by governance, and not adaptable through configuration, because "Anything the registry does not declare is not adaptable" ([Precedence](../docs/responsibility-floor.md#precedence)).
 
 Every record named below is durable on the governing GitHub issue or pull request, written and then verified. A conversation, a local file, or local history is never the record ([F8](../docs/responsibility-floor.md#rules)).
@@ -71,7 +71,7 @@ Gates 7 to 11 are conditions of the merge decision. They hold together on the cu
 | **Question** | Is exactly the approved artifact what is proposed, whether it is committed now or was already committed under commit-stage review? |
 | **Who acts** | Agent #1, in a new invocation after the approval is recorded. |
 | **Record** | The pull request, against the configured integration branch, linking the issue and its review record. For each pushed head, an Agent #1 equivalence record on the pull request. |
-| **Source kind** | Floor rules [F5, F7](../docs/responsibility-floor.md#rules). [E1](../docs/extension-points.md#e1-integration-branch) sets the destination only. |
+| **Source kind** | Floor rules [F5, F7](../docs/responsibility-floor.md#rules). [E1](../docs/extension-points.md#e1-integration-branch) sets the destination only. For a hotfix-designated issue, the release branch, [E11](../docs/extension-points.md#e11-release-branch), sets it instead, and every gate on this page still applies. |
 | **Defined in** | [application-implementation-workflow: Phase 4](../skills/application-implementation-workflow/SKILL.md#phase-4--commit-push-and-integration-pr), [integration-pr-review: Artifact equivalence](../skills/integration-pr-review/SKILL.md#artifact-equivalence), [CONTRIBUTING: Commit, push, and open a pull request](../CONTRIBUTING.md#6-commit-push-and-open-a-pull-request) |
 
 ### 6. PR-review triggers and the supplemental PR review

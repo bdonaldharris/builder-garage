@@ -94,6 +94,54 @@ The human approval that skill requires before merge is the maintainer approval d
 
 How far the repository's settings currently enforce these rules is recorded in [docs/repository-configuration.md](docs/repository-configuration.md).
 
+## Hotfixes and staging synchronization
+
+This section takes effect when Builder Garage configures `staging` as its integration branch and `main` as its release branch ([E11](docs/extension-points.md#e11-release-branch)), in the cutover tracked by [#140](https://github.com/bdonaldharris/builder-garage/issues/140). Until then, every change targets `main`, and there is no separate hotfix path.
+
+It carries out decision 6 of the [release-promotion decision](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6962490422), as clarified by the [hotfix-synchronization amendment](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6984649202) and the [D-A and D-E decisions](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6984929399).
+
+A hotfix and its staging synchronization are separate artifacts, with separate records.
+
+### The hotfix
+
+- **Entry.** A defect in the latest release that cannot wait for the next promotion. Security fixes are the canonical case.
+- **Designation.** The Workflow Owner designates the issue with a [hotfix-designation record](https://github.com/bdonaldharris/builder-garage/issues/139#issuecomment-6989280538) on it, as the [registry](docs/extension-points.md#e11-release-branch) defines. A label is never a designation, and an agent never designates an issue.
+- **Branch and pull request.** The hotfix branch starts from `main`, and its pull request targets `main` with `Closes #N`. It merges with a merge commit.
+- **Review.** Every gate applies unchanged, including issue-recorded independent review and maintainer approval.
+- **Release.** The hotfix is released as `main`'s next patch version, through the normal tag, dry-run, and release steps. It may be released without waiting for conflicts in `staging`.
+
+### The staging synchronization
+
+Immediately after the hotfix merges, it is synchronized from `main` into `staging`:
+
+- **Clean.** A `main` → `staging` pull request that merges without conflict, by merge commit. It is linked from the hotfix issue as that hotfix's synchronization.
+- **Conflicted.** A distinct change, not administrative cleanup within the already-reviewed hotfix:
+  - **The synchronization issue.** A new issue, linked to the hotfix issue, records:
+    - the conflict;
+    - the resolution decision;
+    - the resulting behavior in `staging`;
+    - the original hotfix it preserves;
+    - validation evidence;
+    - the independent-review disposition.
+  - **The branch.** A short-lived `backmerge/vX.Y.Z` branch, cut from `staging`, into which `main` is merged and the conflict resolved. Its pull request targets `staging`, so the ordinary workflow applies.
+  - **Behavior.** The hotfix's required behavior is preserved in the upcoming release, even if the `staging` implementation differs or needs an additional correction.
+  - **Review.** The synchronization is independently reviewed and validated before it merges. It is never folded into the hotfix's review.
+
+**Provenance is not behavior.** After the synchronization, `main` is an ancestor of `staging`. That ancestry is provenance only. The synchronization's review and tests establish that the hotfix's behavior is preserved.
+
+### Release gating
+
+- The next release issue lists every relevant hotfix and synchronization issue.
+- No release candidate is cut or promoted unless `staging` incorporates every hotfix currently on `main`.
+- **A hotfix after a release candidate is cut,** under a different version: synchronize it, abandon that candidate, and cut the next candidate sequence number.
+- **Version collision.** If a hotfix is released under the version an open release candidate targets:
+  1. Abandon that candidate.
+  2. Close its release issue as superseded by the hotfix release.
+  3. Open a new release issue for the next valid Semantic Versioning release, carrying forward the unreleased accepted work.
+  4. Cut its first candidate as `release/vNEXT-rc.1`.
+
+  A released version is never reused as another release candidate.
+
 ## Conduct and security
 
 Maintainers are responsible for enforcing the [Code of Conduct](CODE_OF_CONDUCT.md). Vulnerability reports are handled as described in [SECURITY.md](SECURITY.md).

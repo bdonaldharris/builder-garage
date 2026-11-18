@@ -53,6 +53,8 @@ Each rule states the invariant. The linked sources define how it is carried out.
 | **F13** | The three-question review contract is the same for every change. Analysis and verification depth vary through triggers, not through risk classes. | Fixed | [README: Review contract](../README.md#review-contract), [#7 decision](https://github.com/bdonaldharris/builder-garage/issues/7#issuecomment-6817635061) item 1 |
 | **F14** | No configuration may falsely claim independent review, collapse independent responsibilities into one execution context, or disregard durable evidence. | Fixed | [#7 decision](https://github.com/bdonaldharris/builder-garage/issues/7#issuecomment-6817635061) item 2, [#16 decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788) |
 
+**The release branch.** A project may configure a release branch for hotfixes ([E11](extension-points.md#e11-release-branch)). A hotfix-designated issue's pull request to the release branch is proposed for integration in F5's sense, so F5, and every other rule here, applies to it unchanged. E11 changes a hotfix's destination, never a rule or a gate ([D-A decision](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6984929399)). This note adds no rule.
+
 ## No orchestration
 
 The floor constrains what agents and people do. It does not make Garage an orchestrator. Garage may validate declared configuration and the structure of recorded evidence. It does not assign agents, invoke them, wait or poll for them, advance workflow state, or certify that agents worked independently. Agents run in their own harnesses, and GitHub Issue and PR records remain the authoritative evidence.

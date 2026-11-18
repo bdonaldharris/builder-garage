@@ -97,6 +97,7 @@ func desiredFrom(t *testing.T, args ...string) projectConfig {
 	read := func(name string) string { v, _ := cmd.Flags().GetString(name); return v }
 	readAll := func(name string) []string { v, _ := cmd.Flags().GetStringArray(name); return v }
 	f.IntegrationBranch = read("integration-branch")
+	f.ReleaseBranch = read("release-branch")
 	f.PRReviewTriggers = readAll("pr-review-trigger")
 	f.AutomatedReviewer = read("automated-reviewer")
 	f.AutomatedReviewerRequest = read("automated-reviewer-request")
@@ -298,6 +299,7 @@ func TestInitGuidesARequiredValueSetupWithFlags(t *testing.T) {
 		"1", // product-intent acceptor: same as the Workflow Owner
 		"",  // user-facing inspection: standard rule
 		"",  // guidance: none
+		"",  // release branch: none
 		"",  // agent tools: none
 		"y", // confirm
 	}}
@@ -338,7 +340,7 @@ func TestInitPromptsOnlyForValuesFlagsDoNotSupply(t *testing.T) {
 	ask := &scriptedPrompter{answers: []string{
 		"", "", "", "", "", "", // branch, PR reviews, reviewer, small corrections, release, suggestions
 		"3", "maintainer", "", // change acceptor: someone else (after the two reusable authorities)
-		"", "", "", // inspection, guidance, agent tools
+		"", "", "", "", // inspection, guidance, release branch, agent tools
 		"y",
 	}}
 
@@ -1119,4 +1121,46 @@ func TestReplacementStopsWhenPreconditionFails(t *testing.T) {
 	if got := entryNames(t, garageDir); len(got) != 1 || got[0] != configFileName {
 		t.Errorf("%s contains %v, want only %s", garageDirName, got, configFileName)
 	}
+}
+
+// --release-branch (E11) writes the release branch; an existing
+// configuration gains it on upgrade; a value equal to the integration
+// branch is refused and nothing is written.
+func TestInitHandlesTheReleaseBranch(t *testing.T) {
+	t.Run("new configuration", func(t *testing.T) {
+		dir := newProjectDir(t)
+		if _, _, err := runCLI(t, "dev", initArgs("--release-branch", "main")...); err != nil {
+			t.Fatalf("init: %v", err)
+		}
+		if b := mustLoadValid(t, dir).Project.ReleaseBranch; b == nil || *b != "main" {
+			t.Errorf("release branch = %v, want main", b)
+		}
+	})
+	t.Run("added to an existing configuration", func(t *testing.T) {
+		dir := newProjectDir(t)
+		writeFile(t, configPathIn(dir), "# Keep this comment.\n"+validConfigYAML)
+		stdout, _, err := runCLI(t, "dev", "init", "--release-branch", "main")
+		if err != nil {
+			t.Fatalf("init: %v", err)
+		}
+		if !strings.Contains(stdout, "project.release_branch") {
+			t.Errorf("stdout does not report the added release branch:\n%s", stdout)
+		}
+		if !strings.Contains(readFile(t, configPathIn(dir)), "# Keep this comment.") {
+			t.Error("the upgrade lost a comment")
+		}
+		if b := mustLoadValid(t, dir).Project.ReleaseBranch; b == nil || *b != "main" {
+			t.Errorf("release branch = %v, want main", b)
+		}
+	})
+	t.Run("equal to the integration branch", func(t *testing.T) {
+		dir := newProjectDir(t)
+		_, _, err := runCLI(t, "dev", initArgs("--integration-branch", "main", "--release-branch", "main")...)
+		if err == nil || !strings.Contains(err.Error(), "must differ from the integration branch") {
+			t.Fatalf("err = %v, want a refusal", err)
+		}
+		if _, statErr := os.Stat(configPathIn(dir)); !errors.Is(statErr, os.ErrNotExist) {
+			t.Errorf("a refused configuration was written: %v", statErr)
+		}
+	})
 }
