@@ -26,6 +26,10 @@ type repoIdentity struct {
 	Key string
 	// TopLevel is the absolute path of the working tree's top-level directory.
 	TopLevel string
+	// Remote is the normalized origin URL, "host/path", or "" when the
+	// identity falls back to the local git directory. It is held in memory
+	// only, for comparisons, and is never stored (#19).
+	Remote string
 }
 
 // errNotRepository reports that the directory is not inside a git repository.
@@ -69,16 +73,18 @@ func identifyRepository(ctx context.Context, dir string, git gitRunner) (repoIde
 	commonDir := filepath.Clean(strings.TrimSpace(lines[1]))
 
 	identity := "local:" + filepath.ToSlash(commonDir)
+	normalizedRemote := ""
 	// "git config --get" exits 1 when the key is absent; that is the fallback
 	// case, not a failure.
 	if remote, err := git(ctx, dir, "config", "--get", "remote.origin.url"); err == nil {
 		if normalized := normalizeRemoteURL(string(remote)); normalized != "" {
 			identity = "remote:" + normalized
+			normalizedRemote = normalized
 		}
 	}
 
 	sum := sha256.Sum256([]byte(identity))
-	return repoIdentity{Key: hex.EncodeToString(sum[:16]), TopLevel: topLevel}, nil
+	return repoIdentity{Key: hex.EncodeToString(sum[:16]), TopLevel: topLevel, Remote: normalizedRemote}, nil
 }
 
 // normalizeRemoteURL reduces a git remote URL to "host/path" in lower case,

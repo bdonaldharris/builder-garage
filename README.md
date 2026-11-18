@@ -12,7 +12,7 @@ Builder Garage is at its foundation stage.
 
 **What exists today** is the initial `garage` command-line foundation and the project's engineering documentation: the reusable engineering [skills](#skills), the [operating model](#operating-model) and review contract they implement, the [engineering principles](docs/principles.md) and [history](docs/history.md) behind them, and governance and contribution process.
 
-The CLI can display help and version information, initialize, upgrade, validate, show, and change a project's `.garage/config.yaml`, record private developer-local workflow events, install and verify the canonical skills and the manuals a project adopts at a project's harness targets, show the read-only workflow status of an issue or pull request from GitHub, and, only when asked, check GitHub for a newer release. `garage update check` is the only command that contacts GitHub directly, and no command checks for updates on its own. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, or runtime for the conceptual components has been implemented. Release automation builds attested archives of the CLI itself, with a signed checksum manifest ([ADR 0003](docs/adr/0003-release-distribution.md)); releases are published from `v0.1.1`.
+The CLI can display help and version information, initialize, upgrade, validate, show, and change a project's `.garage/config.yaml`, record and read private developer-local workflow events, install and verify the canonical skills and the manuals a project adopts at a project's harness targets, show the read-only workflow status of an issue or pull request from GitHub, and, only when asked, check GitHub for a newer release. `garage update check` is the only command that contacts GitHub directly, and no command checks for updates on its own. It does not execute workflows, configure agents, connect to AI providers, load plugins, or provide remote services. No library, adapter, SDK, or runtime for the conceptual components has been implemented. Release automation builds attested archives of the CLI itself, with a signed checksum manifest ([ADR 0003](docs/adr/0003-release-distribution.md)); releases are published from `v0.1.1`.
 
 ## Architectural direction
 
@@ -39,6 +39,7 @@ The initial executable provides these entry points:
 | `garage config show`, `get` | Show every setting in plain language, or print one setting's value. |
 | `garage config set`, `unset`, `add`, `remove` | Change one setting, validated against the complete configuration, confirmed, and written atomically. |
 | `garage record` | Records a private workflow event, such as an implementation handoff or a review verdict, in this developer's local history. See [Local workflow history](#local-workflow-history). |
+| `garage history list`, `garage history path` | List this repository's local workflow events, or every local history file with `--all-local`, and show where the history is stored. Offline and read-only. See [Local workflow history](#local-workflow-history). |
 | `garage skills install`, `garage skills verify` | Install or update the canonical skills embedded in the binary, and the manuals the project adopts, at the project's declared harness targets, and check them read-only. See [Skill installation](docs/skill-installation.md). |
 | `garage status` | Shows the workflow status of one issue or pull request, read once from GitHub. See [Workflow status](#workflow-status). |
 | `garage update check` | Reports this version and the latest published release, read once from GitHub, and, when the release is newer, lists the documented ways to update. It downloads and installs nothing. |
@@ -72,6 +73,23 @@ garage record --issue 39 --type implementation --outcome ready \
 - **Safe to run concurrently.** Recordings to the same repository's history, from separate processes, clones, or worktrees, take turns through an operating-system lock on a file beside the history, so each keeps its event. If the history stays locked for 5 seconds, the event is not recorded and a warning is printed. The lock serializes only these local writes; it never coordinates agents or workflow.
 
 Run `garage record --help` for the accepted event types and outcomes. The design is recorded in the [#19 decision](https://github.com/bdonaldharris/builder-garage/issues/19#issuecomment-6837362562).
+
+**Reading the history.** `garage history` reads it back. It is offline and read-only: it never contacts GitHub, never opens a stored link, and never changes the history.
+
+```sh
+garage history list                  # this repository's events, oldest first
+garage history list --issue 39       # one issue (or --pr N for a pull request)
+garage history path                  # where this repository's history is stored, and its key
+garage history list --all-local      # every local history file, each with its own events
+garage history list --format jsonl   # one JSON object per line, for scripts
+```
+
+- **Where it is stored.** One file per repository identity, `<key>.jsonl`, in:
+  - macOS: `~/Library/Caches/builder-garage/history/`;
+  - Linux: `$XDG_CACHE_HOME/builder-garage/history/`, or `~/.cache/builder-garage/history/`;
+  - Windows: `%LocalAppData%\builder-garage\history\`.
+- **The key** is a hash of the checkout's `origin` URL, or of its git directory when there is no `origin`. Clones and worktrees with the same `origin` share one history. Changing `origin`, for example after the repository is renamed, starts a new file, and `garage history list` and `garage status` then show only the new one.
+- **`--all-local`** lists every history file, whichever repository it belongs to, with its path, key, event count, date range, and the GitHub repositories its events link to. It marks a file "events link to this repository" when every link in it points to this checkout's `origin`; that is a label read from the stored links, not proof. Each file's events are listed under it. Histories are never merged.
 
 ### Workflow status
 
