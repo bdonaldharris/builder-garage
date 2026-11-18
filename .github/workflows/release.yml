@@ -4,7 +4,8 @@ name: Release
 # (docs/adr/0003-release-distribution.md; #120, #121, #123).
 #
 # It runs only when a maintainer dispatches it from an existing vMAJOR.MINOR.PATCH
-# tag, and refuses any other ref before building anything. The files a release
+# tag whose commit is on main, and refuses any other ref, and any tag off main,
+# before building anything (#138). The files a release
 # publishes are its release inventory (.github/scripts/release-inventory.sh).
 # Two modes:
 #   dry-run  build, archive, package, checksum, and validate at the tag.
@@ -43,7 +44,7 @@ env:
 
 jobs:
   guard:
-    name: Refuse anything but a version tag
+    name: Refuse anything but a version tag on main
     runs-on: ubuntu-latest
     permissions:
       contents: read
@@ -51,17 +52,20 @@ jobs:
       tag: ${{ steps.guard.outputs.tag }}
       version: ${{ steps.guard.outputs.version }}
     steps:
+      # Full history, with every branch and tag, so the guard can check that
+      # the tag's commit is reachable from origin/main.
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
+          fetch-depth: 0
           persist-credentials: false
           sparse-checkout: .github/scripts
-      - name: Check the ref and mode
+      - name: Check the ref, the mode, and that the tag is on main
         id: guard
         env:
           REF_TYPE: ${{ github.ref_type }}
           REF_NAME: ${{ github.ref_name }}
           MODE: ${{ inputs.mode }}
-        run: sh .github/scripts/release-guard.sh "$REF_TYPE" "$REF_NAME" "$MODE" >>"$GITHUB_OUTPUT"
+        run: sh .github/scripts/release-guard.sh "$REF_TYPE" "$REF_NAME" "$MODE" origin/main >>"$GITHUB_OUTPUT"
 
   build:
     name: Build, archive, checksum, validate
