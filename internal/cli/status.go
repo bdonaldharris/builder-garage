@@ -49,9 +49,18 @@ func newStatusCommand() *cobra.Command {
 GitHub repository, including closed and merged ones.
 
 GitHub records are the only authority for workflow state. Status reads them
-once, through the gh command, and writes nothing to GitHub. It never stores a
-token, never polls or waits, and never assigns, invokes, or advances an agent.
-The next eligible action it shows is information only.
+through the gh command, in one query, plus at most one follow-up query when a
+pull request's "## Governing issue" section names issues its closing
+references do not supply. It writes nothing to GitHub. It never stores a
+token, never polls, waits, or retries, and never assigns, invokes, or advances
+an agent. The next eligible action it shows is information only.
+
+A pull request declares its governing issues in a "## Governing issue"
+section, and its kind in a "## Pull request kind" section: implementation,
+promotion, hotfix, clean synchronization, or conflicted synchronization.
+Status checks a declared kind against the base and head it permits. Only a
+declared, matching promotion or clean synchronization is exempt from the
+implementation-review gates; a mismatch never relaxes a gate.
 
 Each line names its source and basis:
   GitHub, checked      a fact read from GitHub, or a comparison of recorded values
@@ -120,6 +129,19 @@ func runStatus(ctx context.Context, number int, env statusEnv, w io.Writer) erro
 	if errors.Is(err, errStatusNotFound) {
 		return fmt.Errorf("%s/%s #%d: %w", ghRepo.Owner, ghRepo.Name, number, errStatusNotFound)
 	}
+	reads := 1
+	if err == nil {
+		if numbers := bodyIssuesToFetch(item); len(numbers) > 0 {
+			reads = 2
+			issues, notes, fetchErr := fetchGoverningIssues(ctx, env.GH, ghRepo, numbers)
+			if fetchErr != nil {
+				item.BodyIssueNotes = append(item.BodyIssueNotes,
+					"the governing issues named in the Governing issue section could not be read: "+fetchErr.Error())
+			}
+			item.BodyIssues = issues
+			item.BodyIssueNotes = append(item.BodyIssueNotes, notes...)
+		}
+	}
 
 	var report *statusReport
 	if err != nil {
@@ -140,6 +162,7 @@ func runStatus(ctx context.Context, number int, env statusEnv, w io.Writer) erro
 				return recomputeCommitChangeset(ctx, env.Git, repo.TopLevel, ref, commit)
 			},
 			ReadAt: env.Now(),
+			Reads:  reads,
 		})
 	}
 

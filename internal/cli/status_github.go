@@ -16,37 +16,70 @@ import (
 // GitHub access for "garage status".
 //
 // GitHub is read through the gh command (#19 decision): Garage never stores
-// or handles a token, and each invocation makes exactly one read, a single
-// GraphQL query. The runner refuses anything that is not a read-only query,
-// so status can never write GitHub state.
+// or handles a token. An invocation makes one read, a single GraphQL query,
+// and at most one follow-up read: when a pull request's "## Governing issue"
+// section names issues its closing references do not supply, a second query
+// reads only those issues (#137 decision). The runner refuses anything that
+// is not a read-only query, so status can never write GitHub state, and
+// status never waits, retries, or polls.
 
-// statusGHTimeout bounds the one GitHub read an invocation makes.
+// statusGHTimeout bounds each GitHub read an invocation makes.
 const statusGHTimeout = 30 * time.Second
 
-// statusQuery is the only request status sends to GitHub. It reads one issue
-// or pull request, its comments, and, for a pull request, its reviews, the
-// check state of its head, and the issues it closes, with their comments.
+// statusQuery is the first request status sends to GitHub. It reads the
+// repository's default branch and one issue or pull request with its
+// comments. For an issue, it also reads the pull requests that close it and
+// the pull requests that mention it, with their bodies, so that a pull
+// request naming the issue in its "## Governing issue" section is found. For
+// a pull request, it also reads its reviews, the check state of its head,
+// and the issues it closes, with their comments.
 const statusQuery = `query($owner: String!, $name: String!, $number: Int!) {
   repository(owner: $owner, name: $name) {
+    defaultBranchRef { name }
     issueOrPullRequest(number: $number) {
       __typename
       ... on Issue {
         number title url state closedAt
         comments(last: 100) { totalCount pageInfo { hasPreviousPage } nodes { ...WorkflowComment } }
         closedByPullRequestsReferences(first: 10, includeClosedPrs: true) { nodes { number url state mergedAt } }
+        timelineItems(itemTypes: [CROSS_REFERENCED_EVENT], last: 50) { totalCount nodes { ... on CrossReferencedEvent { isCrossRepository source { __typename ... on PullRequest { number url state mergedAt body } } } } }
       }
       ... on PullRequest {
-        number title url state body merged mergedAt baseRefName headRefOid
+        number title url state body merged mergedAt baseRefName headRefName headRefOid
         mergeCommit { oid }
         comments(last: 100) { totalCount pageInfo { hasPreviousPage } nodes { ...WorkflowComment } }
         reviews(last: 100) { nodes { state submittedAt url authorAssociation author { login __typename } commit { oid } comments { totalCount } } }
         commits(last: 1) { nodes { commit { oid statusCheckRollup { state } } } }
-        closingIssuesReferences(first: 5) { nodes { number url state comments(last: 100) { totalCount pageInfo { hasPreviousPage } nodes { ...WorkflowComment } } } }
+        closingIssuesReferences(first: 5) { totalCount nodes { number url state comments(last: 100) { totalCount pageInfo { hasPreviousPage } nodes { ...WorkflowComment } } } }
       }
     }
   }
 }
 fragment WorkflowComment on IssueComment { url body createdAt lastEditedAt authorAssociation author { login __typename } }`
+
+// maxGoverningIssues bounds how many body-declared governing issues the
+// follow-up read fetches. Any beyond it are reported as not read.
+const maxGoverningIssues = 5
+
+// governingIssuesQuery builds the follow-up read: the issues a pull request's
+// "## Governing issue" section names, with their comments, one aliased field
+// per issue. Only the issue numbers vary, and they are passed as variables.
+func governingIssuesQuery(count int) string {
+	var vars, fields strings.Builder
+	for i := 0; i < count; i++ {
+		fmt.Fprintf(&vars, ", $n%d: Int!", i)
+		fmt.Fprintf(&fields, `
+    i%d: issueOrPullRequest(number: $n%d) {
+      __typename
+      ... on Issue { number url state comments(last: 100) { totalCount pageInfo { hasPreviousPage } nodes { ...WorkflowComment } } }
+    }`, i, i)
+	}
+	return `query($owner: String!, $name: String!` + vars.String() + `) {
+  repository(owner: $owner, name: $name) {` + fields.String() + `
+  }
+}
+fragment WorkflowComment on IssueComment { url body createdAt lastEditedAt authorAssociation author { login __typename } }`
+}
 
 // ghRunner runs gh with args and returns its standard output and standard
 // error.
@@ -200,6 +233,19 @@ type ghClosingIssue struct {
 	Comments ghComments `json:"comments"`
 }
 
+// ghCrossReference is a pull request that mentions an issue.
+type ghCrossReference struct {
+	IsCrossRepository bool `json:"isCrossRepository"`
+	Source            *struct {
+		Typename string     `json:"__typename"`
+		Number   int        `json:"number"`
+		URL      string     `json:"url"`
+		State    string     `json:"state"`
+		MergedAt *time.Time `json:"mergedAt"`
+		Body     string     `json:"body"`
+	} `json:"source"`
+}
+
 type ghItem struct {
 	Typename string     `json:"__typename"`
 	Number   int        `json:"number"`
@@ -213,12 +259,17 @@ type ghItem struct {
 	ClosedByPullRequestsReferences *struct {
 		Nodes []ghLinkedPR `json:"nodes"`
 	} `json:"closedByPullRequestsReferences"`
+	TimelineItems *struct {
+		TotalCount int                `json:"totalCount"`
+		Nodes      []ghCrossReference `json:"nodes"`
+	} `json:"timelineItems"`
 
 	// Pull request only.
 	Body        string     `json:"body"`
 	Merged      bool       `json:"merged"`
 	MergedAt    *time.Time `json:"mergedAt"`
 	BaseRefName string     `json:"baseRefName"`
+	HeadRefName string     `json:"headRefName"`
 	HeadRefOid  string     `json:"headRefOid"`
 	MergeCommit *struct {
 		Oid string `json:"oid"`
@@ -237,8 +288,15 @@ type ghItem struct {
 		} `json:"nodes"`
 	} `json:"commits"`
 	ClosingIssuesReferences *struct {
-		Nodes []ghClosingIssue `json:"nodes"`
+		TotalCount int              `json:"totalCount"`
+		Nodes      []ghClosingIssue `json:"nodes"`
 	} `json:"closingIssuesReferences"`
+
+	// Set by status, not decoded from the item: the repository's default
+	// branch, and the governing issues the follow-up read fetched.
+	DefaultBranch  string           `json:"-"`
+	BodyIssues     []ghClosingIssue `json:"-"`
+	BodyIssueNotes []string         `json:"-"`
 }
 
 func (it *ghItem) isPullRequest() bool { return it.Typename == "PullRequest" }
@@ -246,6 +304,9 @@ func (it *ghItem) isPullRequest() bool { return it.Typename == "PullRequest" }
 type ghResponse struct {
 	Data *struct {
 		Repository *struct {
+			DefaultBranchRef *struct {
+				Name string `json:"name"`
+			} `json:"defaultBranchRef"`
 			Item *ghItem `json:"issueOrPullRequest"`
 		} `json:"repository"`
 	} `json:"data"`
@@ -288,7 +349,71 @@ func fetchStatusItem(ctx context.Context, gh ghRunner, repo ghRepository, number
 	if resp.Data.Repository.Item == nil {
 		return nil, errStatusNotFound
 	}
-	return resp.Data.Repository.Item, nil
+	item := resp.Data.Repository.Item
+	if ref := resp.Data.Repository.DefaultBranchRef; ref != nil {
+		item.DefaultBranch = ref.Name
+	}
+	return item, nil
+}
+
+// fetchGoverningIssues makes the follow-up read: the issues numbers names,
+// with their comments. A number that names a pull request or nothing is
+// reported in notes, not returned.
+func fetchGoverningIssues(ctx context.Context, gh ghRunner, repo ghRepository, numbers []int) ([]ghClosingIssue, []string, error) {
+	ctx, cancel := context.WithTimeout(ctx, statusGHTimeout)
+	defer cancel()
+
+	args := []string{"api", "graphql",
+		"--hostname", repo.Host,
+		"-f", "query=" + governingIssuesQuery(len(numbers)),
+		"-F", "owner=" + repo.Owner,
+		"-F", "name=" + repo.Name}
+	for i, n := range numbers {
+		args = append(args, "-F", fmt.Sprintf("n%d=%d", i, n))
+	}
+	stdout, stderr, err := readOnlyGH(gh)(ctx, args...)
+
+	var resp struct {
+		Data *struct {
+			Repository map[string]*struct {
+				Typename string `json:"__typename"`
+				ghClosingIssue
+			} `json:"repository"`
+		} `json:"data"`
+		Errors []struct {
+			Type    string `json:"type"`
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	decodeErr := json.Unmarshal(stdout, &resp)
+	if err != nil && (decodeErr != nil || resp.Data == nil) {
+		return nil, nil, classifyGHError(ctx, err, stderr)
+	}
+	if decodeErr != nil {
+		return nil, nil, ghUnavailable{"gh returned a response that is not valid JSON"}
+	}
+	for _, e := range resp.Errors {
+		if e.Type != "NOT_FOUND" {
+			return nil, nil, ghUnavailable{"GitHub reported an error: " + oneLine(e.Message)}
+		}
+	}
+	if resp.Data == nil || resp.Data.Repository == nil {
+		return nil, nil, ghUnavailable{"GitHub returned no repository data"}
+	}
+	var issues []ghClosingIssue
+	var notes []string
+	for i, n := range numbers {
+		got := resp.Data.Repository[fmt.Sprintf("i%d", i)]
+		switch {
+		case got == nil:
+			notes = append(notes, fmt.Sprintf("#%d names no issue in this repository", n))
+		case got.Typename != "Issue":
+			notes = append(notes, fmt.Sprintf("#%d is a pull request, not an issue", n))
+		default:
+			issues = append(issues, got.ghClosingIssue)
+		}
+	}
+	return issues, notes, nil
 }
 
 func notFoundResponse(resp ghResponse) bool {

@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"io"
 	"slices"
+	"strconv"
 	"strings"
 	"time"
 )
@@ -75,6 +76,12 @@ type statusInputs struct {
 	// It returns the changeset, or "" and the reason it could not.
 	Recompute func(integrationRef, commit string) (string, string)
 	ReadAt    time.Time
+	// Reads is how many times GitHub was read: 1, or 2 when a follow-up
+	// read fetched governing issues. Zero means 1.
+	Reads int
+
+	// kind is the pull request's kind, set by buildStatusReport.
+	kind *prKind
 }
 
 // buildStatusReport evaluates the GitHub evidence for one issue or pull
@@ -90,18 +97,92 @@ func buildStatusReport(in statusInputs) *statusReport {
 		fmt.Sprintf("Status of %s #%d: %s", kind, it.Number, oneLine(it.Title)),
 		it.URL,
 		"",
-		fmt.Sprintf("GitHub records are authoritative. GitHub was read once, at %s.",
-			in.ReadAt.UTC().Format(time.RFC3339)),
+		fmt.Sprintf("GitHub records are authoritative. GitHub was read %s, at %s.",
+			readCount(in.Reads), in.ReadAt.UTC().Format(time.RFC3339)),
 		"Status writes nothing to GitHub, and assigns, invokes, or waits for no agent.",
 		"\"Asserted\" values are recorded claims that no tool can verify, such as a verdict.",
 	}}
 	if it.isPullRequest() {
+		k := pullRequestKind(in, governingIssues(it))
+		in.kind = &k
 		buildPRReport(r, in)
 	} else {
 		buildIssueReport(r, in)
 	}
 	addConfigSection(r, in)
 	return r
+}
+
+func readCount(reads int) string {
+	if reads == 2 {
+		return "twice"
+	}
+	return "once"
+}
+
+// governingIssues returns the issues whose records govern a pull request:
+// those it closes, then those its "## Governing issue" section names that
+// the follow-up read fetched.
+func governingIssues(it *ghItem) []ghClosingIssue {
+	var issues []ghClosingIssue
+	seen := map[int]bool{}
+	if it.ClosingIssuesReferences != nil {
+		for _, issue := range it.ClosingIssuesReferences.Nodes {
+			seen[issue.Number] = true
+			issues = append(issues, issue)
+		}
+	}
+	for _, issue := range it.BodyIssues {
+		if !seen[issue.Number] {
+			seen[issue.Number] = true
+			issues = append(issues, issue)
+		}
+	}
+	return issues
+}
+
+// configuredBranches returns the configured integration branch (E1) and
+// release branch (E11, "" when none), and whether a valid configuration
+// supplied them.
+func configuredBranches(in statusInputs) (string, string, bool) {
+	if in.Config == nil {
+		return "", "", false
+	}
+	pc := proj(in.Config)
+	release := ""
+	if pc.ReleaseBranch != nil {
+		release = *pc.ReleaseBranch
+	}
+	return effectiveIntegrationBranch(pc), release, true
+}
+
+// pullRequestKind classifies the pull request, or returns the zero kind,
+// which relaxes nothing, when there is no valid configuration.
+func pullRequestKind(in statusInputs, governing []ghClosingIssue) prKind {
+	integration, release, ok := configuredBranches(in)
+	if !ok {
+		return prKind{}
+	}
+	return classifyPullRequest(in.Item, integration, release, governing)
+}
+
+// addKindLine reports the pull request's kind.
+func addKindLine(s *statusSection, in statusInputs) {
+	k := *in.kind
+	switch {
+	case in.Config == nil:
+		s.add(labelConfig, "pull-request kind: not evaluated without a valid configuration; every gate below is evaluated")
+	case k.declared && k.kind == "":
+		s.add(labelChecked, "pull-request kind: the Pull request kind section %s; every implementation gate below is evaluated", k.problem)
+	case k.declared && !k.valid:
+		s.add(labelChecked, "pull-request kind: declared %s, MISMATCH: %s; every implementation gate below is evaluated", k.kind, k.problem)
+	case k.declared:
+		s.add(labelChecked, "pull-request kind: %s, declared, with a base and head a %s permits", k.kind, k.kind)
+	case k.kind != "":
+		s.add(labelChecked, "pull-request kind: %s, inferred, because no Pull request kind section declares one", k.kind)
+	default:
+		s.add(labelChecked, "pull-request kind: none; no Pull request kind section declares one, and none is inferred for a base other than the integration branch")
+	}
 }
 
 func location(it *ghItem) string {
@@ -264,6 +345,24 @@ func buildIssueReport(r *statusReport, in statusInputs) {
 	for _, pr := range linked {
 		s.add(labelChecked, "linked pull request #%d is %s: %s", pr.Number, strings.ToLower(pr.State), pr.URL)
 	}
+	// Pull requests into a branch other than the default create no closing
+	// link; one that names this issue in its Governing issue section is found
+	// among the pull requests that mention it.
+	if t := it.TimelineItems; t != nil {
+		if t.TotalCount > len(t.Nodes) {
+			s.add(labelChecked, "only the latest %d of %d cross-references to this issue were read for Governing issue sections", len(t.Nodes), t.TotalCount)
+		}
+		for _, ref := range t.Nodes {
+			src := ref.Source
+			if ref.IsCrossRepository || src == nil || src.Typename != "PullRequest" || linkedContains(linked, src.Number) ||
+				!slices.Contains(governingIssueNumbers(src.Body), it.Number) {
+				continue
+			}
+			linked = append(linked, ghLinkedPR{Number: src.Number, URL: src.URL, State: src.State, MergedAt: src.MergedAt})
+			s.add(labelChecked, "pull request #%d names this issue in its Governing issue section and is %s: %s",
+				src.Number, strings.ToLower(src.State), src.URL)
+		}
+	}
 
 	records := parseWorkflowRecords(it.Comments.Nodes, location(it))
 	addRecordsSection(r, "Workflow records on "+location(it), it.Comments, records)
@@ -280,6 +379,15 @@ func buildIssueReport(r *statusReport, in statusInputs) {
 	default:
 		n.add(labelInfo, "%s", next)
 	}
+}
+
+func linkedContains(linked []ghLinkedPR, number int) bool {
+	for _, pr := range linked {
+		if pr.Number == number {
+			return true
+		}
+	}
+	return false
 }
 
 // approvalRecord is an approving Agent #2 disposition.
@@ -306,22 +414,35 @@ func buildPRReport(r *statusReport, in statusInputs) {
 		s.add(labelChecked, "pull request is %s; current head %s", strings.ToLower(it.State), shortSHA(head))
 	}
 	s.add(labelChecked, "base branch %s", it.BaseRefName)
+	addKindLine(s, in)
+	if c := it.ClosingIssuesReferences; c != nil && c.TotalCount > len(c.Nodes) {
+		s.add(labelChecked, "the pull request closes %d issues; only the first %d were read, and the others' records are not shown or evaluated",
+			c.TotalCount, len(c.Nodes))
+	}
+	for _, issue := range it.BodyIssues {
+		s.add(labelChecked, "governing issue #%d is named in the Governing issue section; its records were read by a follow-up read", issue.Number)
+	}
+	for _, note := range it.BodyIssueNotes {
+		s.add(labelChecked, "%s", note)
+	}
 
 	// The issue-side records: the authoritative implementation review.
 	var issueRecords []workflowRecord
 	var issues []int
-	if it.ClosingIssuesReferences != nil {
-		for _, issue := range it.ClosingIssuesReferences.Nodes {
-			issues = append(issues, issue.Number)
-			recs := parseWorkflowRecords(issue.Comments.Nodes, fmt.Sprintf("issue #%d", issue.Number))
-			addRecordsSection(r, fmt.Sprintf("Workflow records on governing issue #%d", issue.Number), issue.Comments, recs)
-			issueRecords = append(issueRecords, recs...)
-		}
+	for _, issue := range governingIssues(it) {
+		issues = append(issues, issue.Number)
+		recs := parseWorkflowRecords(issue.Comments.Nodes, fmt.Sprintf("issue #%d", issue.Number))
+		addRecordsSection(r, fmt.Sprintf("Workflow records on governing issue #%d", issue.Number), issue.Comments, recs)
+		issueRecords = append(issueRecords, recs...)
 	}
 	prRecords := parseWorkflowRecords(it.Comments.Nodes, location(it))
 	addRecordsSection(r, "Workflow records on "+location(it), it.Comments, prRecords)
 
 	g := r.section("Gates for the current head " + shortSHA(head))
+	if in.kind.relaxed() {
+		buildRelaxedGates(r, g, in, issues)
+		return
+	}
 	if len(issues) == 0 {
 		g.add(labelChecked, "the pull request closes no issue, so no issue-side records were read")
 	}
@@ -382,6 +503,46 @@ func buildPRReport(r *statusReport, in statusInputs) {
 		n.add(labelInfo, "Agent #1 surfaces the Environment / Deployment Requirements")
 	default:
 		n.add(labelInfo, "no gate that status can check is unmet; merging remains a human decision, and asserted and unevaluated items above still apply")
+	}
+}
+
+// buildRelaxedGates reports the gates of a declared, topology-valid promotion
+// or clean synchronization: implementation-review gates do not apply, and
+// the merge gates status can check are reported.
+func buildRelaxedGates(r *statusReport, g *statusSection, in statusInputs, issues []int) {
+	it := in.Item
+	k := in.kind.kind
+	g.add(labelChecked, "implementation-review gates do not apply to a %s: the issue review, the head's equivalence record, and the PR-review triggers are not evaluated", k)
+	if len(issues) == 0 {
+		g.add(labelChecked, "the pull request names no governing issue")
+	} else {
+		var names []string
+		for _, n := range issues {
+			names = append(names, "#"+strconv.Itoa(n))
+		}
+		g.add(labelChecked, "governing issues: %s", strings.Join(names, ", "))
+	}
+	ciOK := evaluateChecks(g, it, it.HeadRefOid)
+	accepted := evaluateHumanAcceptance(g, in, it, it.HeadRefOid)
+	envOK := strings.Contains(it.Body, "Environment / Deployment Requirements")
+	if envOK {
+		g.add(labelChecked, "the pull request description has an Environment / Deployment Requirements section")
+	} else {
+		g.add(labelChecked, "the pull request description has NO Environment / Deployment Requirements section")
+	}
+
+	n := r.section("Next eligible action")
+	switch {
+	case it.State != "OPEN":
+		n.add(labelInfo, "none: the pull request is %s", strings.ToLower(it.State))
+	case !ciOK:
+		n.add(labelInfo, "required checks must pass on the current head")
+	case !accepted:
+		n.add(labelInfo, "the change acceptor's approval, a human gate")
+	case !envOK:
+		n.add(labelInfo, "Agent #1 surfaces the Environment / Deployment Requirements")
+	default:
+		n.add(labelInfo, "no gate that status can check for a %s is unmet; merging remains a human decision", k)
 	}
 }
 
@@ -647,9 +808,13 @@ func addConfigSection(r *statusReport, in statusInputs) {
 	s.add(labelConfig, "valid; integration branch (E1): %s", branch)
 	if in.Item.isPullRequest() {
 		want := strings.TrimSuffix(branch, " (default)")
-		if in.Item.BaseRefName == want {
+		k := in.kind
+		switch {
+		case in.Item.BaseRefName == want:
 			s.add(labelChecked, "the pull request targets the configured integration branch")
-		} else {
+		case k != nil && k.declared && k.valid && (k.kind == kindPromotion || k.kind == kindHotfix):
+			s.add(labelChecked, "the pull request targets %s, the configured release branch, as a declared %s", in.Item.BaseRefName, k.kind)
+		default:
 			s.add(labelChecked, "the pull request targets %s, NOT the configured integration branch %s", in.Item.BaseRefName, want)
 		}
 	}
