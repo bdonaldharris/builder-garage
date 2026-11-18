@@ -29,7 +29,7 @@ type projectConfig struct {
 	Tooling       *toolingConfig  `yaml:"tooling,omitempty"`
 }
 
-// projectChoices holds the extension points E1 to E10.
+// projectChoices holds the extension points E1 to E11.
 type projectChoices struct {
 	IntegrationBranch    *string            `yaml:"integration_branch,omitempty"`     // E1
 	PRReviewTriggers     *[]namedCondition  `yaml:"pr_review_triggers,omitempty"`     // E2
@@ -41,6 +41,7 @@ type projectChoices struct {
 	Authorities          *authorities       `yaml:"authorities,omitempty"`            // E8
 	UserFacingInspection *inspectionChoice  `yaml:"user_facing_inspection,omitempty"` // E9
 	Guidance             *guidanceChoice    `yaml:"guidance,omitempty"`               // E10
+	ReleaseBranch        *string            `yaml:"release_branch,omitempty"`         // E11
 }
 
 // namedCondition is a named trigger with a description of when it applies.
@@ -231,6 +232,13 @@ func validateConfig(cfg projectConfig) configProblems {
 	if pc.IntegrationBranch != nil {
 		if err := checkBranchName(*pc.IntegrationBranch); err != nil {
 			add("project.integration_branch (E1): %v", err)
+		}
+	}
+	if pc.ReleaseBranch != nil {
+		if err := checkBranchName(*pc.ReleaseBranch); err != nil {
+			add("project.release_branch (E11): %v", err)
+		} else if integration := effectiveIntegrationBranch(pc); *pc.ReleaseBranch == integration {
+			add("project.release_branch (E11) must differ from the integration branch, %q: a hotfix targets the released branch, not the integration branch", integration)
 		}
 	}
 	if pc.PRReviewTriggers != nil {
@@ -462,6 +470,15 @@ func checkUniqueTexts(p *configProblems, field string, values []string) {
 
 // checkBranchName applies the subset of git's branch-name rules that can be
 // checked without running git.
+// effectiveIntegrationBranch is the configured integration branch (E1), or
+// its canonical default when E1 is omitted.
+func effectiveIntegrationBranch(pc *projectChoices) string {
+	if pc != nil && pc.IntegrationBranch != nil {
+		return *pc.IntegrationBranch
+	}
+	return defaultIntegrationBranch
+}
+
 func checkBranchName(name string) error {
 	switch {
 	case name == "":

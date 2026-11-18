@@ -1,6 +1,6 @@
 # Extension-Point Registry
 
-**Version:** 2. Version 1 also declared conditional stack or provider guidance at E10; it was retired under [#59](https://github.com/bdonaldharris/builder-garage/issues/59).
+**Version:** 3. Version 3 adds E11, the release branch for hotfixes ([#139](https://github.com/bdonaldharris/builder-garage/issues/139)). Version 1 also declared conditional stack or provider guidance at E10; it was retired under [#59](https://github.com/bdonaldharris/builder-garage/issues/59).
 **Status:** Canonical. Defined under [#32](https://github.com/bdonaldharris/builder-garage/issues/32), following the [#16 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788). That decision established the registry's role and its precedence. The entries below, including their allowed values and defaults, are accepted through this change's independent review and maintainer approval.
 
 This registry lists every point at which a project adopting Builder Garage may adapt the framework. For each point, it gives the values a project may choose, the canonical default, and the constraint the choice must keep. A project may adapt only what this registry declares. The rules no choice may weaken are in the [responsibility floor](responsibility-floor.md).
@@ -114,6 +114,38 @@ The human responsibilities are:
 | **Default** | No manual adopted. |
 | **Constraint** | Guidance only, never a requirement. Adopting a manual never relaxes a floor rule or a canonical skill gate. |
 | **Source** | [Manuals: How manuals are used](../manuals/README.md#how-manuals-are-used), [architecture: Conceptual components](architecture.md#conceptual-components), [#6 direction](https://github.com/bdonaldharris/builder-garage/issues/6#issuecomment-6817083027) item 3, [#56 decision](https://github.com/bdonaldharris/builder-garage/issues/56#issuecomment-6859392233) |
+
+### E11: Release branch
+
+| | |
+| --- | --- |
+| **Allowed values** | None, or the name of one branch, the released branch, which must differ from the integration branch (E1). |
+| **Default** | None. No hotfix path exists, and every implementation pull request targets E1. |
+| **Constraint** | Changes a hotfix's destination only, never a gate. Only an issue that is explicitly hotfix-designated (below) may branch from the release branch, record its artifact against it, and target it. Every other target that is not E1 is still rejected. A hotfix keeps every gate an implementation pull request has, including issue-recorded independent review ([F5](responsibility-floor.md#rules)) and the change acceptor's approval. |
+| **Source** | [D-A decision on #120](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6984929399), [hotfix-designation decision on #139](https://github.com/bdonaldharris/builder-garage/issues/139#issuecomment-6989280538) |
+
+**Hotfix designation.** An issue is hotfix-designated only by a comment on that issue, posted by the Workflow Owner ([E8](#e8-human-authorities)), in this form:
+
+````markdown
+[WORKFLOW OWNER — HOTFIX DESIGNATION]
+
+```yaml
+garage_designation: 1
+designation: hotfix          # hotfix | withdrawn
+issue: <this issue's number>
+release_branch: <the configured release branch>
+asserted:
+  authority: workflow_owner
+```
+
+Reason: <the released defect that cannot wait>
+````
+
+- The latest designation record on the issue governs. `designation: withdrawn` withdraws an earlier one.
+- A record whose `issue` is not the issue it is posted on, or whose `release_branch` is not the configured release branch, is not a designation.
+- A label, such as `hotfix`, aids discovery only. It is never a designation.
+- No tool can verify that the commenter holds the Workflow Owner role. Authority is an assertion, as with maintainer acceptance comments.
+- A designation never applies when E11 is omitted.
 
 ## Not configurable
 

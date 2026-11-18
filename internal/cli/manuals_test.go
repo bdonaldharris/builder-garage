@@ -219,8 +219,9 @@ func TestGuidedSetupOffersTheCatalogAsAPickList(t *testing.T) {
 	useManualCatalog(t, testCatalog())
 	noDefaultBranch(t)
 	dir := t.TempDir()
-	answers := append(append([]string(nil), defaultAnswers[:len(defaultAnswers)-2]...),
+	answers := append(append([]string(nil), defaultAnswers[:len(defaultAnswers)-3]...),
 		"2", // manuals: rust only
+		"",  // release branch: none
 		"",  // agent tools: none
 		"y")
 	ask := &scriptedPrompter{answers: answers}

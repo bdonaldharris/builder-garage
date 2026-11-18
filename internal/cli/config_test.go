@@ -310,3 +310,53 @@ func TestValidateRefusesPlaceholderReviewerNames(t *testing.T) {
 		})
 	}
 }
+
+// The release branch (E11) is optional. Omitted, nothing changes; set, it
+// must be a valid branch name that differs from the integration branch, the
+// configured one or, when E1 is omitted, its default.
+func TestReleaseBranchValidation(t *testing.T) {
+	for name, c := range map[string]struct {
+		extra string
+		want  string // "" means valid
+	}{
+		"omitted":                          {"", ""},
+		"differs from the default E1":      {"  release_branch: main\n", ""},
+		"differs from the configured E1":   {"  integration_branch: staging\n  release_branch: main\n", ""},
+		"equals the default E1":            {"  release_branch: staging\n", "must differ from the integration branch, \"staging\""},
+		"equals the configured E1":         {"  integration_branch: develop\n  release_branch: develop\n", "must differ from the integration branch, \"develop\""},
+		"not a branch name":                {"  release_branch: \"a..b\"\n", "project.release_branch (E11): \"a..b\" is not a valid branch name"},
+		"empty":                            {"  release_branch: \"\"\n", "project.release_branch (E11): must not be empty"},
+		"E1 default shifts with E1 itself": {"  integration_branch: main\n  release_branch: staging\n", ""},
+	} {
+		t.Run(name, func(t *testing.T) {
+			problems := validateConfig(decodeOrFail(t, validConfigYAML+c.extra))
+			switch {
+			case c.want == "" && problems != nil:
+				t.Errorf("unexpected problems: %v", problems)
+			case c.want != "" && (problems == nil || !strings.Contains(problems.Error(), c.want)):
+				t.Errorf("problems = %v, want one containing %q", problems, c.want)
+			}
+		})
+	}
+}
+
+func TestConfigValidateReportsTheReleaseBranch(t *testing.T) {
+	dir := newProjectDir(t)
+	writeFile(t, configPathIn(dir), validConfigYAML)
+	stdout, _, err := runCLI(t, "dev", "config", "validate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "E11  release branch               none (default); no hotfix path"; !strings.Contains(stdout, want) {
+		t.Errorf("stdout does not contain %q:\n%s", want, stdout)
+	}
+
+	writeFile(t, configPathIn(dir), validConfigYAML+"  release_branch: main\n")
+	stdout, _, err = runCLI(t, "dev", "config", "validate")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if want := "E11  release branch               main (hotfix-designated issues only)"; !strings.Contains(stdout, want) {
+		t.Errorf("stdout does not contain %q:\n%s", want, stdout)
+	}
+}

@@ -594,11 +594,56 @@ func guideNewConfiguration(cfg *projectConfig, p prompter, projectDir string) er
 			return err
 		}
 	}
+	if pc.ReleaseBranch == nil {
+		if err := g.askReleaseBranch(pc, projectDir); err != nil {
+			return err
+		}
+	}
 	if cfg.Tooling == nil || cfg.Tooling.SkillTargets == nil {
 		if err := g.askSkillTargets(cfg); err != nil {
 			return err
 		}
 	}
+	return nil
+}
+
+// askReleaseBranch asks whether the project has a release branch for
+// hotfix-designated issues (E11). The default is none: no hotfix path.
+func (g guide) askReleaseBranch(pc *projectChoices, projectDir string) error {
+	integration := effectiveIntegrationBranch(pc)
+	intro := "Release branch for hotfixes\n" +
+		"Hotfix-designated issues can branch from, and target, a released branch other\n" +
+		"than the integration branch. Every review and approval still applies. Which\n" +
+		"branch, if any?"
+	options := []choice{{label: "None", detail: "no hotfix path"}}
+	var branches []string
+	if detected := detectDefaultBranch(projectDir); detected != "" && detected != integration {
+		options = append(options, choice{label: detected, detail: "this repository's default branch"})
+		branches = append(branches, detected)
+	}
+	options = append(options, choice{label: "Another branch"})
+	n, err := g.choose(intro, options, 0)
+	if err != nil || n == 0 {
+		return err
+	}
+	branch := ""
+	if n-1 < len(branches) {
+		branch = branches[n-1]
+	} else {
+		branch, err = g.text("Branch name: ", "", func(name string) error {
+			if err := checkBranchName(name); err != nil {
+				return err
+			}
+			if name == integration {
+				return fmt.Errorf("the release branch must differ from the integration branch, %q", integration)
+			}
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+	}
+	pc.ReleaseBranch = &branch
 	return nil
 }
 
@@ -920,6 +965,11 @@ func describeConfiguration(cfg projectConfig) []summaryLine {
 		add("project.guidance", strings.Join(m, ", "))
 	} else {
 		add("project.guidance", def("none"))
+	}
+	if pc.ReleaseBranch != nil {
+		add("project.release_branch", *pc.ReleaseBranch+"; hotfix-designated issues only")
+	} else {
+		add("project.release_branch", def("none; no hotfix path"))
 	}
 	if cfg.Tooling != nil && cfg.Tooling.SkillTargets != nil && len(*cfg.Tooling.SkillTargets) > 0 {
 		var t []string

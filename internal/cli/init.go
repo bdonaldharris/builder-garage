@@ -89,6 +89,7 @@ func (s configSnapshot) verifyUnchanged() error {
 // initFlags are the raw flag values of "garage init".
 type initFlags struct {
 	IntegrationBranch            string
+	ReleaseBranch                string
 	PRReviewTriggers             []string
 	AutomatedReviewer            string
 	AutomatedReviewerRequest     string
@@ -246,6 +247,7 @@ Value formats:
 	f.StringVar(&flags.SmallCorrectionClassifier, "small-correction-classifier", "", "who classifies a small correction, ROLE[:MEMBERS] (E8)")
 	f.StringArrayVar(&flags.InspectionConditions, "inspection-condition", nil, "an added user-facing inspection condition (E9; repeatable)")
 	f.StringArrayVar(&flags.Manuals, "manual", nil, "an adopted manual, NAME@VERSION (E10; repeatable)")
+	f.StringVar(&flags.ReleaseBranch, "release-branch", "", "released branch for hotfix-designated issues; must differ from the integration branch (E11; default none)")
 	f.StringArrayVar(&flags.SkillTargets, "skill-target", nil, "a skill-install target, HARNESS@VERSION@YYYY-MM-DD (tooling; repeatable)")
 
 	return cmd
@@ -309,6 +311,9 @@ func configFromFlags(f initFlags, changed func(string) bool) (projectConfig, err
 
 	if changed("integration-branch") {
 		pc.IntegrationBranch = &f.IntegrationBranch
+	}
+	if changed("release-branch") {
+		pc.ReleaseBranch = &f.ReleaseBranch
 	}
 	if changed("pr-review-trigger") {
 		list := make([]namedCondition, 0, len(f.PRReviewTriggers))

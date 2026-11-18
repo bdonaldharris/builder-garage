@@ -11,9 +11,9 @@ import (
 var defaultAnswers = []string{
 	"", "", "", "", "", "", "", // branch, PR reviews, reviewer, small corrections, discovery, release, suggestions
 	"lead maintainer", "alice", // Workflow Owner
-	"1",        // change acceptor: same as the Workflow Owner
-	"1",        // product-intent acceptor: same as the Workflow Owner
-	"", "", "", // inspection, guidance, agent tools
+	"1",            // change acceptor: same as the Workflow Owner
+	"1",            // product-intent acceptor: same as the Workflow Owner
+	"", "", "", "", // inspection, guidance, release branch, agent tools
 }
 
 func TestGuidedSetupWithDefaultsWritesOnlyChoicesMade(t *testing.T) {
@@ -50,7 +50,7 @@ func TestGuidedSetupKeepsFrameworkIdentifiersInternal(t *testing.T) {
 		t.Fatal(err)
 	}
 	all := ask.transcript()
-	if regexp.MustCompile(`\bE(10|[1-9])\b`).MatchString(all) {
+	if regexp.MustCompile(`\bE(1[01]|[1-9])\b`).MatchString(all) {
 		t.Errorf("the setup flow shows an extension-point identifier:\n%s", all)
 	}
 	for _, internal := range []string{"ROLE", "MEMBERS", "NAME|WHEN", "implementer-judgment"} {
@@ -100,7 +100,7 @@ func TestGuidedSetupRejectsPlaceholders(t *testing.T) {
 		"lead maintainer",
 		"MEMBERS", // rejected placeholder member
 		"alice",
-		"1", "1", "", "", "", "y")
+		"1", "1", "", "", "", "", "y")
 	ask := &scriptedPrompter{answers: answers}
 	if _, err := initProject(dir, projectConfig{}, ask); err != nil {
 		t.Fatalf("unexpected error: %v", err)
@@ -151,7 +151,8 @@ func TestGuidedSetupMatchesTheEquivalentFlags(t *testing.T) {
 		"1", // product-intent acceptor: same as the Workflow Owner
 		"2", // classifier: same as the change acceptor
 		"2", "the change alters a user-visible flow", "n",
-		"1",   // manuals: the Go Manual, from the catalog
+		"1",               // manuals: the Go Manual, from the catalog
+		"2", "production", // release branch: another branch
 		"1,3", // Claude Code and GitHub Copilot CLI
 		"yes",
 	}}
@@ -178,6 +179,7 @@ func TestGuidedSetupMatchesTheEquivalentFlags(t *testing.T) {
 		"--small-correction-classifier", "maintainer",
 		"--inspection-condition", "the change alters a user-visible flow",
 		"--manual", "go@0.1",
+		"--release-branch", "production",
 		"--skill-target", "claude-code@2.1.277@2026-11-12",
 		"--skill-target", "copilot-cli@1.0.93-1@2026-11-12",
 	)
@@ -270,8 +272,9 @@ func TestGuidedSetupNeverAsksForConditionalGuidance(t *testing.T) {
 	// A fixed catalog keeps the Go Manual at pick-list position 1 as manuals
 	// are added.
 	useManualCatalog(t, testCatalog())
-	adoptManual := append(append([]string(nil), defaultAnswers[:len(defaultAnswers)-2]...),
+	adoptManual := append(append([]string(nil), defaultAnswers[:len(defaultAnswers)-3]...),
 		"1", // manuals: the Go Manual, from the catalog
+		"",  // release branch: none
 		"",  // agent tools: none
 		"y") // confirm
 	for name, answers := range map[string][]string{
@@ -344,6 +347,69 @@ func TestConditionalGuidanceIsNotConfigurable(t *testing.T) {
 		}
 		if got := readFile(t, configPathIn(dir)); got != withConditional {
 			t.Errorf("the configuration was changed:\n%s", got)
+		}
+	})
+}
+
+// Guided setup offers the repository's default branch as the release branch
+// when it is not the integration branch, and refuses a typed release branch
+// equal to the integration branch. The default answer is no hotfix path.
+func TestGuidedSetupAsksForTheReleaseBranch(t *testing.T) {
+	releaseAt := len(defaultAnswers) - 2 // the release-branch question
+
+	t.Run("default: none", func(t *testing.T) {
+		noDefaultBranch(t)
+		dir := t.TempDir()
+		ask := &scriptedPrompter{answers: append(append([]string(nil), defaultAnswers...), "y")}
+		if _, err := initProject(dir, projectConfig{}, ask); err != nil {
+			t.Fatal(err)
+		}
+		if b := mustLoadValid(t, dir).Project.ReleaseBranch; b != nil {
+			t.Errorf("release branch = %q, want omitted", *b)
+		}
+		if !strings.Contains(ask.transcript(), "Release branch for hotfixes") {
+			t.Error("guided setup did not ask for the release branch")
+		}
+	})
+
+	t.Run("the repository default branch", func(t *testing.T) {
+		saved := detectDefaultBranch
+		detectDefaultBranch = func(string) string { return "main" }
+		t.Cleanup(func() { detectDefaultBranch = saved })
+		dir := t.TempDir()
+		answers := append([]string(nil), defaultAnswers...)
+		answers[0] = "2"         // integration branch: staging, the Builder Garage default
+		answers[releaseAt] = "2" // release branch: main, this repository's default branch
+		ask := &scriptedPrompter{answers: append(answers, "y")}
+		if _, err := initProject(dir, projectConfig{}, ask); err != nil {
+			t.Fatal(err)
+		}
+		pc := mustLoadValid(t, dir).Project
+		if pc.IntegrationBranch != nil || pc.ReleaseBranch == nil || *pc.ReleaseBranch != "main" {
+			t.Errorf("integration branch = %v, release branch = %v; want the default and main", pc.IntegrationBranch, pc.ReleaseBranch)
+		}
+	})
+
+	t.Run("typed branch equal to the integration branch is refused", func(t *testing.T) {
+		noDefaultBranch(t)
+		dir := t.TempDir()
+		answers := append([]string(nil), defaultAnswers[:releaseAt]...)
+		answers = append(answers,
+			"2", "staging", // another branch, equal to the integration branch: refused
+			"production", // accepted
+			"", "y")      // agent tools, confirm
+		ask := &scriptedPrompter{answers: answers}
+		if _, err := initProject(dir, projectConfig{}, ask); err != nil {
+			t.Fatal(err)
+		}
+		if len(ask.answers) != 0 {
+			t.Fatalf("unused answers %q", ask.answers)
+		}
+		if b := mustLoadValid(t, dir).Project.ReleaseBranch; b == nil || *b != "production" {
+			t.Errorf("release branch = %v, want production", b)
+		}
+		if !strings.Contains(ask.transcript(), "must differ from the integration branch") {
+			t.Error("the refusal was not shown")
 		}
 	})
 }

@@ -499,6 +499,11 @@ func writeConfigSummary(w io.Writer, cfg projectConfig) error {
 		}
 	}
 	row("E10", "manuals", namesOrDefault(manuals, "none (default)"))
+	if pc.ReleaseBranch != nil {
+		row("E11", "release branch", *pc.ReleaseBranch+" (hotfix-designated issues only)")
+	} else {
+		row("E11", "release branch", "none (default); no hotfix path")
+	}
 
 	b.WriteString("\nTooling:\n")
 	if cfg.Tooling == nil || cfg.Tooling.SkillTargets == nil || len(*cfg.Tooling.SkillTargets) == 0 {

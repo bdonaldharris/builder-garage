@@ -43,7 +43,7 @@ These rules hold whatever the project configures, and no instruction can waive t
 
 # Project configuration
 
-A project records its configured choices in `.garage/config.yaml` at its repository root. That file is the only source of project values. This skill reads it only at a step that cites an extension point, written as (E1) through (E10), and only when that step is reached. This skill states the canonical default for each extension point it uses.
+A project records its configured choices in `.garage/config.yaml` at its repository root. That file is the only source of project values. This skill reads it only at a step that cites an extension point, written as (E1) through (E11), and only when that step is reached. This skill states the canonical default for each extension point it uses.
 
 ## Resolving a configured value
 

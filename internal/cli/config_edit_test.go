@@ -561,6 +561,8 @@ func TestTranslatedProblemsUseSettingNames(t *testing.T) {
 		validConfigYAML + "tooling:\n  skill_targets:\n    - {harness: vim, scope: team, confirmed_version: \"\", confirmed_on: x}\n",
 		strings.Replace(validConfigYAML, "      role: maintainer\n", "      role: \"\"\n      members: [a, a]\n", 1),
 		strings.Replace(validConfigYAML, "implementer-judgment", "sometimes", 1),
+		validConfigYAML + "  release_branch: staging\n",
+		validConfigYAML + "  release_branch: \"-x\"\n",
 	}
 	for _, content := range invalid {
 		problems := validateConfig(decodeOrFail(t, content))
@@ -569,5 +571,42 @@ func TestTranslatedProblemsUseSettingNames(t *testing.T) {
 			continue
 		}
 		assertNoSchemaTerms(t, "translated problems", formatProblems(problems))
+	}
+}
+
+// The release branch is set, shown, and unset like any value setting, and a
+// value equal to the integration branch is refused without writing.
+func TestConfigSetsAndUnsetsTheReleaseBranch(t *testing.T) {
+	dir := newProjectDir(t)
+	writeFile(t, configPathIn(dir), validConfigYAML)
+
+	if _, _, err := runCLI(t, "dev", "config", "set", "release-branch", "main", "--yes"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+	if b := mustLoadValid(t, dir).Project.ReleaseBranch; b == nil || *b != "main" {
+		t.Fatalf("release branch = %v, want main", b)
+	}
+	stdout, _, err := runCLI(t, "dev", "config", "get", "release-branch")
+	if err != nil || strings.TrimSpace(stdout) != "main" {
+		t.Errorf("get = %q, %v; want main", stdout, err)
+	}
+
+	before := readFile(t, configPathIn(dir))
+	_, _, err = runCLI(t, "dev", "config", "set", "release-branch", "staging", "--yes")
+	if err == nil || !strings.Contains(err.Error(), "must differ from the integration branch") {
+		t.Errorf("setting the integration branch as the release branch = %v, want a refusal", err)
+	}
+	if err != nil {
+		assertNoSchemaTerms(t, "the refusal", err.Error())
+	}
+	if got := readFile(t, configPathIn(dir)); got != before {
+		t.Errorf("a refused change was written:\n%s", got)
+	}
+
+	if _, _, err := runCLI(t, "dev", "config", "unset", "release-branch", "--yes"); err != nil {
+		t.Fatalf("unset: %v", err)
+	}
+	if b := mustLoadValid(t, dir).Project.ReleaseBranch; b != nil {
+		t.Errorf("release branch = %q after unset, want omitted", *b)
 	}
 }
