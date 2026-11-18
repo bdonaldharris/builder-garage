@@ -40,6 +40,7 @@ func TestHelpDescribesPurposeAndCommands(t *testing.T) {
 				"init ",
 				"record ",
 				"status ",
+				"update ",
 				"version ",
 				"Flags:",
 				"-h, --help",
@@ -72,6 +73,7 @@ func TestHelpSummaryNamesCapabilities(t *testing.T) {
 		"installs and verifies the canonical skills and the manuals a project adopts at a project's harness targets",
 		"shows the read-only workflow status of an issue or pull request from GitHub",
 		"reports its own version",
+		"only when asked, checks GitHub for a newer release",
 	} {
 		if !strings.Contains(summary, want) {
 			t.Errorf("help summary does not contain %q:\n%s", want, stdout)
@@ -86,7 +88,7 @@ func TestRegisteredCommands(t *testing.T) {
 	}
 	slices.Sort(got)
 
-	want := []string{"config", "init", "record", "skills", "status", "version"}
+	want := []string{"config", "init", "record", "skills", "status", "update", "version"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("registered commands = %v, want %v", got, want)
 	}
