@@ -9,9 +9,9 @@ Each `garage` release on the [Releases page](https://github.com/bdonaldharris/bu
 
 Every archive and package also has a [GitHub artifact attestation](https://docs.github.com/en/actions/security-for-github-actions/using-artifact-attestations).
 
-`<version>` is the tag without its `v`. For tag `v0.1.1`, the manifest is `garage_0.1.1_checksums.txt`. Which files each release carries is its release inventory, recorded in [ADR 0003](adr/0003-release-distribution.md#release-inventory).
+`<version>` is the tag without its `v`. For tag `v0.1.1`, the manifest is `garage_0.1.1_checksums.txt`. Which files each release carries is its release inventory, recorded in [ADR 0003](adr/0003-release-distribution.md#6-release-inventory).
 
-There are no published releases until `v0.1.1`. The design is recorded in [ADR 0003](adr/0003-release-distribution.md).
+The first published release is `v0.1.1`. The design is recorded in [ADR 0003](adr/0003-release-distribution.md).
 
 ## Platform trust
 
