@@ -9,9 +9,14 @@
 #     branch, in a throwaway repository;
 #   - release-inventory.sh selects inventory v1 up to v0.1.x and v2 from
 #     v0.2.0, names every file exactly, and refuses a malformed version;
-#   - platform-sign.sh leaves every binary unchanged in every known mode,
-#     since nothing is platform-signed until #122, and refuses an unset or
-#     unknown mode and a missing binary.
+#   - platform-sign.sh never changes a binary, refuses an unset or unknown
+#     mode and a missing binary, and refuses a darwin release build unless
+#     every macOS signing credential is set (#122);
+#   - check-macos-signing-env.sh requires all five macOS signing credentials
+#     in release mode only, each certificate and key as one line of base64,
+#     and never prints a credential's value;
+#   - on macOS only, check-macos-notarization.sh refuses an executable that
+#     is not Developer ID signed and notarized.
 # CI runs it on every pull request. It runs on macOS and Linux.
 
 set -eu
@@ -143,19 +148,79 @@ for v in 0.1.1 0.2.1; do
 	done
 done
 
-# platform-sign.sh
+# check-macos-signing-env.sh and platform-sign.sh
+# Dummy credentials, never real ones: the scripts check presence and shape.
+creds=$scripts/check-macos-signing-env.sh
 sign=$scripts/platform-sign.sh
+p12=$(printf 'not a real p12' | base64 | tr -d '\n')
+p8=$(printf 'not a real p8 key' | base64 | tr -d '\n')
+with_creds() { # with_creds COMMAND...: run with all five dummy credentials
+	MACOS_SIGN_P12=$p12 MACOS_SIGN_PASSWORD=dummy-password MACOS_NOTARY_KEY=$p8 \
+		MACOS_NOTARY_KEY_ID=DUMMYKEYID MACOS_NOTARY_ISSUER_ID=dummy-issuer "$@"
+}
+no_creds() { # no_creds COMMAND...: run with none of them
+	env -u MACOS_SIGN_P12 -u MACOS_SIGN_PASSWORD -u MACOS_NOTARY_KEY \
+		-u MACOS_NOTARY_KEY_ID -u MACOS_NOTARY_ISSUER_ID "$@"
+}
+without() { # without NAME COMMAND...: all five but NAME, which is empty
+	name=$1
+	shift
+	with_creds env "$name=" "$@"
+}
+
+accepts "credentials not required in snapshot mode" no_creds sh "$creds" snapshot
+accepts "credentials not required in dry-run mode" no_creds sh "$creds" dry-run
+refuses "credentials required in release mode" no_creds sh "$creds" release
+accepts "release mode accepts all five credentials" with_creds sh "$creds" release
+for name in MACOS_SIGN_P12 MACOS_SIGN_PASSWORD MACOS_NOTARY_KEY MACOS_NOTARY_KEY_ID MACOS_NOTARY_ISSUER_ID; do
+	refuses "release mode refuses an empty $name" without "$name" sh "$creds" release
+	if without "$name" sh "$creds" release 2>&1 | grep -Fq "$name"; then
+		pass "the refusal names $name"
+	else
+		fail "the refusal names $name"
+	fi
+done
+refuses "release mode refuses a certificate split over two lines" \
+	with_creds env "MACOS_SIGN_P12=$(printf 'not a real p12' | base64 | fold -w 8)" sh "$creds" release
+refuses "release mode refuses a key given as a file path" \
+	with_creds env "MACOS_NOTARY_KEY=/tmp/AuthKey.p8" sh "$creds" release
+refuses "credentials check refuses an unknown mode" with_creds sh "$creds" publish
+if with_creds sh "$creds" release 2>&1 | grep -Eq "$p12|dummy-password|$p8|DUMMYKEYID|dummy-issuer"; then
+	fail "credentials check prints no credential value"
+else
+	pass "credentials check prints no credential value"
+fi
+
 bin=$work/garage
 printf 'binary' >"$bin"
 for mode in snapshot dry-run release; do
-	for os in darwin linux windows; do
-		accepts "hook passes a $os binary in $mode mode" sh "$sign" "$mode" "$os" "$bin"
+	for os in linux windows; do
+		accepts "hook passes a $os binary in $mode mode" no_creds sh "$sign" "$mode" "$os" "$bin"
 	done
 done
+accepts "hook passes a darwin binary in snapshot mode without credentials" no_creds sh "$sign" snapshot darwin "$bin"
+accepts "hook passes a darwin binary in dry-run mode without credentials" no_creds sh "$sign" dry-run darwin "$bin"
+refuses "hook refuses a darwin binary in release mode without credentials" no_creds sh "$sign" release darwin "$bin"
+refuses "hook refuses a darwin binary in release mode without the notary key" \
+	without MACOS_NOTARY_KEY sh "$sign" release darwin "$bin"
+accepts "hook passes a darwin binary in release mode with every credential" with_creds sh "$sign" release darwin "$bin"
 if [ "$(cat "$bin")" = binary ]; then pass "hook did not modify the binary"; else fail "hook did not modify the binary"; fi
 refuses "hook refuses an unset mode" sh "$sign" unset linux "$bin"
 refuses "hook refuses an unknown mode" sh "$sign" publish linux "$bin"
 refuses "hook refuses a missing binary" sh "$sign" dry-run linux "$work/absent"
+
+# check-macos-notarization.sh, on macOS: an Apple platform binary is signed,
+# but neither by a Developer ID Application identity nor notarized.
+notary=$scripts/check-macos-notarization.sh
+if [ "$(uname -s)" = Darwin ]; then
+	mkdir "$work/platform"
+	cp /bin/ls "$work/platform/garage"
+	tar -czf "$work/platform.tar.gz" -C "$work/platform" garage
+	refuses "notarization check refuses an executable that is not Developer ID signed" \
+		sh "$notary" "$work/platform.tar.gz" 38397A2FG6
+else
+	refuses "notarization check refuses to run off macOS" sh "$notary" "$bin" 38397A2FG6
+fi
 
 if [ "$failures" -ne 0 ]; then
 	echo "$failures check(s) failed"

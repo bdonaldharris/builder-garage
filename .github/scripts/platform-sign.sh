@@ -7,12 +7,20 @@
 # MODE is GARAGE_RELEASE_MODE: snapshot, dry-run, or release. Any other MODE,
 # including an unset one, fails, so GoReleaser never builds without a mode.
 #
-# Platform signing (macOS Developer ID signing and notarization, Windows
-# Authenticode) is track 2 of #120 (#122) and is not implemented yet. In every
-# mode the binary is left unchanged. Releases publish unsigned macOS and
-# Windows executables, and their notes say so (amended #120 decision 4). Until
-# #122 signs every platform together, nothing is signed, so no release mixes
-# signed and unsigned platforms.
+# Platform signing is track 2 of #120 (#122). It ships one platform at a time
+# (#122, D2), so a release may carry signed macOS and unsigned Windows
+# executables, and its notes say which is which.
+#
+# - macOS: in release mode, GoReleaser's notarize.macos signs each darwin
+#   binary with the Developer ID Application identity (hardened runtime,
+#   secure timestamp) and notarizes it, after this hook and before archiving.
+#   This hook refuses a darwin release build without every signing credential
+#   (check-macos-signing-env.sh), because GoReleaser would otherwise sign
+#   without notarizing (#122, D3). Snapshot and dry-run builds are unsigned.
+# - Windows: not Authenticode-signed yet (#122, phase 2), in any mode.
+# - Linux: needs no platform signature.
+#
+# The hook never changes a binary itself.
 
 set -eu
 
@@ -30,18 +38,25 @@ if [ ! -f "$binary" ]; then
 fi
 
 case $mode in
-snapshot | dry-run | release)
-	case $goos in
-	darwin | windows)
-		echo "platform-sign: $mode build; $goos binary is not platform-signed (#122): $binary"
-		;;
-	*)
-		echo "platform-sign: $mode build; $goos binaries need no platform signature: $binary"
-		;;
-	esac
-	;;
+snapshot | dry-run | release) ;;
 *)
 	echo "platform-sign: GARAGE_RELEASE_MODE must be snapshot, dry-run, or release; got '$mode'" >&2
 	exit 1
+	;;
+esac
+
+case $mode/$goos in
+release/darwin)
+	sh "$(dirname -- "$0")/check-macos-signing-env.sh" release
+	echo "platform-sign: release build; GoReleaser notarize.macos signs and notarizes this darwin binary next: $binary"
+	;;
+*/darwin)
+	echo "platform-sign: $mode build; darwin binaries are signed and notarized only in release builds: $binary"
+	;;
+*/windows)
+	echo "platform-sign: $mode build; windows binary is not platform-signed (#122, phase 2): $binary"
+	;;
+*)
+	echo "platform-sign: $mode build; $goos binaries need no platform signature: $binary"
 	;;
 esac
