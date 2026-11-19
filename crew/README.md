@@ -26,11 +26,11 @@ A Technician is an agent or a human specialist that performs bounded work and pr
 | --- | --- | --- |
 | `discovery` | What does the existing system actually do? | [engineering-discovery-workflow](../skills/engineering-discovery-workflow/SKILL.md) |
 | `readiness` | Is this change understood well enough to implement? | [implementation-readiness-workflow](../skills/implementation-readiness-workflow/SKILL.md) |
-| `planner` | How should approved work be framed and entered into the backlog? | [issue-authoring-workflow](../skills/issue-authoring-workflow/SKILL.md) |
+| `planner` | How should approved work be framed and entered into the backlog, and how should proposed project intent be drafted for acceptance? | [issue-authoring-workflow](../skills/issue-authoring-workflow/SKILL.md), [project-spec-workflow](../skills/project-spec-workflow/SKILL.md) |
 | `implementer` | Implementation, correction, and integration-PR finalization | [application-implementation-workflow](../skills/application-implementation-workflow/SKILL.md), [integration-pr-review](../skills/integration-pr-review/SKILL.md) |
 | `reviewer` | Was the artifact independently shown to be correct? | [independent-implementation-review](../skills/independent-implementation-review/SKILL.md) |
 
-A planner may prepare evidence or an issue. It never makes the product, workflow, or acceptance decisions that belong to the Builder or to a configured human authority.
+A planner may prepare evidence, an issue, or a draft spec ([#149 decision](https://github.com/bdonaldharris/builder-garage/issues/149#issuecomment-7010610605), item 4). It never makes the product, workflow, or acceptance decisions that belong to the Builder or to a configured human authority.
 
 Later needs may add Technicians, such as `tester`, `release`, or `documentation`. A new one is added through a framework change, in the same way.
 
