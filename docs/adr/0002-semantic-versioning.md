@@ -74,4 +74,4 @@ This record does not decide:
 - when a release is cut, and what moves the version;
 - the criteria for 1.0.
 
-Since decided: release automation, signing, and the release channel for archives, under [ADR 0003](0003-release-distribution.md). Publication there amends decision 2's timing: `v0.1.0` stays a tag only, and the first published release is `v0.1.1`. Packaging, other channels, and published installation are later tracks of [#120](https://github.com/bdonaldharris/builder-garage/issues/120). When a release is cut, and the criteria for 1.0, remain undecided.
+Since decided: release automation, signing, and the release channel for archives, under [ADR 0003](0003-release-distribution.md). Publication there amends decision 2's timing: `v0.1.0` stays a tag only, and the first published release is `v0.1.1`. Packaging, other channels, and published installation are later tracks of [#120](https://github.com/bdonaldharris/builder-garage/issues/120). When a release is cut is decided under [ADR 0004](0004-release-promotion.md): by a release issue and its promotion from `staging` to `main`. The criteria for 1.0 remain undecided.

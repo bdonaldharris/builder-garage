@@ -3,9 +3,26 @@
 Closes #
 
 <!--
-Substantive changes require an issue. For a small correction that changes no meaning
-(typo, broken link, formatting), replace the line above with "None - small correction".
-See CONTRIBUTING.md.
+Substantive changes require an issue. Name it here as #N, Closes #N, Fixes #N, Resolves #N, or
+Refs #N; garage status reads this section. Into staging, GitHub does not close the issue on merge:
+it stays open until its release is promoted. A promotion pull request lists the release issue and
+"Closes #N" for every member issue.
+For a small correction that changes no meaning (typo, broken link, formatting), replace the line
+above with "None - small correction". See CONTRIBUTING.md.
+-->
+
+## Pull request kind
+
+implementation
+
+<!--
+Exactly one of: implementation, promotion, hotfix, clean synchronization, conflicted synchronization.
+- implementation: an issue branch into staging.
+- promotion: release/vX.Y.Z-rc.N into main (docs/release-runbook.md).
+- hotfix: a hotfix-designated issue's branch into main.
+- clean synchronization: main into staging, without conflicts.
+- conflicted synchronization: backmerge/vX.Y.Z into staging, with its own issue and review.
+garage status checks the kind against the base and head it permits.
 -->
 
 ## Summary
