@@ -1,6 +1,6 @@
 # Contributing to Builder Garage
 
-Builder Garage is maintainer-led and community-contributed, and contributions are welcome from anyone. This document explains how a change moves from an idea to `main`.
+Builder Garage is maintainer-led and community-contributed, and contributions are welcome from anyone. This document explains how a change moves from an idea to `staging`, and from there to a release on `main`.
 
 ## Before you start
 
@@ -10,6 +10,19 @@ Builder Garage is maintainer-led and community-contributed, and contributions ar
 - **License.** Builder Garage is released under the [MIT License](LICENSE). Contributions you submit are licensed under the same terms.
 - **Authority.** [GOVERNANCE.md](GOVERNANCE.md) describes who decides what.
 - **First contribution.** [Your first contribution](docs/first-contribution.md) walks a first-time contributor through one change, from finding an issue to an open pull request.
+
+## Minimum garage version
+
+Work on this repository with **`garage` `v0.3.0` or later**, and reinstall the skills from it:
+
+```sh
+garage version          # v0.3.0 or later
+garage skills install
+```
+
+- **Why the minimum.** Builder Garage's configuration names a release branch (`release_branch`). Releases before `v0.3.0` cannot read it: `garage config validate` fails with "field release_branch not found", and every canonical skill stops when validation fails.
+- **Why the reinstall.** It gives agents the skill versions that carry the hotfix rules (E11).
+- **Every environment needs it,** including remote or hosted agent setups, which install their own copy.
 
 ## Two separate gates
 
@@ -88,7 +101,7 @@ Only after independent approval:
 
 1. commit the change that was approved, and nothing else;
 2. push it to a branch (in your fork, or in this repository if you have access);
-3. open a pull request against `main`, completing the [pull request template](.github/PULL_REQUEST_TEMPLATE.md) and linking the issue and its review record.
+3. open a pull request against `staging`, completing the [pull request template](.github/PULL_REQUEST_TEMPLATE.md), linking the issue and its review record, and declaring its kind, `implementation`.
 
 Under commit-stage review, the approved change is already committed and pushed: skip steps 1 and 2, and open the pull request from the reviewed commit, or from one whose change is identical.
 
@@ -96,11 +109,13 @@ If the change is modified after approval, it returns to independent review.
 
 - Pull-request-stage procedure: [integration-pr-review](skills/integration-pr-review/SKILL.md)
 
-`main` is Builder Garage's integration destination. The canonical skill opens a pull request against the integration branch configured in [`.garage/config.yaml`](.garage/config.yaml), rather than its default, `staging`, which Builder Garage does not have. The skill's review, validation, and authorization requirements apply in full. Only the destination differs. See [GOVERNANCE.md](GOVERNANCE.md#changes-to-main).
+`staging` is Builder Garage's integration branch, configured in [`.garage/config.yaml`](.garage/config.yaml), and the canonical skill opens pull requests against it. Only a hotfix-designated issue targets `main`, the release branch. The skill's review, validation, and authorization requirements apply in full; the configured branch changes only the destination. See [GOVERNANCE: Changes to `staging` and `main`](GOVERNANCE.md#changes-to-staging-and-main).
 
 ### 7. Maintainer approval and merge
 
-A maintainer reviews the pull request. It merges only after maintainer approval and after all required checks pass. No one pushes to `main` directly.
+A maintainer reviews the pull request. It merges only after maintainer approval and after all required checks pass, with a merge commit. No one pushes to `staging` or `main` directly.
+
+Merging into `staging` does not close the issue: it stays open until its release is promoted to `main`, and the promotion pull request closes it ([Release runbook](docs/release-runbook.md)).
 
 Maintainer approval is normally recorded as a GitHub approving review on the pull request.
 

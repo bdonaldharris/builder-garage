@@ -15,7 +15,7 @@ The skills are framework artifacts that any project can adopt. This profile is B
 | [integration-pr-review](../skills/integration-pr-review/SKILL.md) | `pr-review` |
 | [issue-authoring-workflow](../skills/issue-authoring-workflow/SKILL.md) | `author-issue` |
 
-**Revision adopted.** The skills carry no version label today. Builder Garage adopts them as they exist on its `main` branch. A specific revision is identified by commit: the skills at the commit that contains a given change are the ones that governed it. Agents should run copies that match `main`. `garage skills install` installs the skills a `garage` binary embeds, each marked with its revision, and `garage skills verify` checks installed copies against them ([Skill installation](skill-installation.md)).
+**Revision adopted.** The skills carry no version label today. Builder Garage adopts them as they exist on its integration branch, `staging`, where changes to them land; `main` holds the released ones. A specific revision is identified by commit: the skills at the commit that contains a given change are the ones that governed it. Agents should run copies that match `staging`. `garage skills install` installs the skills a `garage` binary embeds, each marked with its revision, and `garage skills verify` checks installed copies against them ([Skill installation](skill-installation.md)).
 
 ## Configuration
 
@@ -25,7 +25,7 @@ The file was generated, not hand-authored, by running this noninteractive comman
 
 ```sh
 garage init \
-  --integration-branch main \
+  --integration-branch staging \
   --small-corrections enabled \
   --small-corrections-without-issue \
   --small-correction-classifier maintainer \
@@ -35,22 +35,25 @@ garage init \
   --change-acceptor maintainer \
   --product-intent-acceptor "Workflow Owner" \
   --manual go@0.1 \
+  --release-branch main \
   --skill-target claude-code@2.1.277@2026-11-12 \
   --skill-target codex@0.137.0@2026-11-12 \
   --skill-target copilot-cli@1.0.93-1@2026-11-12
 ```
 
+The cutover to `staging` ([#140](https://github.com/bdonaldharris/builder-garage/issues/140)) changed `--integration-branch` from `main` to `staging`, and added `--release-branch main`. The file was updated in place with `garage config set`, and the command above still generates it exactly.
+
 The canonical skills read these values from the configuration, at the extension points they cite ([How the skills read the configuration](configuration.md#how-the-skills-read-the-configuration)). An agent needs a `garage` binary built from this repository on its `PATH` to resolve them; [`install.sh`](../README.md#install-from-source) builds and installs one. The table explains what each configured choice means for Builder Garage.
 
 | Configured choice | What it means here | Source |
 | --- | --- | --- |
-| Integration branch ([E1](extension-points.md#e1-integration-branch)) | Implementation pull requests target the configured integration branch, and review records resolve it as their `integration_ref`. This changes the destination only, not any gate. | [GOVERNANCE: Changes to `main`](../GOVERNANCE.md#changes-to-main) |
+| Integration branch ([E1](extension-points.md#e1-integration-branch)) | `staging`. Implementation pull requests target it, and review records resolve it as their `integration_ref`. This changes the destination only, not any gate. | [GOVERNANCE: Changes to `staging` and `main`](../GOVERNANCE.md#changes-to-staging-and-main), [ADR 0004](adr/0004-release-promotion.md) |
 | Automated reviewer ([E3](extension-points.md#e3-automated-reviewer)) | None is configured, so the canonical default applies: no automated reviewer. No pull-request review is requested from one, and its absence establishes nothing. If any automated reviewer does report findings on a PR head, they still fire minimum PR-review trigger 2. No tool establishes review authority. | [#52](https://github.com/bdonaldharris/builder-garage/issues/52), [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 3), [#7 decision](https://github.com/bdonaldharris/builder-garage/issues/7#issuecomment-6817635061) (item 5) |
 | Small corrections ([E4](extension-points.md#e4-small-correction-entry-path)) | A small correction that changes no meaning, such as a typo, broken link, or formatting, may be proposed as a pull request without an issue, and does not require independent review. Only the configured classifier, a human authority, decides that a change is a small correction; an agent never does ([F5](responsibility-floor.md#rules)). Maintainer approval is still required. | [CONTRIBUTING: Small corrections](../CONTRIBUTING.md#small-corrections), [pull request template](../.github/PULL_REQUEST_TEMPLATE.md), [#16 decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788) (item 1) |
 | Discovery ([E5](extension-points.md#e5-discovery-applicability)) | The implementer decides whether discovery is needed, and the Workflow Owner may require it. | [#16 decision](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836671788) (item 5), [CONTRIBUTING: Discover when warranted](../CONTRIBUTING.md#2-discover-when-warranted) |
 | Suggestions backlog ([E7](extension-points.md#e7-improvement-suggestions-backlog)) | Non-blocking review observations and dogfooding friction go to the configured issue. A suggestion authorizes nothing until it is promoted into a separately scoped issue. | [#22 decision](https://github.com/bdonaldharris/builder-garage/issues/22#issuecomment-6830592571) (item 5) |
 | Human authorities ([E8](extension-points.md#e8-human-authorities)) | The configured roles are explained in [GOVERNANCE: Workflow Owner](../GOVERNANCE.md#workflow-owner) and [GOVERNANCE: Review requirements](../GOVERNANCE.md#review-requirements). | [#8 decision](https://github.com/bdonaldharris/builder-garage/issues/8#issuecomment-6817923896) (item 1), #18 |
-| Release branch ([E11](extension-points.md#e11-release-branch)) | Not configured, so there is no hotfix path: every change targets the integration branch, `main`. The cutover to `staging` ([#140](https://github.com/bdonaldharris/builder-garage/issues/140)) sets the release branch to `main`. | [D-A decision on #120](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6984929399) |
+| Release branch ([E11](extension-points.md#e11-release-branch)) | `main`. Only a hotfix-designated issue branches from it and targets it, and a release candidate is promoted into it. Every gate still applies. | [D-A decision on #120](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6984929399), [GOVERNANCE: Hotfixes and staging synchronization](../GOVERNANCE.md#hotfixes-and-staging-synchronization) |
 | Skill targets ([tooling](tooling-configuration.md)) | The harness targets Builder Garage's maintainer uses, as confirmed by the #37 load test. They grant no workflow authority. | [#37 decision](https://github.com/bdonaldharris/builder-garage/issues/37#issuecomment-6837792244) |
 
 ## Other project deltas

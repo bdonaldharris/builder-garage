@@ -23,7 +23,7 @@ This registry lists every point at which a project adopting Builder Garage may a
 | **Allowed values** | The name of one branch that implementation pull requests target. |
 | **Default** | `staging`, the branch the canonical skills, such as [integration-pr-review](../skills/integration-pr-review/SKILL.md#no-pr-exists), use when E1 is omitted. |
 | **Constraint** | Changes the destination only. It changes no gate, review, or evidence requirement. |
-| **Source** | [GOVERNANCE: Changes to `main`](../GOVERNANCE.md#changes-to-main), [#6 discovery](https://github.com/bdonaldharris/builder-garage/issues/6) |
+| **Source** | [GOVERNANCE: Changes to `staging` and `main`](../GOVERNANCE.md#changes-to-staging-and-main), [#6 discovery](https://github.com/bdonaldharris/builder-garage/issues/6) |
 
 ### E2: Additional PR-review triggers
 

@@ -82,13 +82,17 @@ This applies only to pull requests authored by the sole maintainer. Pull request
 
 Once additional authorized maintainers are available, a maintainer-authored pull request receives approval from another maintainer under the normal process.
 
-## Changes to `main`
+## Changes to `staging` and `main`
 
-- `main` is Builder Garage's integration destination. Pull requests are opened against `main`.
-- `main` changes only through pull requests. No one pushes to `main` directly, including maintainers.
-- A pull request merges only after maintainer approval and after all required checks pass.
+Builder Garage integrates on `staging` and releases from `main` ([ADR 0004](docs/adr/0004-release-promotion.md)):
 
-The canonical [integration-pr-review](skills/integration-pr-review/SKILL.md) skill opens an integration pull request against the integration branch configured at extension point [E1](docs/extension-points.md#e1-integration-branch) in [`.garage/config.yaml`](.garage/config.yaml). Its default, `staging`, does not apply, because Builder Garage configures its own. Builder Garage applies that workflow's review, validation, and authorization requirements in full. The configured branch changes the destination only. It does not change or relax any gate the skill defines.
+- **`staging`** is the integration branch ([E1](docs/extension-points.md#e1-integration-branch)). Implementation pull requests are opened against `staging`.
+- **`main`** is the default branch, the public released-code branch, and the release branch ([E11](docs/extension-points.md#e11-release-branch)). It changes only through the promotion of a release candidate, or the pull request of a hotfix-designated issue (below). Releases follow the [release runbook](docs/release-runbook.md).
+- **Both change only through pull requests,** merged with merge commits. No one pushes to either directly, including maintainers.
+- **A pull request merges only** after maintainer approval and after all required checks pass.
+- **An issue integrated into `staging` stays open until its release is promoted.** GitHub closes an issue on merge only into the default branch, so the promotion pull request closes the release's member issues.
+
+The canonical [integration-pr-review](skills/integration-pr-review/SKILL.md) skill opens an integration pull request against the integration branch configured at E1 in [`.garage/config.yaml`](.garage/config.yaml): `staging`, which is also the canonical default. For a hotfix-designated issue, it targets the release branch configured at E11 instead. Builder Garage applies that workflow's review, validation, and authorization requirements in full. The configured branches change the destination only. They do not change or relax any gate the skill defines.
 
 The human approval that skill requires before merge is the maintainer approval described under [Review requirements](#review-requirements).
 
@@ -96,7 +100,7 @@ How far the repository's settings currently enforce these rules is recorded in [
 
 ## Hotfixes and staging synchronization
 
-This section takes effect when Builder Garage configures `staging` as its integration branch and `main` as its release branch ([E11](docs/extension-points.md#e11-release-branch)), in the cutover tracked by [#140](https://github.com/bdonaldharris/builder-garage/issues/140). Until then, every change targets `main`, and there is no separate hotfix path.
+Builder Garage configures `staging` as its integration branch and `main` as its release branch ([E11](docs/extension-points.md#e11-release-branch)), since the cutover tracked by [#140](https://github.com/bdonaldharris/builder-garage/issues/140). This section governs how a hotfix reaches `main` and returns to `staging`. The [release runbook](docs/release-runbook.md#hotfixes) gives the steps.
 
 It carries out decision 6 of the [release-promotion decision](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6962490422), as clarified by the [hotfix-synchronization amendment](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6984649202) and the [D-A and D-E decisions](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6984929399).
 

@@ -92,7 +92,7 @@ Gates 7 to 11 are conditions of the merge decision. They hold together on the cu
 | **Who acts** | The project's CI. Agent #1 confirms the result at the merge decision. |
 | **Record** | The check results on the pull request. |
 | **Source kind** | Governance rule. Which checks are required is a repository setting, not an extension point. |
-| **Defined in** | [GOVERNANCE: Changes to `main`](../GOVERNANCE.md#changes-to-main), [integration-pr-review: Phase 5](../skills/integration-pr-review/SKILL.md#phase-5--merge-decision) |
+| **Defined in** | [GOVERNANCE: Changes to `staging` and `main`](../GOVERNANCE.md#changes-to-staging-and-main), [integration-pr-review: Phase 5](../skills/integration-pr-review/SKILL.md#phase-5--merge-decision) |
 
 ### 8. Environment / Deployment Requirements visibility
 
@@ -134,6 +134,23 @@ Gates 7 to 11 are conditions of the merge decision. They hold together on the cu
 | **Source kind** | Floor rule [F12](../docs/responsibility-floor.md#rules). The acceptor is named at [E8](../docs/extension-points.md#e8-human-authorities), and the inspection trigger is [E9](../docs/extension-points.md#e9-user-facing-inspection-trigger), which a project may extend. |
 | **Defined in** | [GOVERNANCE: Product-intent acceptance](../GOVERNANCE.md#product-intent-acceptance), [integration-pr-review: Phase 5](../skills/integration-pr-review/SKILL.md#phase-5--merge-decision) |
 
+## Promotion and synchronization pull requests
+
+The gates above govern an implementation pull request, including a hotfix's, which keeps every gate. Two other kinds of pull request carry no change of their own, and `garage status` exempts them from the implementation-review gates (gates 3 to 6) only when they declare their kind and their base and head fit it ([README: Governing issues and pull-request kinds](../README.md#governing-issues-and-pull-request-kinds)):
+
+- **A promotion,** `release/vX.Y.Z-rc.N` → `main`. Its gates are:
+  - the release issue's member list, each member with its approval record;
+  - the candidate's head being a commit on `staging`;
+  - the release-candidate precondition;
+  - required checks (gate 7);
+  - the Workflow Owner's acceptance on the release issue;
+  - change-acceptor approval (gate 10).
+
+  See [ADR 0004: Promotion](../docs/adr/0004-release-promotion.md#7-promotion) and the [release runbook](../docs/release-runbook.md).
+- **A clean synchronization,** `main` → `staging` without conflicts. Its gates are required checks (gate 7) and change-acceptor approval (gate 10).
+
+A **conflicted synchronization** is a distinct change, with its own issue, and passes every gate above ([GOVERNANCE: Hotfixes and staging synchronization](../GOVERNANCE.md#hotfixes-and-staging-synchronization)).
+
 ## Three distinct decisions
 
 Independent engineering review (gate 3), change-acceptor approval (gate 10), and product-intent acceptance (gate 11) answer different questions, and none substitutes for another.
@@ -154,7 +171,7 @@ Option B, commit-stage review of a pushed branch, is available under the [#99 de
 
 *Project-specific. This section describes Builder Garage's own configuration, not the canonical map.*
 
-- **Configured values.** Builder Garage's extension-point values are in [`.garage/config.yaml`](../.garage/config.yaml), and [GOVERNANCE](../GOVERNANCE.md#workflow-owner) explains them. Its integration branch is `main`, and its Workflow Owner, currently the lead maintainer, is the product-intent acceptor.
-- **Required checks.** The checks in force are recorded as observed, not decided, in [Repository configuration: Required checks](../docs/repository-configuration.md#required-checks).
-- **Sole maintainer.** While the lead maintainer is the only maintainer, gate 10 for the lead maintainer's own pull requests may be recorded as an explicit acceptance comment. The repository's ruleset that permits this is recorded, also as observed and not decided, in [Repository configuration: Sole maintainer](../docs/repository-configuration.md#sole-maintainer).
+- **Configured values.** Builder Garage's extension-point values are in [`.garage/config.yaml`](../.garage/config.yaml), and [GOVERNANCE](../GOVERNANCE.md#workflow-owner) explains them. Its integration branch is `staging`, its release branch is `main`, and its Workflow Owner, currently the lead maintainer, is the product-intent acceptor.
+- **Required checks.** Eight checks are required on both `staging` and `main`, as decided under [D-C](https://github.com/bdonaldharris/builder-garage/issues/140#issuecomment-6999760359) and recorded in [Repository configuration: Required checks](../docs/repository-configuration.md#required-checks).
+- **Sole maintainer.** While the lead maintainer is the only maintainer, gate 10 for the lead maintainer's own pull requests may be recorded as an explicit acceptance comment. The rulesets that permit this, with zero required approvals on both protected branches, are decided ([#120 decision](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6962490422), item 7) and recorded in [Repository configuration: Sole maintainer](../docs/repository-configuration.md#sole-maintainer).
 - **Small corrections.** Builder Garage enables [E4](../docs/extension-points.md#e4-small-correction-entry-path). See [CONTRIBUTING: Small corrections](../CONTRIBUTING.md#small-corrections).

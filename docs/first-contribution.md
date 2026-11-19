@@ -47,7 +47,7 @@ Each carries a `garage-evidence` block that identifies the exact change with its
 
 ## 7. Open the pull request
 
-After the review record approves the change, commit exactly the approved change, push it to a branch in your fork, and open a pull request against `main`. If the change was already pushed for commit-stage review, open the pull request from that reviewed commit instead ([Commit, push, and open a pull request](../CONTRIBUTING.md#6-commit-push-and-open-a-pull-request)).
+After the review record approves the change, commit exactly the approved change, push it to a branch in your fork, and open a pull request against `staging`. If the change was already pushed for commit-stage review, open the pull request from that reviewed commit instead ([Commit, push, and open a pull request](../CONTRIBUTING.md#6-commit-push-and-open-a-pull-request)).
 
 - **The template.** Complete the [pull request template](../.github/PULL_REQUEST_TEMPLATE.md), and link the issue and its approving review record.
 - **The equivalence record.** The pull-request stage also asks for an [equivalence record on the pull request](review-evidence.md#equivalence-record-on-a-pr), as [integration-pr-review](../skills/integration-pr-review/SKILL.md) defines.

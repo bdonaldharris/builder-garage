@@ -1,6 +1,6 @@
 # Repository Configuration: Observed State and Recommendations
 
-**Observed:** 2026-11-14 (UTC), read-only, through the GitHub API with repository admin access.
+**Observed:** 2026-11-14 (UTC), read-only, through the GitHub API with repository admin access. **Re-observed on 2026-11-19 (UTC)**, after the cutover settings of [#140](https://github.com/bdonaldharris/builder-garage/issues/140) were applied: the rulesets, the merge methods they allow, the required checks, the remote branches, and the labels. Rows marked *(2026-11-19)* come from that re-observation. The others are from 2026-11-14.
 
 This is a point-in-time record. It compares the repository's settings with the rules in [GOVERNANCE.md](../GOVERNANCE.md) and recommends changes. **No repository setting was modified in producing it.** Verify the current state before acting on it. The previous observation, from 2026-11-12, remains in Git history.
 
@@ -10,28 +10,32 @@ This is a point-in-time record. It compares the repository's settings with the r
 | --- | --- |
 | Repository | `bdonaldharris/builder-garage`, public, default branch `main`. Renamed from `agentic-builder-engineering-system`; the old URL redirects. The description is set. No topics are set. |
 | Collaborators | One: `bdonaldharris` (admin). |
-| Rulesets | One: **Protect main**. Active, defined on the repository, targeting the default branch. No bypass actors. |
-| **Protect main** rules | **Restrict deletions.**<br>**Block force pushes.**<br>**Require a pull request before merging:** 0 required approving reviews; stale approvals are not dismissed when new commits are pushed; code-owner review is not required; approval of the most recent push is not required; review threads must be resolved; extra approval is required for unattributed changes; merge commits, squash, and rebase are allowed.<br>**Require status checks to pass:** `Format, vet, build, cross-compile`, `Test (ubuntu-latest)`, `Test (macos-latest)`, and `Test (windows-latest)`. Branches are not required to be up to date before merging. The checks are also enforced when a branch is created. |
-| Branch protection on `main` | None. The ruleset above is the only protection. |
+| Rulesets *(2026-11-19)* | Six, all active, defined on the repository:<br>**Protect main** (27087247), targeting the default branch;<br>**Protect staging** (27611942), targeting `refs/heads/staging`;<br>**Protect release candidates** (27611943) and **Restrict release-candidate creation** (27611945), targeting `refs/heads/release/**`;<br>**Protect version tags** and **Restrict version tag creation**, targeting `refs/tags/v*` ([ADR 0003](adr/0003-release-distribution.md#4-repository-protection)).<br>Only the two creation rulesets have a bypass actor: Repository admin. A ruleset's bypass applies to all its rules, so creation is restricted in its own ruleset. |
+| **Protect main** and **Protect staging** rules *(2026-11-19)* | The same rules on both:<br>**Restrict deletions.**<br>**Block force pushes.**<br>**Require a pull request before merging:** 0 required approving reviews; stale approvals are not dismissed when new commits are pushed; code-owner review is not required; approval of the most recent push is not required; review threads must be resolved; extra approval is required for unattributed changes; **merge commits only** ([ADR 0004](adr/0004-release-promotion.md#2-merge-commits-only)).<br>**Require status checks to pass:** eight checks, `Format, vet, build, cross-compile`, `Test (ubuntu-latest)`, `Test (macos-latest)`, `Test (windows-latest)`, `Release configuration (snapshot, amd64)`, `Release configuration (snapshot, arm64)`, `Source installer (ubuntu-latest)`, and `Source installer (macos-latest)`, each from GitHub Actions. Branches are not required to be up to date before merging. The checks are also enforced when a branch is created. |
+| **Protect release candidates** rules *(2026-11-19)* | **Restrict updates:** no one can push to a `release/**` branch, which therefore receives no commits after it is cut.<br>**Block force pushes.**<br>Deletion is not restricted, so a merged candidate's branch is deleted automatically. |
+| **Restrict release-candidate creation** rules *(2026-11-19)* | **Restrict creations:** only Repository admin can create a `release/**` branch ([D-D](https://github.com/bdonaldharris/builder-garage/issues/140#issuecomment-6999760359)). |
+| Branch protection on `main` and `staging` | None. The rulesets above are the only protection. |
 | GitHub Actions workflows | One repository workflow, CI ([`ci.yml`](../.github/workflows/ci.yml)), on pull requests. Besides the four required checks, it runs `Source installer (ubuntu-latest)` and `Source installer (macos-latest)`, which are not required. GitHub also lists two dynamic workflows of its own, Copilot cloud agent and Dependency Graph. |
 | GitHub Actions policy | Actions enabled. All actions and reusable workflows are allowed. SHA pinning is not required. The default workflow token is read-only, and workflows cannot approve pull requests. |
-| Merge settings | Merge commits, squash, and rebase all allowed. Auto-merge off. Head branches are deleted on merge. |
+| Merge settings | At the repository level, merge commits, squash, and rebase are all allowed. Auto-merge is off. Head branches are deleted on merge. *(2026-11-19)* The rulesets on `main` and `staging` allow merge commits only. |
 | Private vulnerability reporting | Enabled. |
 | Secret scanning and push protection | Both enabled. Non-provider patterns and validity checks are disabled. |
 | Dependabot | Alerts enabled. Security updates disabled. The repository has Go module dependencies (`go.mod`): `github.com/spf13/cobra` and `go.yaml.in/yaml/v3`, and indirectly `github.com/spf13/pflag` and `github.com/inconshreveable/mousetrap`. |
 | Issues / Discussions / Wiki / Projects | Enabled / disabled / enabled / enabled. The wiki is the community wiki ([#70](https://github.com/bdonaldharris/builder-garage/issues/70)). |
-| Labels | GitHub defaults, plus `accessibility`, `chore`, `discovery`, `extension`, `hotfix`, `plugin`, and the area labels `area:cli`, `area:configuration`, `area:crew`, `area:inspection`, `area:manuals`, `area:shipping`, and `area:workbench`. |
+| Labels *(2026-11-19)* | GitHub defaults, plus `accessibility`, `chore`, `discovery`, `extension`, `hotfix`, `plugin`, `release`, and the area labels `area:cli`, `area:configuration`, `area:crew`, `area:inspection`, `area:manuals`, `area:shipping`, and `area:workbench`. |
 | `CODEOWNERS` | None. |
 | Community profile | Health 100%. Detected: README, license, contributing guide, code of conduct, and pull request template. The profile reports no issue template, although `.github/ISSUE_TEMPLATE/` holds issue forms. |
 | Recent history | The ten most recent commits on `main` (`70aab17` back to `2cff999`) all belong to merged pull requests, #71 through #79. |
-| Remote branches | `main` only. |
+| Remote branches *(2026-11-19)* | `main`, the default branch and release branch, and `staging`, the integration branch, created from `main` at `ce2e300`. |
 
 ## Gaps against governance
 
 The repository's settings now enforce these [GOVERNANCE.md](../GOVERNANCE.md) rules:
 
-- **No direct pushes to `main`.** The **Protect main** ruleset requires a pull request, blocks force pushes and deletion, and has no bypass actors ([Changes to `main`](../GOVERNANCE.md#changes-to-main)).
-- **All required checks pass before merge.** The ruleset requires four checks. Which checks should be required is still open; see [Required checks](#required-checks).
+- **No direct pushes to `staging` or `main`.** The **Protect staging** and **Protect main** rulesets require a pull request, block force pushes and deletion, and have no bypass actors ([Changes to `staging` and `main`](../GOVERNANCE.md#changes-to-staging-and-main)).
+- **Merge commits only on `staging` and `main`** ([ADR 0004](adr/0004-release-promotion.md#2-merge-commits-only)).
+- **All required checks pass before merge.** Both rulesets require the eight checks [decided under D-C](#required-checks).
+- **A release candidate receives no commits,** and only Repository admin can cut one ([ADR 0004](adr/0004-release-promotion.md#6-validating-a-release-candidate)).
 - **Private vulnerability reporting**, the preferred channel in [SECURITY.md](../SECURITY.md), is available.
 
 These rules are not enforced by settings:
@@ -74,7 +78,7 @@ Both keep "no direct pushes" enforced. Under either, project acceptance of the l
 
 Neither weakens independent engineering verification. No repository setting enforces that review under either configuration. It is recorded on the originating issue, linked from the pull request, and confirmed before acceptance is recorded.
 
-**In effect, as observed:** the first configuration. **Protect main** requires a pull request with zero approving reviews and has no bypass actors. No durable record of the decision to use it has been found, so the choice is listed under [Unresolved decisions](#sole-maintainer-ruleset-configuration).
+**In effect, as observed:** the first configuration. **Protect main** and **Protect staging** require a pull request with zero approving reviews, and have no bypass actors. This is now decided: while the lead maintainer is the only maintainer, required approving reviews may remain at zero on both protected branches ([#120 decision](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6962490422), item 7).
 
 Once a second authorized maintainer is available, maintainer-authored pull requests receive approval from another maintainer under the normal process. The ruleset can then require at least one approving review without a bypass.
 
@@ -82,13 +86,10 @@ Once a second authorized maintainer is available, maintainer-authored pull reque
 
 Each decision below belongs to the lead maintainer. Each one stays here, with its observed setting, until the decision is recorded on [#77](https://github.com/bdonaldharris/builder-garage/issues/77) or linked from it.
 
-### Sole-maintainer ruleset configuration
+Since decided, and no longer open:
 
-Which of the two configurations under [Sole maintainer](#sole-maintainer) to use is not recorded. **Observed:** the first, a pull request with zero required approving reviews and no bypass actors.
-
-### Required checks
-
-Which checks are required is not recorded. **Observed:** four required checks, `Format, vet, build, cross-compile`, `Test (ubuntu-latest)`, `Test (macos-latest)`, and `Test (windows-latest)`, with no up-to-date requirement. Also open: whether `Source installer (ubuntu-latest)` and `Source installer (macos-latest)`, which run on every pull request, become required.
+- **Sole-maintainer ruleset configuration:** the first configuration under [Sole maintainer](#sole-maintainer), zero required approvals on both protected branches ([#120 decision](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6962490422), item 7).
+- <a id="required-checks"></a>**Required checks:** the eight checks listed under [Observed state](#observed-state), on both `main` and `staging` ([D-C decision on #140](https://github.com/bdonaldharris/builder-garage/issues/140#issuecomment-6999760359)).
 
 ### Dependabot security updates
 

@@ -103,7 +103,7 @@ An illustration of one issue, #N, from implementation through review to the pull
 5. A new implementer session confirms that the working tree still has the approved `changeset`. It commits exactly that change, pushes it, opens the pull request against the integration branch ([E1](../docs/extension-points.md#e1-integration-branch)), and records equivalence. No PR-review trigger applies, so no PR review follows ([integration-pr-review: PR-review triggers](../skills/integration-pr-review/SKILL.md#pr-review-triggers)).
 6. The configured human authorities accept the change and its product intent. The pull request merges after its remaining gates pass.
 
-Builder Garage example: the integration branch is `main`, a maintainer approves the pull request, and the Workflow Owner accepts product intent ([CONTRIBUTING: How a substantive change proceeds](../CONTRIBUTING.md#how-a-substantive-change-proceeds)).
+Builder Garage example: the integration branch is `staging`, a maintainer approves the pull request, and the Workflow Owner accepts product intent ([CONTRIBUTING: How a substantive change proceeds](../CONTRIBUTING.md#how-a-substantive-change-proceeds)).
 
 ## What this guide does not change
 

@@ -9,7 +9,7 @@
 # Change values through the project's normal review process.
 schema_version: 2
 project:
-  integration_branch: main
+  integration_branch: staging
   small_corrections:
     enabled: true
     without_issue: true
@@ -29,6 +29,7 @@ project:
     manuals:
       - name: go
         version: "0.1"
+  release_branch: main
 tooling:
   skill_targets:
     - harness: claude-code
