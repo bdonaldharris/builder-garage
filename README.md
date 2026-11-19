@@ -168,7 +168,7 @@ garage version
 - **Like the source install below,** it installs in `~/.local/bin` (or `--install-dir PATH`) for the current user, never edits shell startup files or `PATH`, and does not install skills.
 - **Re-running it replaces the installed binary in place,** for example to move to a newer release.
 - **To find out whether a newer release exists,** run `garage update check`, from the first release after `v0.2.2`. It makes one request to GitHub, only when you run it, and lists the update command for each way of installing `garage`. It installs nothing itself.
-- **The macOS and Windows executables are not yet platform-signed** ([Platform trust](docs/release-verification.md#platform-trust)). A `curl` download is not quarantined, so macOS runs it.
+- **The Windows executables are not yet platform-signed** ([Platform trust](docs/release-verification.md#platform-trust)). The macOS executables are Developer ID signed and notarized from the first release built after macOS signing was added; a `curl` download is not quarantined, so macOS runs earlier, unsigned ones too.
 - **Windows:** a PowerShell installer follows platform signing ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)). On Windows, download and verify a release as [Verifying a release](docs/release-verification.md#windows-powershell) shows.
 
 #### Install from source
@@ -193,7 +193,7 @@ Release archives for macOS, Linux, and Windows, with a signed checksum manifest 
 
 From `v0.2.0`, releases also carry `.deb` and `.rpm` packages for Linux on amd64 and arm64. A package installs `garage` system-wide at `/usr/bin/garage`, and `apt` or `dnf` upgrades and removes it. Verify it before installing, as [Verifying a release](docs/release-verification.md#linux-packages) shows. `install.sh` installs for one user in `~/.local/bin` instead: use one or the other, so that only one `garage` is on your `PATH`.
 
-On Linux, Homebrew users can install the release from Builder Garage's tap: `brew tap bdonaldharris/tap`, `brew trust --tap bdonaldharris/tap`, then `brew install --cask bdonaldharris/tap/garage` ([Homebrew (Linux)](docs/release-verification.md#homebrew-linux)). Use the full name: homebrew/core has an unrelated formula also called `garage`. The cask is offered on Linux only until macOS executables are notarized ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)).
+On Linux, Homebrew users can install the release from Builder Garage's tap: `brew tap bdonaldharris/tap`, `brew trust --tap bdonaldharris/tap`, then `brew install --cask bdonaldharris/tap/garage` ([Homebrew (Linux)](docs/release-verification.md#homebrew-linux)). Use the full name: homebrew/core has an unrelated formula also called `garage`. The cask is offered on Linux only until Homebrew on macOS is added ([#124](https://github.com/bdonaldharris/builder-garage/issues/124)).
 
 #### Build by hand
 
@@ -266,7 +266,7 @@ sh .github/scripts/test-install.sh
 ### Current limitations
 
 - Releases are published from `v0.1.1`. The [release workflow](.github/workflows/release.yml) builds archives with GoReleaser, with a signed checksum manifest and attestations ([ADR 0003](docs/adr/0003-release-distribution.md)). On macOS and Linux, [`install.sh`](#install-a-release) installs a verified release, or builds from source.
-- macOS executables are not yet Developer ID signed and notarized, and Windows executables are not yet Authenticode-signed ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)). Gatekeeper may restrict them, and SmartScreen may warn. Verifying a release establishes its integrity and origin, not operating-system publisher trust. See [Verifying a release](docs/release-verification.md#platform-trust).
+- Windows executables are not yet Authenticode-signed ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)), and SmartScreen may warn. macOS executables are Developer ID signed and notarized from the first release built after macOS signing was added; earlier releases' are not, and Gatekeeper may restrict them. Verifying a release establishes its integrity and origin; on Windows, it does not establish operating-system publisher trust. See [Verifying a release](docs/release-verification.md#platform-trust).
 - Linux `.deb` and `.rpm` packages ship from `v0.2.0` ([#123](https://github.com/bdonaldharris/builder-garage/issues/123)). A Homebrew cask is offered on Linux from Builder Garage's tap ([#124](https://github.com/bdonaldharris/builder-garage/issues/124)). On macOS and Linux, [`install.sh`](#install-a-release) installs a verified release from `v0.2.2` ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)). macOS `.pkg` and Windows `.msi` installers, Homebrew on macOS, Scoop, winget, and a Windows release installer are later work of [#120](https://github.com/bdonaldharris/builder-garage/issues/120). They wait for platform signing.
 - The CLI initializes, shows, and changes configuration, records local workflow history, installs and verifies skills and the manuals a project adopts, and shows read-only workflow status only. It does not implement Workbench, Crew, Inspection, or Shipping capabilities, and its only Manuals capability is delivering adopted manuals to agents as skills.
 - `garage status` needs the `gh` command, installed and authenticated, to read GitHub.

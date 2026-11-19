@@ -29,11 +29,11 @@ cat <<EOF
 
 ## Platform trust
 
-- **macOS:** the executables are not yet Developer ID signed and notarized. You may encounter Gatekeeper restrictions.
-- **Windows:** the executables are not yet Authenticode-signed. You may encounter SmartScreen warnings.
-- **What verification proves:** the signed checksum manifest and the provenance attestations below establish this release's integrity and origin. They do not replace your operating system's publisher trust.
+- **macOS:** the executables are signed with the Developer ID Application identity \`Developer ID Application: BRIAN DONALD HARRIS (38397A2FG6)\`, with the hardened runtime and a secure timestamp, and notarized by Apple. A bare executable cannot be stapled, so Gatekeeper confirms the notarization with Apple when it checks a quarantined copy. [Verifying a release]($url/blob/$tag/docs/release-verification.md#macos-signature-and-notarization) shows how to check the signature.
+- **Windows:** the executables are not yet Authenticode-signed ([#122]($url/issues/122)). You may encounter SmartScreen warnings.
+- **What verification proves:** the signed checksum manifest and the provenance attestations below establish this release's integrity and origin. The macOS signature adds Apple's publisher trust; on Windows, nothing replaces your operating system's publisher trust yet.
 
-Platform signing is tracked in [#122]($url/issues/122). Until then, download and extract from a terminal, as [Verifying a release]($url/blob/$tag/docs/release-verification.md) shows: \`gh release download\` or \`curl\`, verify, then \`tar\` on macOS and Linux, or \`Expand-Archive\` on Windows.
+Download, verify, and extract from a terminal, as [Verifying a release]($url/blob/$tag/docs/release-verification.md) shows: \`gh release download\` or \`curl\`, verify, then \`tar\` on macOS and Linux, or \`Expand-Archive\` on Windows.
 EOF
 
 if [ -n "$packages" ]; then

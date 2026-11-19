@@ -1,9 +1,10 @@
 # GoReleaser configuration for garage release archives (#121), Linux packages
 # (#123), and the Homebrew cask (#124).
 #
-# GoReleaser builds, archives, packages, checksums, and generates the cask. It
-# never signs or publishes:
-# signing, attestation, and publication are separate least-privilege jobs in
+# GoReleaser builds, archives, packages, checksums, and generates the cask. In
+# release mode it also signs and notarizes the macOS executables (notarize,
+# below), before archiving. It never signs the checksum manifest, attests, or
+# publishes: those are separate least-privilege jobs in
 # .github/workflows/release.yml (docs/adr/0003-release-distribution.md).
 #
 # The build matches "make build", plus -s -w for distributed binaries:
@@ -11,7 +12,7 @@
 # {{ .Version }} drops the leading "v", so the tag is set explicitly.
 #
 # Validate locally (GARAGE_RELEASE_MODE is required by the platform-signing
-# hook; "snapshot" leaves binaries unchanged):
+# hook; "snapshot" builds unsigned binaries and needs no credentials):
 #   goreleaser check
 #   GARAGE_RELEASE_MODE=snapshot goreleaser release --snapshot --clean --skip=publish
 version: 2
@@ -20,8 +21,8 @@ project_name: garage
 
 # Two builds with one definition (the YAML anchor): Linux, and the other
 # platforms. A channel can then select only the platforms it may serve: the
-# Homebrew cask serves Linux only until macOS executables are notarized (#122,
-# #124). The asset names are the same as with one build.
+# Homebrew cask serves Linux only until Homebrew on macOS is added (#124). The
+# asset names are the same as with one build.
 builds:
   - &build
     id: garage-linux
@@ -38,9 +39,11 @@ builds:
     mod_timestamp: "{{ .CommitTimestamp }}"
     hooks:
       post:
-        # Platform signing happens here, after each build and before archiving,
-        # so the checksums, signature, and attestations cover signed binaries.
-        # Nothing is platform-signed yet; #122 fills the hook.
+        # Platform signing happens after each build and before archiving, so
+        # the checksums, signature, and attestations cover signed binaries.
+        # The hook refuses a darwin release build without every macOS signing
+        # credential; notarize.macos (below) then signs and notarizes the
+        # darwin binaries. Windows binaries are not signed yet (#122).
         - cmd: sh .github/scripts/platform-sign.sh '{{ envOrDefault "GARAGE_RELEASE_MODE" "unset" }}' '{{ .Os }}' '{{ .Path }}'
           output: true
   - <<: *build
@@ -103,8 +106,8 @@ nfpms:
         type: license
 
 # Homebrew cask (#124), Linux only: it selects only the Linux archives, so
-# Homebrew on macOS refuses it ("This cask requires Linux.") until #122
-# notarizes the macOS executables. GoReleaser writes it to
+# Homebrew on macOS refuses it ("This cask requires Linux.") until #124 adds
+# macOS. GoReleaser writes it to
 # dist/homebrew/Casks/garage.rb and never publishes it: the release
 # workflow's channel-publish job commits it to bdonaldharris/homebrew-tap,
 # after the release is published and verified. The URL template is needed
@@ -125,6 +128,34 @@ homebrew_casks:
     repository:
       owner: bdonaldharris
       name: homebrew-tap
+
+# macOS signing and notarization (#122), in release mode only. GoReleaser's
+# quill fork signs each darwin binary of garage-other with the Developer ID
+# Application identity, with the hardened runtime and Apple's timestamp
+# server, then submits it to Apple's notary service and waits for the
+# verdict. It runs after the build hooks and before archiving.
+#
+# The credentials are base64 values from the macos-signing environment,
+# passed through the process environment and never written to the checkout.
+# GoReleaser signs without notarizing when a notary value is empty, and only
+# logs a notarization that times out, so the release fails closed elsewhere:
+# check-macos-signing-env.sh refuses missing credentials, and the release
+# workflow's run-check job requires Gatekeeper's "Notarized Developer ID"
+# verdict (check-macos-notarization.sh) before anything is signed.
+notarize:
+  macos:
+    - ids: [garage-other]
+      enabled: '{{ eq (envOrDefault "GARAGE_RELEASE_MODE" "unset") "release" }}'
+      sign:
+        certificate: "{{ .Env.MACOS_SIGN_P12 }}"
+        password: "{{ .Env.MACOS_SIGN_PASSWORD }}"
+      notarize:
+        issuer_id: "{{ .Env.MACOS_NOTARY_ISSUER_ID }}"
+        key_id: "{{ .Env.MACOS_NOTARY_KEY_ID }}"
+        key: "{{ .Env.MACOS_NOTARY_KEY }}"
+        wait: true
+        # Apple rejects longer-lived tokens, so 20m is GoReleaser's maximum.
+        timeout: 20m
 
 checksum:
   name_template: "garage_{{ .Version }}_checksums.txt"

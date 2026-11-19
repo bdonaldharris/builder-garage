@@ -10,14 +10,15 @@ name: Release
 # Two modes:
 #   dry-run  build, archive, package, checksum, and validate at the tag.
 #            Nothing is signed, attested, uploaded, or published.
-#   release  also run every archive on its own platform, install, check, and
-#            remove every Linux package with its own package manager,
-#            sign the checksum manifest (keyless cosign), attest every listed
-#            file, verify all of it, and, after the Workflow Owner approves the
-#            protected release environment, publish exactly the inventory's
-#            files. The macOS and Windows
-#            executables are not yet platform-signed (#122); the release notes
-#            say so (amended #120 decision 4).
+#   release  also sign and notarize the macOS executables before archiving,
+#            run every archive on its own platform (and check the macOS
+#            ones' notarization), install, check, and remove every Linux
+#            package with its own package manager, sign the checksum manifest
+#            (keyless cosign), attest every listed file, verify all of it,
+#            and, after the Workflow Owner approves the protected release
+#            environment, publish exactly the inventory's files. The Windows
+#            executables are not yet Authenticode-signed (#122, phase 2); the
+#            release notes say so (amended #120 decision 4).
 #
 # Each job holds only the permissions its step needs (#120 decision 6).
 # Third-party actions are pinned by commit.
@@ -38,6 +39,10 @@ concurrency:
 
 env:
   GORELEASER_VERSION: v2.20.2
+  # The Apple Team ID of the Developer ID Application identity that signs the
+  # macOS executables: "Developer ID Application: BRIAN DONALD HARRIS
+  # (38397A2FG6)" (#122). run-check requires it.
+  MACOS_TEAM_ID: 38397A2FG6
   COSIGN_VERSION: v3.1.4
   # Fedora 45, pinned by digest, for the rpm package checks.
   FEDORA_IMAGE: fedora:45@sha256:a7d72ba2745b100a3351087472e5ee7b2450af7cf331e7673007e3817612839c
@@ -71,6 +76,11 @@ jobs:
     name: Build, archive, checksum, validate
     needs: guard
     runs-on: ubuntu-latest
+    # Holds only the five macOS signing and notarization secrets (#122). Its
+    # deployment rule allows only v* tags, and it has no reviewers: the
+    # Workflow Owner's approval stays at publish. The secrets reach only the
+    # two steps that need them, and only in release mode.
+    environment: macos-signing
     permissions:
       contents: read
     env:
@@ -95,9 +105,22 @@ jobs:
           distribution: goreleaser
           version: ${{ env.GORELEASER_VERSION }}
           install-only: true
-      - name: Build, archive, and checksum
+      - name: Refuse a release without every macOS signing credential
+        env:
+          MACOS_SIGN_P12: ${{ inputs.mode == 'release' && secrets.MACOS_SIGN_P12 || '' }}
+          MACOS_SIGN_PASSWORD: ${{ inputs.mode == 'release' && secrets.MACOS_SIGN_PASSWORD || '' }}
+          MACOS_NOTARY_KEY: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_KEY || '' }}
+          MACOS_NOTARY_KEY_ID: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_KEY_ID || '' }}
+          MACOS_NOTARY_ISSUER_ID: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_ISSUER_ID || '' }}
+        run: sh .github/scripts/check-macos-signing-env.sh "$GARAGE_RELEASE_MODE"
+      - name: Build, sign and notarize macOS, archive, and checksum
         env:
           GORELEASER_CURRENT_TAG: ${{ needs.guard.outputs.tag }}
+          MACOS_SIGN_P12: ${{ inputs.mode == 'release' && secrets.MACOS_SIGN_P12 || '' }}
+          MACOS_SIGN_PASSWORD: ${{ inputs.mode == 'release' && secrets.MACOS_SIGN_PASSWORD || '' }}
+          MACOS_NOTARY_KEY: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_KEY || '' }}
+          MACOS_NOTARY_KEY_ID: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_KEY_ID || '' }}
+          MACOS_NOTARY_ISSUER_ID: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_ISSUER_ID || '' }}
         run: goreleaser release --clean --skip=publish
       - name: Check the archives, manifest, and executables
         run: sh .github/scripts/check-release-dist.sh dist "$VERSION" "$TAG" "$(git rev-parse HEAD)"
@@ -157,6 +180,11 @@ jobs:
         with:
           name: release-archives
           path: assets
+      - name: Check the macOS executable's signature and notarization
+        if: startsWith(matrix.target, 'darwin_')
+        env:
+          ARCHIVE: assets/garage_${{ needs.guard.outputs.version }}_${{ matrix.target }}.${{ matrix.ext }}
+        run: sh .github/scripts/check-macos-notarization.sh "$ARCHIVE" "$MACOS_TEAM_ID"
       - name: Run the archive
         shell: bash
         env:
