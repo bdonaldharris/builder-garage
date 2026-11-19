@@ -66,6 +66,8 @@ Independent engineering review checks a change against its written issue. Whethe
 
 This adds no gate and changes no skill. The review contract is unchanged. Intent that the issue states is checked by independent review. Intent that the issue does not state is the Workflow Owner's to judge, not the reviewer's.
 
+A pull request that adds or changes a project spec under `docs/specs/` states product intent itself. Accepting it includes the Workflow Owner's acceptance of that intent, with no separate gate ([Project specs](docs/project-specs.md), [#149 decision](https://github.com/bdonaldharris/builder-garage/issues/149#issuecomment-7010610605), item 3).
+
 When a change affects something a user sees or uses, and inspecting it is practical, the Workflow Owner inspects the result in that form before accepting it. Examples are the rendered page rather than its Markdown source, or a command's actual output. This applies only when that condition holds. It is not a step every change must complete.
 
 ### Pull requests authored by a sole maintainer
