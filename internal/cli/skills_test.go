@@ -607,6 +607,29 @@ func TestSkillsInstallRequiresACleanBuildOrDevelopment(t *testing.T) {
 	}
 }
 
+// The outputs are each harness's "--version" output, byte for byte where
+// captured (#152).
+func TestHarnessVersionFromOutput(t *testing.T) {
+	for _, tc := range []struct {
+		name, output, want string
+	}{
+		{"copilot-cli ends its version with a period", "GitHub Copilot CLI 1.0.93-1.\nRun 'copilot update' to check for updates.\n", "1.0.93-1"},
+		{"claude-code prints the version first", "2.1.277 (Claude Code)\n", "2.1.277"},
+		{"codex prints the version after its name", "codex-cli 0.137.0\n", "0.137.0"},
+		{"a dotted pre-release is kept whole", "tool 1.2.3-rc.1\n", "1.2.3-rc.1"},
+		{"a period after a dotted pre-release is dropped", "tool 1.2.3-rc.1.\n", "1.2.3-rc.1"},
+		{"a period after a plain version is dropped", "tool 1.2.3.\n", "1.2.3"},
+		{"other sentence punctuation is dropped", "tool 1.2.3-beta, built today\n", "1.2.3-beta"},
+		{"no version number", "tool: unknown flag --version\n", ""},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if got := harnessVersionFrom(tc.output); got != tc.want {
+				t.Errorf("harnessVersionFrom(%q) = %q, want %q", tc.output, got, tc.want)
+			}
+		})
+	}
+}
+
 func TestSkillsUnverifiedHarnessIsAWarningOnly(t *testing.T) {
 	f := newSkillsFixture(t, "claude-code", "codex")
 	f.Versions["claude-code"] = "2.2.0"
