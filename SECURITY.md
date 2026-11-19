@@ -2,13 +2,13 @@
 
 ## Scope
 
-Builder Garage contains an initial command-line application alongside engineering skills, standards, and workflow definitions that AI agents and people follow. It does not yet publish releases.
+Builder Garage contains a command-line application alongside engineering skills, standards, and workflow definitions that AI agents and people follow. It publishes releases of the command-line application on GitHub.
 
 A security issue may affect the CLI, its generated project configuration, or content that could lead an agent or a person following it to expose credentials or other secrets, or to take unsafe or destructive actions. Reports about any other security-relevant weakness are also welcome.
 
 ## Supported versions
 
-There are no released versions. Reports are assessed against the current state of the `main` branch.
+The latest published release is supported. Reports are assessed against it, and against the current state of the `staging` branch, where the next release is integrated. A fix to a released version ships as a hotfix to `main`, under [GOVERNANCE: Hotfixes and staging synchronization](GOVERNANCE.md#hotfixes-and-staging-synchronization), and is then synchronized into `staging`.
 
 ## Reporting a vulnerability
 

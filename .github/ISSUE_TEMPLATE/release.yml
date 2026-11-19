@@ -1,0 +1,82 @@
+name: Release
+description: Record one version's contents and govern its promotion from staging to main.
+title: "[Release] vX.Y.Z"
+labels: ["release"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        A release issue records what one version contains and governs its promotion to `main` ([ADR 0004](https://github.com/bdonaldharris/builder-garage/blob/main/docs/adr/0004-release-promotion.md)). Follow the [release runbook](https://github.com/bdonaldharris/builder-garage/blob/main/docs/release-runbook.md). Membership is recorded by convention; no tool validates it.
+  - type: input
+    id: version
+    attributes:
+      label: Version
+      description: The version this release targets, as a tag, for example v0.4.0. It is provisional until promotion; record any change below.
+      placeholder: vX.Y.Z
+    validations:
+      required: true
+  - type: textarea
+    id: members
+    attributes:
+      label: Member issues and pull requests
+      description: Every accepted issue and its pull request merged into staging for this version, each with a link to its approving review record. The promotion pull request closes each listed issue.
+      placeholder: |
+        - #N, merged in #M; review: <link>
+    validations:
+      required: true
+  - type: textarea
+    id: hotfixes
+    attributes:
+      label: Hotfixes and synchronizations
+      description: Each hotfix on main since the last release, with its clean synchronization pull request or its conflicted-synchronization issue. Write "None" when there are none.
+      placeholder: |
+        - Hotfix #N (vX.Y.Z), synchronized by #M (clean) or by issue #K (conflicted, reviewed: <link>)
+    validations:
+      required: true
+  - type: textarea
+    id: precondition
+    attributes:
+      label: Release-candidate precondition
+      description: The output of `git rev-list --no-merges origin/staging..origin/main`, which must be empty, and the behavior check, recorded when a candidate is cut and again before promotion.
+      placeholder: |
+        At cut (YYYY-MM-DD): output empty; every hotfix above is synchronized.
+        Before promotion (YYYY-MM-DD): output empty; every hotfix above is synchronized.
+    validations:
+      required: false
+  - type: textarea
+    id: candidates
+    attributes:
+      label: Release-candidate branches
+      description: Each release/vX.Y.Z-rc.N branch cut, and why any was abandoned.
+      placeholder: |
+        - release/vX.Y.Z-rc.1, cut from staging at <commit>
+    validations:
+      required: false
+  - type: input
+    id: promotion
+    attributes:
+      label: Promotion pull request
+      description: The pull request from the release candidate to main.
+    validations:
+      required: false
+  - type: textarea
+    id: acceptance
+    attributes:
+      label: Workflow Owner acceptance
+      description: Link to the Workflow Owner's comment on this issue accepting the promotion.
+    validations:
+      required: false
+  - type: textarea
+    id: release
+    attributes:
+      label: Tag and release
+      description: The tag on the promotion's merge commit, and the published release URL.
+    validations:
+      required: false
+  - type: textarea
+    id: supersession
+    attributes:
+      label: Supersession
+      description: If a hotfix release took this version (a version collision), the hotfix release that superseded this issue, and the new release issue its unreleased work carries forward to. Write "None" otherwise.
+    validations:
+      required: false

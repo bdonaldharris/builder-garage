@@ -18,7 +18,7 @@ An artifact is a change: the difference between a **base commit** `B` and a **re
 
 | Input | Working-tree artifact: an uncommitted change | Committed artifact: a pushed head `H` |
 | --- | --- | --- |
-| Integration reference `I` | The project's configured integration branch tip, as fetched, or, for a hotfix-designated issue, the configured release branch tip ([E11](extension-points.md#e11-release-branch)). Builder Garage: `origin/main`. | Same |
+| Integration reference `I` | The project's configured integration branch tip, as fetched, or, for a hotfix-designated issue, the configured release branch tip ([E11](extension-points.md#e11-release-branch)). Builder Garage: `origin/staging`, or `origin/main` for a hotfix-designated issue. | Same |
 | Base `B` | `git merge-base I HEAD` | `git merge-base I H` before the PR opens and while it is open. After merge, `git merge-base M^1 M^2`, where `M` is the merge commit. |
 | Result tree `T` | The working tree, staged into a **temporary** index (procedure below) | `H^{tree}` |
 

@@ -842,7 +842,7 @@ func TestInitProjectUsesTheGivenDirectory(t *testing.T) {
 // builderGarageFlags are the flags that generate Builder Garage's own
 // committed configuration.
 var builderGarageFlags = []string{
-	"--integration-branch", "main",
+	"--integration-branch", "staging",
 	"--small-corrections", "enabled",
 	"--small-corrections-without-issue",
 	"--small-correction-classifier", "maintainer",
@@ -852,6 +852,7 @@ var builderGarageFlags = []string{
 	"--change-acceptor", "maintainer",
 	"--product-intent-acceptor", "Workflow Owner",
 	"--manual", "go@0.1",
+	"--release-branch", "main",
 	"--skill-target", "claude-code@2.1.277@2026-11-12",
 	"--skill-target", "codex@0.137.0@2026-11-12",
 	"--skill-target", "copilot-cli@1.0.93-1@2026-11-12",
