@@ -173,6 +173,39 @@ To check the archive the cask uses yourself, verify the release's manifest as ab
 
 Use one installation method at a time: the Homebrew cask, a Linux package (`/usr/bin`), or [`install.sh`](../install.sh) (`~/.local/bin`), so that only one `garage` is on your `PATH`.
 
+## npm
+
+On macOS and Linux, `garage` is also published to npm as [`@buildergarage/garage`](https://www.npmjs.com/package/@buildergarage/garage), from the first release published there ([#158](https://github.com/bdonaldharris/builder-garage/issues/158)). It needs Node.js 20 or later.
+
+```sh
+npm install -g @buildergarage/garage
+garage version
+```
+
+Or run it once with `npx @buildergarage/garage version`.
+
+**Always use the full name, `@buildergarage/garage`.** The unscoped npm package `garage` is unrelated to Builder Garage: `npx garage` runs it instead, and npm refuses to install both, since each installs a `garage` command.
+
+- **What it installs.** `@buildergarage/garage` is a small Node.js launcher. npm installs one platform package beside it, `@buildergarage/garage-<os>-<cpu>`, for macOS or Linux on arm64 or x64. That package holds the `garage` executable from the release archive for the same platform, byte for byte. Nothing runs at install time.
+- **How it is published.** After a release is published and verified, Builder Garage's [npm workflow](../.github/workflows/npm-publish.yml) checks each archive against the release's signed checksum manifest, then publishes the packages from those archives, with [npm provenance](https://docs.npmjs.com/generating-provenance-statements).
+- **Upgrade and removal.** Upgrade with `npm install -g @buildergarage/garage@latest`, and remove it with `npm uninstall -g @buildergarage/garage`.
+- **Platform trust.** npm does not quarantine what it installs, so macOS does not ask Gatekeeper about an npm-installed `garage`, notarized or not.
+- **Windows** is not offered through npm yet. Unsigned Windows executables may be offered later, with a disclosure of what Windows may do with them, after a test on a clean Windows 11 machine ([#158](https://github.com/bdonaldharris/builder-garage/issues/158)). Until then, the launcher says so on Windows: download and verify a release archive, as [Windows (PowerShell)](#windows-powershell) shows.
+
+To check the packages yourself:
+
+1. **Provenance.** In a project that depends on `@buildergarage/garage`, run `npm audit signatures`. It verifies the registry signatures and the provenance attestations, which name this repository and its npm workflow.
+2. **The executable.** Verify the release's manifest and your platform's archive as [macOS and Linux](#macos-and-linux) shows. Then compare the archive's `garage` with the npm-installed one. For example, on Linux arm64:
+
+   ```sh
+   tar -xzf "garage_${VERSION}_linux_arm64.tar.gz" garage
+   sha256sum garage "$(npm root -g)/@buildergarage/garage/node_modules/@buildergarage/garage-linux-arm64/bin/garage"
+   ```
+
+   The two checksums are the same.
+
+Use one installation method at a time, so that only one `garage` is on your `PATH`.
+
 ## Windows (PowerShell)
 
 ```powershell

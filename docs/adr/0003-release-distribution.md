@@ -6,7 +6,8 @@
   - [#120](https://github.com/bdonaldharris/builder-garage/issues/120), its [correction](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6930428330), its [amendment to decision 5](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6935475192), and its [amendment to decision 4](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6938614931) (2026-11-17);
   - [#121's decisions](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935474831), and those recorded in its readiness reports, [the first](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935931327) and [the follow-up after the decision 4 amendment](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6938700447);
   - [#123's decisions](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952041049), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952505748) (2026-11-17): Linux packages and the release inventory;
-  - [#124's decisions](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959529918), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959615104) (2026-11-17): package-manager channels, starting with the Homebrew cask on Linux.
+  - [#124's decisions](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959529918), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959615104) (2026-11-17): package-manager channels, starting with the Homebrew cask on Linux;
+  - #120's [amendment to decision 4 for npm](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-7027245596), and the decisions recorded in [#158's readiness](https://github.com/bdonaldharris/builder-garage/issues/158#issuecomment-7027540094) (2026-11-19): the npm channel.
 
 ## Context
 
@@ -128,6 +129,7 @@ The files a release publishes are its **release inventory**: a versioned, explic
   - The Homebrew cask on **Linux** ships first. The release's signed checksum manifest and attestations are its trust, as for the Linux packages.
   - Homebrew on **macOS** needs notarized macOS executables (#122), because Homebrew quarantines every cask download and macOS kills a quarantined unsigned executable. It is added by its own change (#124).
   - **Scoop and winget** wait for Windows platform trust (#122).
+  - **npm** (#158) ships macOS and Linux. Windows is excepted from the platform-trust requirement for npm only ([#120 amendment](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-7027245596)): unsigned Windows executables may be published with a disclosure that never advises disabling a Windows protection. Whether Windows is published at all follows a clean Windows 11 test, recorded on #158; until then, it is not.
 - **The cask.**
   - GoReleaser generates it, as `homebrew_casks`, from the release's own Linux archives and checksums. There is no hand-maintained formula.
   - It selects only the Linux archives: the build is defined once and split into Linux and other platforms with a YAML anchor, so asset names do not change. Homebrew on macOS therefore refuses it ("This cask requires Linux.").
@@ -136,12 +138,19 @@ The files a release publishes are its **release inventory**: a versioned, explic
   - Channels are published only after the immutable release has passed `post-verify`, which follows the Workflow Owner's release approval.
   - `channel-publish` first re-verifies the published release, then checks that the cask's downloads are exactly the inventory's Linux archives, with the manifest's checksums ([`check-channel-cask.sh`](../../.github/scripts/check-channel-cask.sh)).
   - **A channel failure does not affect the release.** It is retried by re-running the failed job, within 30 days, against the same release; the generated cask is kept 30 days. After that, the next release updates the channel.
+- **npm publishing** is its own workflow, [`npm-publish.yml`](../../.github/workflows/npm-publish.yml), never called from `release.yml`.
+  - **Why separate:** npm trusted publishing identifies the publisher by its workflow filename, and needs `id-token: write`. In `release.yml`, that permission would let a job mint a Sigstore certificate as the release workflow, the identity users pin for the checksum manifest. Running from `main`, this workflow's identity is `npm-publish.yml@refs/heads/main`.
+  - **When:** it runs after every Release run, whatever its result, and decides from the release itself. The tag must pass `release-guard.sh`, its GitHub release must be published (not a draft or prerelease), and the release must pass `verify-release.sh`. A dry run has no release, so nothing is published. A manual dispatch, from `main`, recovers a failed publication or backfills a release, with the same checks.
+  - **What:** [`npm-packages.sh`](../../.github/scripts/npm-packages.sh) checks each archive against the signed manifest, then writes a launcher, `@buildergarage/garage`, and one package per platform, `@buildergarage/garage-<os>-<cpu>`, holding the archive's executable byte for byte. No package has an install script.
+  - **How:** [`npm-publish.sh`](../../.github/scripts/npm-publish.sh) publishes the platform packages, then the launcher, with provenance. A version already on npm is compared, not republished, so a partial failure is recovered by running again. [`npm-dist-tag.sh`](../../.github/scripts/npm-dist-tag.sh) never moves `latest` backward: a backfilled older release gets `release-MAJOR.MINOR`.
+  - **Credentials:** the `npm-publish` environment allows only `main`, has no reviewers (the Workflow Owner approved the release itself), and holds no secret: trusted publishing uses OIDC. A token is used once, only if npm requires one for the first publish, then deleted.
+  - **Verification:** the `verify` job installs from the registry on Linux and macOS, amd64 and arm64, runs `npm audit signatures`, and runs the archive checks through the npm-installed `garage` ([`check-npm-install.sh`](../../.github/scripts/check-npm-install.sh)). Pull-request CI runs the same checks on locally packed packages, including an upgrade.
 - **Repositories and credentials.**
   - Each channel has a dedicated, Builder Garage-owned repository: `bdonaldharris/homebrew-tap`, then `bdonaldharris/scoop-bucket` and a fork of `microsoft/winget-pkgs` when those phases begin.
   - Each has its own fine-grained credential, held in the protected `channel-publish` environment. It is never the release workflow's token, and never has access to this repository.
   - The tap and bucket receive direct commits. winget receives a pull request from the fork, and Microsoft's review is its own gate.
 - **Names.**
-  - Every channel uses the package name `garage`.
+  - Every channel uses the package name `garage`, except npm. There, `garage` belongs to an unrelated package, so npm uses the scoped `@buildergarage/garage` ([#120 amendment](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-7027245596)). The installed command is `garage` everywhere.
   - winget's publisher metadata is "B Donald Harris", describing project ownership. It does not claim an Authenticode publisher identity for unsigned executables.
 - **Users trust the tap explicitly** (`brew trust --tap bdonaldharris/tap`), as Homebrew requires. Nothing bypasses tap trust.
 

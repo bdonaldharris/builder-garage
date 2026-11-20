@@ -56,7 +56,8 @@ jobs:
     # Builds the release archives and Linux packages as a snapshot, exactly as
     # the release workflow does, but publishes, signs, and attests nothing.
     # Then installs, upgrades, and removes this architecture's .deb (apt) and
-    # .rpm (dnf, in Fedora) with their package managers.
+    # .rpm (dnf, in Fedora) with their package managers, and the npm packages
+    # (#158) from locally packed tarballs.
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -90,8 +91,9 @@ jobs:
         run: |
           goreleaser release --snapshot --clean --skip=publish
           # Moved out of the checkout, so the next build's tree stays clean.
+          # The archives and manifest are kept for the npm upgrade check.
           mkdir "$RUNNER_TEMP/older"
-          mv dist/*.deb dist/*.rpm "$RUNNER_TEMP/older/"
+          mv dist/*.deb dist/*.rpm dist/*.tar.gz dist/*.zip dist/*_checksums.txt "$RUNNER_TEMP/older/"
           rm -rf dist
       - name: Build a snapshot
         env:
@@ -131,6 +133,14 @@ jobs:
           docker run --rm -e GARAGE_PACKAGE_CHECK=1 -v "$PWD:/w:ro" -v "$RUNNER_TEMP/older:/older:ro" -w /w "$FEDORA_IMAGE" \
             sh -c 'dnf install -y -q git >/dev/null && sh .github/scripts/check-release-package.sh "$1" "$2" "$3" "$4"' \
             sh "dist/$pkg" "$version" "$(git rev-parse HEAD)" "/older/$older"
+      - name: Install, upgrade, and remove the npm packages (local)
+        run: |
+          version=$(jq -r .version dist/metadata.json)
+          older=$(cd "$RUNNER_TEMP/older" && ls garage_*_checksums.txt | sed 's/^garage_\(.*\)_checksums\.txt$/\1/')
+          # Generated outside the checkout, so its tree stays clean.
+          sh .github/scripts/npm-packages.sh "$older" "$RUNNER_TEMP/older" "$RUNNER_TEMP/npm-older"
+          sh .github/scripts/npm-packages.sh "$version" dist "$RUNNER_TEMP/npm"
+          sh .github/scripts/check-npm-install.sh --local "$RUNNER_TEMP/npm" "$version" "$(git rev-parse HEAD)" "$RUNNER_TEMP/npm-older"
 
   install:
     name: Source installer (${{ matrix.os }})
