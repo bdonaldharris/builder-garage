@@ -6,6 +6,7 @@
   - [#120](https://github.com/bdonaldharris/builder-garage/issues/120), its [correction](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6930428330), its [amendment to decision 5](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6935475192), and its [amendment to decision 4](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6938614931) (2026-11-17);
   - [#121's decisions](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935474831), and those recorded in its readiness reports, [the first](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935931327) and [the follow-up after the decision 4 amendment](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6938700447);
   - [#123's decisions](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952041049), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952505748) (2026-11-17): Linux packages and the release inventory;
+  - [#123's macOS package amendment](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-7031839496), and [readiness](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-7031893236): architecture-specific `.pkg` packages from v0.5.0;
   - [#124's decisions](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959529918), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959615104) (2026-11-17): package-manager channels, starting with the Homebrew cask on Linux;
   - #120's [amendment to decision 4 for npm](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-7027245596), and the decisions recorded in [#158's readiness](https://github.com/bdonaldharris/builder-garage/issues/158#issuecomment-7027540094) (2026-11-19): the npm channel.
 
@@ -26,9 +27,9 @@ This record covers the program's decisions and the foundation's design.
 
 | Area | Decision |
 | --- | --- |
-| Formats | Archives: `.tar.gz` for macOS and Linux, `.zip` for Windows, each holding the executable, `LICENSE`, and `README.md`. From `v0.2.0`, Linux `.deb` and `.rpm` packages, built with GoReleaser's free nfpm support (#123). macOS `.pkg` (`pkgbuild` and `productsign` on a macOS runner) and Windows `.msi` (WiX, if its license is compatible with MIT distribution) follow their platform-trust prerequisites. GoReleaser Pro is not used. Package-manager channels: see [Package-manager channels](#7-package-manager-channels). |
+| Formats | Archives: `.tar.gz` for macOS and Linux, `.zip` for Windows, each holding the executable, `LICENSE`, and `README.md`. From `v0.2.0`, Linux `.deb` and `.rpm` packages use GoReleaser's free nfpm support. From `v0.5.0`, macOS has architecture-specific `.pkg` packages made with `pkgbuild`, `productbuild`, and `productsign` on native macOS runners. Windows `.msi` remains dropped. GoReleaser Pro is not used. Package-manager channels: see [Package-manager channels](#7-package-manager-channels). |
 | Platforms | macOS, Linux, and Windows, each on amd64 and arm64. |
-| Assets | Exactly the release's inventory (see [Release inventory](#6-release-inventory)). Inventory v1 (to `v0.1.x`) is the six archives, a SHA-256 checksum manifest, and its Sigstore bundle. Inventory v2 (from `v0.2.0`) adds the four Linux packages. No skills or manuals bundle. |
+| Assets | Exactly the release's inventory (see [Release inventory](#6-release-inventory)). Inventory v1 (to `v0.1.x`) is the six archives, a SHA-256 checksum manifest, and its Sigstore bundle. Inventory v2 (`v0.2.0`–`v0.4.x`) adds four Linux packages. Inventory v3 (from `v0.5.0`) adds two macOS `.pkg` packages. No skills or manuals bundle. |
 | Integrity | The manifest is signed with keyless Sigstore/cosign. Every archive and package also gets a GitHub artifact attestation, as additional provenance. |
 | Verification identity | `https://github.com/bdonaldharris/builder-garage/.github/workflows/release.yml@refs/tags/<tag>`, with issuer `https://token.actions.githubusercontent.com`. |
 | Platform trust | macOS signing and notarization, and Windows Authenticode signing (#122), are required before platform-native installers, packages, or package-manager channels are introduced. They are not required for the archive release. #122 ships one platform at a time: macOS first, then Windows. Until a platform is signed, release notes and verification docs disclose that its executables are not platform-signed. For the direct-download Linux `.deb` and `.rpm` packages, the signed checksum manifest and attestations are their platform trust: there is no PGP package-signing key, and the docs explain verifying a package before installing it. |
@@ -109,19 +110,22 @@ The files a release publishes are its **release inventory**: a versioned, explic
 | --- | --- | --- |
 | v1 | to `v0.1.x` | Six archives, `garage_<version>_checksums.txt`, and its `.sigstore.json` bundle (8 files). |
 | v2 | from `v0.2.0` | v1, plus `garage_<version>_linux_amd64.deb`, `garage_<version>_linux_arm64.deb`, `garage-<version>-1.x86_64.rpm`, and `garage-<version>-1.aarch64.rpm` (12 files). |
+| v3 | from `v0.5.0` | v2, plus `garage_<version>_darwin_amd64.pkg` and `garage_<version>_darwin_arm64.pkg` (14 files). |
 
 - **The inventory is selected by version.** [`verify-release.sh`](../../.github/scripts/verify-release.sh) verifies any published release against its own inventory. A snapshot uses its base version's inventory.
 - **Enforcement:**
   - `build` and pull-request CI fail unless `dist` holds exactly the inventory's archives and packages, and the manifest lists exactly them;
   - `publish` creates the release with exactly the verified files;
   - pull-request CI validates the names on every change, before any immutable release.
-- **Adding to it.** A later `.pkg` or `.msi` needs an explicit inventory amendment, recorded here, before it is published.
+- **Adding to it.** A later release asset needs an explicit inventory amendment, recorded here, before it is published.
 - **Linux packages.**
   - A package installs only `/usr/bin/garage` and its license file (`/usr/share/doc/garage/copyright` for `.deb`, `/usr/share/licenses/garage/LICENSE` for `.rpm`).
   - It has no maintainer scripts, configuration files, or dependencies.
   - `apt`, `dpkg`, `dnf`, and `rpm` own upgrades and removal.
   - Installing, upgrading, or removing it never creates, alters, or removes project configuration, installed skills, manuals, local history, or other user data.
   - [`check-release-package.sh`](../../.github/scripts/check-release-package.sh) checks all of this on both architectures, with sentinel user data, in pull-request CI (with an upgrade) and before every release is signed.
+- **macOS installer packages.** Each package has its matching `com.buildergarage.garage.pkg.{amd64,arm64}` receipt and installs only the architecture-matching signed executable, `LICENSE`, `PACKAGE-OWNERSHIP.json`, and `uninstall` under `/usr/local/lib/buildergarage/<version>/<arch>`, plus the controlled `current` and `/usr/local/bin/garage` symlinks. It refuses foreign ownership, switches `current` only after payload installation, and the installed helper removes only marked package content and its own receipt. The macOS job builds packages after GoReleaser's signed archives, then the assemble job regenerates the final checksum manifest only after both packages are present; signing and attestation cover that final manifest.
+  - The existing protected `macos-signing` environment holds the existing notarization credentials and two new release-only values: `MACOS_INSTALLER_P12` and `MACOS_INSTALLER_PASSWORD`. They are distinct from `MACOS_SIGN_P12` and `MACOS_SIGN_PASSWORD`. A release refuses missing or malformed Installer credentials and refuses a certificate that does not identify as `Developer ID Installer` for Team ID `38397A2FG6`; the exact common name is recorded only once provisioned.
 
 ### 7. Package-manager channels
 
@@ -167,5 +171,5 @@ The files a release publishes are its **release inventory**: a versioned, explic
 ## Still undecided
 
 - Windows signing (#122, phase 2).
-- macOS `.pkg` and Windows `.msi` packaging readiness, including the WiX license review (#123); Homebrew on macOS, Scoop, and winget, including whether a fine-grained credential can open the winget pull request (#124); and release installers and update (#125).
+- Homebrew on macOS, Scoop, and winget (#124), and release installers and update (#125).
 - When a release is cut, and what moves the version (as in ADR 0002).

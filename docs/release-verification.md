@@ -4,6 +4,7 @@ Each `garage` release on the [Releases page](https://github.com/bdonaldharris/bu
 
 - **Six archives:** `garage_<version>_<os>_<arch>.tar.gz` for macOS and Linux, and `.zip` for Windows, on amd64 and arm64;
 - **From `v0.2.0`, four Linux packages:** `garage_<version>_linux_amd64.deb`, `garage_<version>_linux_arm64.deb`, `garage-<version>-1.x86_64.rpm`, and `garage-<version>-1.aarch64.rpm`;
+- **From `v0.5.0`, two macOS installer packages:** `garage_<version>_darwin_amd64.pkg` and `garage_<version>_darwin_arm64.pkg`;
 - **`garage_<version>_checksums.txt`:** the SHA-256 checksum manifest of the archives and packages;
 - **`garage_<version>_checksums.txt.sigstore.json`:** the manifest's [Sigstore](https://www.sigstore.dev/) bundle.
 
@@ -205,6 +206,29 @@ To check the packages yourself:
    The two checksums are the same.
 
 Use one installation method at a time, so that only one `garage` is on your `PATH`.
+
+## macOS installer packages
+
+From `v0.5.0`, download the `.pkg` matching `uname -m` (`arm64` on Apple Silicon; `amd64` on Intel), the checksum manifest, and its Sigstore bundle. Verify the manifest and package checksum exactly as in [macOS and Linux](#macos-and-linux), then optionally verify its attestation with `gh attestation verify`.
+
+Each flat installer is signed with a Developer ID Installer certificate for Team ID `38397A2FG6`, notarized, and stapled. Install it with Finder or:
+
+```sh
+sudo installer -pkg "garage_${VERSION}_darwin_arm64.pkg" -target /
+garage version
+```
+
+It owns only `/usr/local/lib/buildergarage/<version>/<arch>/garage`, `LICENSE`, `PACKAGE-OWNERSHIP.json`, and `uninstall`; `/usr/local/lib/buildergarage/current`; and `/usr/local/bin/garage`. All are `root:wheel`; directories and executables are `0755`, while the license and marker are `0644`.
+
+The installer refuses an existing `/usr/local/bin/garage` unless it is its controlled symlink, and refuses unmarked content in `/usr/local/lib/buildergarage`. It never adopts or overwrites an `install.sh`, npm, or Homebrew command. Use one installation method at a time: first remove the other one and ensure its directory no longer precedes `/usr/local/bin` on `PATH`.
+
+To remove only the package-owned installation, run its installed helper with administrator privileges:
+
+```sh
+sudo /usr/local/lib/buildergarage/current/uninstall
+```
+
+It removes only matching marked payloads, package-owned symlinks that still point inside the package root, and its receipt. It preserves project configuration, skills, manuals, and user history.
 
 ## Windows (PowerShell)
 

@@ -9,7 +9,7 @@ name: Release
 # publishes are its release inventory (.github/scripts/release-inventory.sh).
 # Two modes:
 #   dry-run  build, archive, package, checksum, and validate at the tag.
-#            Nothing is signed, attested, uploaded, or published.
+#            Nothing is signed, attested, or published.
 #   release  also sign and notarize the macOS executables before archiving,
 #            run every archive on its own platform (and check the macOS
 #            ones' notarization), install, check, and remove every Linux
@@ -73,7 +73,7 @@ jobs:
         run: sh .github/scripts/release-guard.sh "$REF_TYPE" "$REF_NAME" "$MODE" origin/main >>"$GITHUB_OUTPUT"
 
   build:
-    name: Build, archive, checksum, validate
+    name: Build and archive
     needs: guard
     runs-on: ubuntu-latest
     # Holds only the five macOS signing and notarization secrets (#122). Its
@@ -122,8 +122,10 @@ jobs:
           MACOS_NOTARY_KEY_ID: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_KEY_ID || '' }}
           MACOS_NOTARY_ISSUER_ID: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_ISSUER_ID || '' }}
         run: goreleaser release --clean --skip=publish
-      - name: Check the archives, manifest, and executables
-        run: sh .github/scripts/check-release-dist.sh dist "$VERSION" "$TAG" "$(git rev-parse HEAD)"
+      - name: Check the GoReleaser archives and executables
+        run: |
+          test -f "dist/garage_${VERSION}_checksums.txt"
+          for f in $(sh .github/scripts/release-inventory.sh "$VERSION" archives); do test -f "dist/$f"; done
       - name: Run the linux/amd64 archive
         run: sh .github/scripts/check-release-archive.sh "dist/garage_${VERSION}_linux_amd64.tar.gz" "$TAG" "$(git rev-parse HEAD)"
       - name: Check the Homebrew cask (Linux only)
@@ -138,25 +140,112 @@ jobs:
           path: dist/homebrew/Casks/garage.rb
           if-no-files-found: error
           retention-days: 30
-      - name: Stage exactly the release inventory's files
-        if: inputs.mode == 'release'
+      - name: Stage the archives and Linux packages for macOS packaging
         run: |
-          mkdir "$RUNNER_TEMP/release-files"
-          for f in $(sh .github/scripts/release-inventory.sh "$VERSION" manifest) "garage_${VERSION}_checksums.txt"; do
-            cp "dist/$f" "$RUNNER_TEMP/release-files/"
+          mkdir "$RUNNER_TEMP/release-build"
+          for f in $(sh .github/scripts/release-inventory.sh "$VERSION" archives) $(sh .github/scripts/release-inventory.sh "$VERSION" packages | grep -v '\.pkg$'); do
+            cp "dist/$f" "$RUNNER_TEMP/release-build/"
           done
-      - name: Hand the archives, packages, and manifest to the next jobs
+      - name: Hand unsigned final-artifact inputs to macOS packaging
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: release-build
+          path: ${{ runner.temp }}/release-build/
+          if-no-files-found: error
+          retention-days: 1
+
+  macos-package:
+    name: Package macOS ${{ matrix.arch }}
+    needs: [guard, build]
+    runs-on: ${{ matrix.runner }}
+    environment: macos-signing
+    permissions:
+      contents: read
+    strategy:
+      fail-fast: true
+      matrix:
+        include:
+          - { arch: amd64, runner: macos-15-intel }
+          - { arch: arm64, runner: macos-latest }
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: release-build
+          path: assets
+      - name: Build, sign, notarize, and staple the installer
+        env:
+          MODE: ${{ inputs.mode }}
+          VERSION: ${{ needs.guard.outputs.version }}
+          ARCH: ${{ matrix.arch }}
+          MACOS_INSTALLER_P12: ${{ inputs.mode == 'release' && secrets.MACOS_INSTALLER_P12 || '' }}
+          MACOS_INSTALLER_PASSWORD: ${{ inputs.mode == 'release' && secrets.MACOS_INSTALLER_PASSWORD || '' }}
+          MACOS_NOTARY_KEY: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_KEY || '' }}
+          MACOS_NOTARY_KEY_ID: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_KEY_ID || '' }}
+          MACOS_NOTARY_ISSUER_ID: ${{ inputs.mode == 'release' && secrets.MACOS_NOTARY_ISSUER_ID || '' }}
+        run: sh .github/scripts/build-macos-package.sh "$MODE" "$VERSION" "$ARCH" "assets/garage_${VERSION}_darwin_${ARCH}.tar.gz" "assets/garage_${VERSION}_darwin_${ARCH}.pkg"
+      - name: Install and remove the package
+        env:
+          GARAGE_MACOS_PACKAGE_CHECK: 1
+          MODE: ${{ inputs.mode }}
+          VERSION: ${{ needs.guard.outputs.version }}
+          TAG: ${{ needs.guard.outputs.tag }}
+          ARCH: ${{ matrix.arch }}
+        run: sh .github/scripts/check-macos-package.sh "$MODE" "assets/garage_${VERSION}_darwin_${ARCH}.pkg" "$VERSION" "$TAG" "$GITHUB_SHA"
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: macos-package-${{ matrix.arch }}
+          path: assets/garage_${{ needs.guard.outputs.version }}_darwin_${{ matrix.arch }}.pkg
+          if-no-files-found: error
+          retention-days: 1
+
+  assemble:
+    name: Assemble and validate final release inventory
+    needs: [guard, build, macos-package]
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          sparse-checkout: .github/scripts
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: release-build
+          path: assets
+          merge-multiple: true
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: macos-package-*
+          path: assets
+          merge-multiple: true
+      - name: Make the final checksum manifest after every package exists
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+        run: |
+          for f in $(sh .github/scripts/release-inventory.sh "$VERSION" manifest); do test -f "assets/$f"; done
+          (cd assets && sha256sum $(sh ../.github/scripts/release-inventory.sh "$VERSION" manifest) >"garage_${VERSION}_checksums.txt")
+      - name: Check the archives, packages, manifest, and executables
+        env:
+          VERSION: ${{ needs.guard.outputs.version }}
+          TAG: ${{ needs.guard.outputs.tag }}
+        run: sh .github/scripts/check-release-dist.sh assets "$VERSION" "$TAG" "$GITHUB_SHA"
+      - name: Hand the complete release inventory to release gates
         if: inputs.mode == 'release'
         uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: release-archives
-          path: ${{ runner.temp }}/release-files/
+          path: assets/
           if-no-files-found: error
           retention-days: 1
 
   run-check:
     name: Run ${{ matrix.target }}
-    needs: [guard, build]
+    needs: [guard, assemble]
     if: inputs.mode == 'release'
     runs-on: ${{ matrix.runner }}
     permissions:
@@ -194,7 +283,7 @@ jobs:
 
   package-check:
     name: Install ${{ matrix.suffix }}
-    needs: [guard, build]
+    needs: [guard, assemble]
     if: inputs.mode == 'release'
     runs-on: ${{ matrix.runner }}
     permissions:
