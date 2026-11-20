@@ -124,7 +124,9 @@ check_eq() { # check_eq NAME GOT WANT
 check_eq "inventory v1 for 0.1.1" "$(sh "$inv" 0.1.1 id)" v1
 check_eq "inventory v1 for 0.1.99" "$(sh "$inv" 0.1.99 id)" v1
 check_eq "inventory v2 for 0.2.0" "$(sh "$inv" 0.2.0 id)" v2
-check_eq "inventory v2 for 1.0.0" "$(sh "$inv" 1.0.0 id)" v2
+check_eq "inventory v3 for 1.0.0" "$(sh "$inv" 1.0.0 id)" v3
+check_eq "inventory v2 for 0.4.9" "$(sh "$inv" 0.4.9 id)" v2
+check_eq "inventory v3 for 0.5.0" "$(sh "$inv" 0.5.0 id)" v3
 check_eq "inventory v1 has 8 assets" "$(count 0.1.1)" 8
 check_eq "inventory v1 has no packages" "$(sh "$inv" 0.1.1 packages | grep -c . || true)" 0
 check_eq "inventory v2 has 12 assets" "$(count 0.2.0)" 12
@@ -133,6 +135,10 @@ check_eq "inventory v2 packages" "$(sh "$inv" 0.2.0 packages | tr '\n' ' ')" \
 	"garage-0.2.0-1.aarch64.rpm garage-0.2.0-1.x86_64.rpm garage_0.2.0_linux_amd64.deb garage_0.2.0_linux_arm64.deb "
 check_eq "inventory v2 assets include the manifest and bundle" \
 	"$(sh "$inv" 0.2.0 all | grep -c '^garage_0.2.0_checksums.txt')" 2
+check_eq "inventory v3 has 14 assets" "$(count 0.5.0)" 14
+check_eq "inventory v3 manifest lists 12 files" "$(count 0.5.0 manifest)" 12
+check_eq "inventory v3 packages include macOS installers" \
+	"$(sh "$inv" 0.5.0 packages | grep -c '^garage_0.5.0_darwin_.*\.pkg$')" 2
 check_eq "a snapshot selects its base version's inventory" "$(sh "$inv" 0.2.0-snapshot+abc1234 id)" v2
 check_eq "a snapshot rpm name writes the pre-release with ~" \
 	"$(sh "$inv" 0.2.0-snapshot+abc1234 packages | grep x86_64)" "garage-0.2.0~snapshot+abc1234-1.x86_64.rpm"
@@ -200,6 +206,19 @@ if with_creds sh "$creds" release 2>&1 | grep -Eq "$p12|dummy-password|$p8|DUMMY
 else
 	pass "credentials check prints no credential value"
 fi
+
+# The Installer certificate is deliberately separate from the Application
+# certificate. Its preflight shares only the existing notarization values.
+installer_creds=$scripts/check-macos-installer-env.sh
+with_installer_creds() {
+	MACOS_INSTALLER_P12=$p12 MACOS_INSTALLER_PASSWORD=dummy-installer-password MACOS_NOTARY_KEY=$p8 \
+		MACOS_NOTARY_KEY_ID=DUMMYKEYID MACOS_NOTARY_ISSUER_ID=dummy-issuer "$@"
+}
+accepts "Installer credentials are not required in snapshot mode" sh "$installer_creds" snapshot
+refuses "Installer credentials are required in release mode" sh "$installer_creds" release
+accepts "Installer preflight accepts dedicated credentials" with_installer_creds sh "$installer_creds" release
+refuses "Installer preflight refuses an Application certificate in place of an Installer certificate" \
+	env MACOS_SIGN_P12=$p12 MACOS_SIGN_PASSWORD=dummy-password MACOS_NOTARY_KEY=$p8 MACOS_NOTARY_KEY_ID=DUMMYKEYID MACOS_NOTARY_ISSUER_ID=dummy-issuer sh "$installer_creds" release
 
 bin=$work/garage
 printf 'binary' >"$bin"

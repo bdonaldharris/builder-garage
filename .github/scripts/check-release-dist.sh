@@ -11,7 +11,7 @@
 #   REVISION         the full commit the release is built from
 #
 # It checks that:
-#   - dist holds exactly the archives and packages of ARCHIVE_VERSION's
+#   - dist holds exactly the archives and native packages of ARCHIVE_VERSION's
 #     release inventory, with the expected names, and no others;
 #   - each archive holds exactly the executable, LICENSE, and README.md;
 #   - the checksum manifest lists exactly those files, and matches them;
@@ -96,7 +96,7 @@ done
 
 # Exactly the inventory's archives and packages, and no other.
 want=$(sh "$inventory" "$aver" manifest | tr '\n' ' ')
-found=$(cd "$dist" && ls -1 | grep -E '\.(tar\.gz|zip|deb|rpm)$' | LC_ALL=C sort | tr '\n' ' ')
+found=$(cd "$dist" && ls -1 | grep -E '\.(tar\.gz|zip|deb|rpm|pkg)$' | LC_ALL=C sort | tr '\n' ' ')
 if [ "$found" = "$want" ]; then pass "dist holds exactly the inventory $inv_id archives and packages"; else
 	fail "dist holds exactly the inventory $inv_id archives and packages (got: $found)"
 fi
