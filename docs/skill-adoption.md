@@ -42,7 +42,8 @@ garage init \
   --release-branch main \
   --skill-target claude-code@2.1.277@2026-11-12 \
   --skill-target codex@0.137.0@2026-11-12 \
-  --skill-target copilot-cli@1.0.93-1@2026-11-12
+  --skill-target copilot-cli@1.0.93-1@2026-11-12 \
+  --skill-target cursor@2026.11.19-f005e9d@2026-11-20
 ```
 
 The cutover to `staging` ([#140](https://github.com/bdonaldharris/builder-garage/issues/140)) changed `--integration-branch` from `main` to `staging`, and added `--release-branch main`. The file was updated in place with `garage config set`, and the command above still generates it exactly.

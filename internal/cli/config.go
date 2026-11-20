@@ -118,10 +118,10 @@ type skillTarget struct {
 	ConfirmedOn      string        `yaml:"confirmed_on"`
 }
 
-// skillPathRule resolves a target directory: the override, when its
-// environment variable is set, before the default.
+// skillPathRule resolves a target directory. Override is optional: a blank
+// value means the harness has one immutable default location.
 type skillPathRule struct {
-	Override string `yaml:"override"`
+	Override string `yaml:"override,omitempty"`
 	Default  string `yaml:"default"`
 }
 
@@ -143,9 +143,10 @@ var supportedSkillTargets = map[string]skillPathRule{
 	"claude-code": {Override: "$CLAUDE_CONFIG_DIR/skills", Default: "~/.claude/skills"},
 	"codex":       {Override: "$CODEX_HOME/skills", Default: "~/.codex/skills"},
 	"copilot-cli": {Override: "$COPILOT_HOME/skills", Default: "~/.copilot/skills"},
+	"cursor":      {Default: "~/.cursor/skills"},
 }
 
-var supportedHarnesses = []string{"claude-code", "codex", "copilot-cli"}
+var supportedHarnesses = []string{"claude-code", "codex", "copilot-cli", "cursor"}
 
 // confirmedSkillTargets are the harness versions whose skill paths the #37
 // load test confirmed, and the date it did. Guided setup declares a chosen
@@ -154,6 +155,7 @@ var confirmedSkillTargets = map[string]struct{ Version, On string }{
 	"claude-code": {"2.1.277", "2026-11-12"},
 	"codex":       {"0.137.0", "2026-11-12"},
 	"copilot-cli": {"1.0.93-1", "2026-11-12"},
+	"cursor":      {"2026.11.19-f005e9d", "2026-11-20"},
 }
 
 // errNoConfig reports that the project has no configuration file.
