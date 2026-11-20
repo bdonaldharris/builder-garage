@@ -53,3 +53,9 @@ tooling:
         default: ~/.copilot/skills
       confirmed_version: 1.0.93-1
       confirmed_on: "2026-11-12"
+    - harness: cursor
+      scope: user
+      path:
+        default: ~/.cursor/skills
+      confirmed_version: 2026.11.19-f005e9d
+      confirmed_on: "2026-11-20"

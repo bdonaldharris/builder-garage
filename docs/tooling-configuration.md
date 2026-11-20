@@ -17,9 +17,9 @@ Each entry has:
 
 | Field | Value |
 | --- | --- |
-| `harness` | `claude-code`, `codex`, or `copilot-cli`. Each harness may appear once. |
+| `harness` | `claude-code`, `codex`, `copilot-cli`, or `cursor`. Each harness may appear once. |
 | `scope` | `user`. Only user scope is supported ([#15 decision](https://github.com/bdonaldharris/builder-garage/issues/15#issuecomment-6837361506), item 2). |
-| `path.override`, `path.default` | The confirmed path rule for the harness, exactly as in the table below. The override is used when its environment variable is set; otherwise the default is used. |
+| `path.override`, `path.default` | The confirmed path rule for the harness, exactly as in the table below. Where an override exists, it is used when its environment variable is set; Cursor has no override. |
 | `confirmed_version` | The harness version with which the target's behavior was last confirmed |
 | `confirmed_on` | The date of that confirmation, written `YYYY-MM-DD` |
 
@@ -30,6 +30,7 @@ The supported targets and their path rules come from the [#37 decision](https://
 | `claude-code` | `$CLAUDE_CONFIG_DIR/skills` | `~/.claude/skills` |
 | `codex` | `$CODEX_HOME/skills` | `~/.codex/skills` |
 | `copilot-cli` | `$COPILOT_HOME/skills` | `~/.copilot/skills` |
+| `cursor` | none | `~/.cursor/skills` |
 
 Garage does not manage `~/.agents/skills` or any other path. A project cannot add a target or change a path rule through configuration: the path fields must equal the confirmed rule, so a configuration cannot direct Garage to write anywhere else. `garage init --skill-target HARNESS@VERSION@YYYY-MM-DD` fills the scope and path rule for the harness.
 

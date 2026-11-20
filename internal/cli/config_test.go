@@ -125,7 +125,7 @@ func TestValidateReportsEachInvalidValue(t *testing.T) {
 		{"E9 duplicate", validConfigYAML + "  user_facing_inspection:\n    additional_conditions: [x, x]\n", "(E9)"},
 		{"E10 duplicate manual", validConfigYAML + "  guidance:\n    manuals:\n      - {name: go, version: \"0.1\"}\n      - {name: go, version: \"0.2\"}\n", "listed more than once"},
 		{"E10 version", validConfigYAML + "  guidance:\n    manuals:\n      - {name: go, version: \"zero one\"}\n", "single word"},
-		{"tooling harness", validConfigYAML + "tooling:\n  skill_targets:\n    - {harness: cursor, scope: user, path: {override: x, default: y}, confirmed_version: \"1\", confirmed_on: \"2026-11-12\"}\n", "harness must be one of"},
+		{"tooling harness", validConfigYAML + "tooling:\n  skill_targets:\n    - {harness: vim, scope: user, path: {override: x, default: y}, confirmed_version: \"1\", confirmed_on: \"2026-11-12\"}\n", "harness must be one of"},
 		{"tooling path", validConfigYAML + "tooling:\n  skill_targets:\n    - {harness: codex, scope: user, path: {override: /tmp, default: /tmp}, confirmed_version: \"1\", confirmed_on: \"2026-11-12\"}\n", "confirmed rule for codex"},
 		{"tooling scope", validConfigYAML + "tooling:\n  skill_targets:\n    - {harness: codex, scope: project, path: {override: $CODEX_HOME/skills, default: ~/.codex/skills}, confirmed_version: \"1\", confirmed_on: \"2026-11-12\"}\n", "scope must be \"user\""},
 		{"tooling date", validConfigYAML + "tooling:\n  skill_targets:\n    - {harness: codex, scope: user, path: {override: $CODEX_HOME/skills, default: ~/.codex/skills}, confirmed_version: \"1\", confirmed_on: \"12/11/2026\"}\n", "YYYY-MM-DD"},

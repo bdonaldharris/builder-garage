@@ -252,7 +252,7 @@ func TestInitRejectsInvalidValuesAndWritesNothing(t *testing.T) {
 		"discovery mode":    {"--discovery", "sometimes"},
 		"trigger format":    {"--pr-review-trigger", "no separator"},
 		"manual format":     {"--manual", "go"},
-		"skill harness":     {"--skill-target", "cursor@1.0@2026-11-12"},
+		"skill harness":     {"--skill-target", "vim@1.0@2026-11-12"},
 		"skill date":        {"--skill-target", "codex@0.137.0@yesterday"},
 		"small corrections": {"--small-corrections", "sometimes"},
 		"reviewer request":  {"--automated-reviewer", "codex"},
@@ -856,6 +856,7 @@ var builderGarageFlags = []string{
 	"--skill-target", "claude-code@2.1.277@2026-11-12",
 	"--skill-target", "codex@0.137.0@2026-11-12",
 	"--skill-target", "copilot-cli@1.0.93-1@2026-11-12",
+	"--skill-target", "cursor@2026.11.19-f005e9d@2026-11-20",
 }
 
 // withLF normalizes line endings. A Windows checkout may convert the
@@ -935,7 +936,7 @@ func TestBuilderGarageFlagsProduceAValidConfiguration(t *testing.T) {
 	if !*cfg.Project.SmallCorrections.Enabled || cfg.Project.Authorities.SmallCorrectionClassifier.Role != "maintainer" {
 		t.Errorf("small corrections = %+v", cfg.Project.SmallCorrections)
 	}
-	if len(*cfg.Tooling.SkillTargets) != 3 {
+	if len(*cfg.Tooling.SkillTargets) != 4 {
 		t.Errorf("skill targets = %+v", *cfg.Tooling.SkillTargets)
 	}
 }

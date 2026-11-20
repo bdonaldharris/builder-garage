@@ -49,14 +49,17 @@ type skillsFixture struct {
 
 func skillTargetYAML(harness, version string) string {
 	rule := supportedSkillTargets[harness]
+	path := "      path:\n"
+	if rule.Override != "" {
+		path += fmt.Sprintf("        override: %s\n", rule.Override)
+	}
+	path += fmt.Sprintf("        default: %s\n", rule.Default)
 	return fmt.Sprintf(`    - harness: %s
       scope: user
-      path:
-        override: %s
-        default: %s
+%s
       confirmed_version: %s
       confirmed_on: "2026-11-12"
-`, harness, rule.Override, rule.Default, version)
+`, harness, path, version)
 }
 
 func newSkillsFixture(t *testing.T, harnesses ...string) *skillsFixture {
@@ -68,7 +71,7 @@ func newSkillsFixture(t *testing.T, harnesses ...string) *skillsFixture {
 		ConfigDir: filepath.Join(root, "userconfig"),
 		Project:   filepath.Join(root, "project"),
 		Vars:      map[string]string{},
-		Versions:  map[string]string{"claude-code": "2.1.277", "codex": "0.137.0", "copilot-cli": "1.0.93-1"},
+		Versions:  map[string]string{"claude-code": "2.1.277", "codex": "0.137.0", "copilot-cli": "1.0.93-1", "cursor": "2026.11.19-f005e9d"},
 		Build:     buildRevision{Revision: testRevisionA, Clean: true},
 	}
 	for _, d := range []string{f.Home, f.ConfigDir, f.Project} {
@@ -105,7 +108,7 @@ func (f *skillsFixture) writeConfig(harnesses ...string) {
 	if len(harnesses) > 0 {
 		content += "tooling:\n  skill_targets:\n"
 		for _, h := range harnesses {
-			content += skillTargetYAML(h, map[string]string{"claude-code": "2.1.277", "codex": "0.137.0", "copilot-cli": "1.0.93-1"}[h])
+			content += skillTargetYAML(h, map[string]string{"claude-code": "2.1.277", "codex": "0.137.0", "copilot-cli": "1.0.93-1", "cursor": "2026.11.19-f005e9d"}[h])
 		}
 	}
 	mustMkdir(f.t, filepath.Join(f.Project, garageDirName))
@@ -119,6 +122,7 @@ func (f *skillsFixture) root(harness string) string {
 		"claude-code": filepath.Join(f.Home, ".claude", "skills"),
 		"codex":       filepath.Join(f.Home, ".codex", "skills"),
 		"copilot-cli": filepath.Join(f.Home, ".copilot", "skills"),
+		"cursor":      filepath.Join(f.Home, ".cursor", "skills"),
 	}[harness]
 }
 
@@ -307,6 +311,74 @@ func TestResolveSkillRoot(t *testing.T) {
 	vars["CODEX_HOME"] = "relative/dir"
 	if _, err := resolveSkillRoot(rule, getenv, home); err == nil {
 		t.Error("expected a relative override to be refused")
+	}
+}
+
+func TestResolveCursorSkillRootHasNoOverride(t *testing.T) {
+	home := filepath.Join(t.TempDir(), "home")
+	rule := supportedSkillTargets["cursor"]
+	if rule.Override != "" {
+		t.Fatalf("Cursor override = %q, want none", rule.Override)
+	}
+	if got, err := resolveSkillRoot(rule, func(string) string { return filepath.Join(t.TempDir(), "ignored") }, home); err != nil || got != filepath.Join(home, ".cursor", "skills") {
+		t.Errorf("Cursor root = %q, %v", got, err)
+	}
+}
+
+func TestCursorCollisionsAreRecursiveAndRefuseBeforeWrite(t *testing.T) {
+	f := newSkillsFixture(t, "cursor")
+	mustWrite(t, filepath.Join(f.Home, ".agents", "skills", "alpha", "SKILL.md"), "shared")
+	mustWrite(t, filepath.Join(f.Project, "node_modules", "pkg", ".codex", "skills", "beta", "SKILL.md"), "nested")
+
+	out, err := f.install(installOptions{})
+	if !errors.Is(err, errInstallRefused) {
+		t.Fatalf("install = %v\n%s", err, out)
+	}
+	for _, want := range []string{"alpha also exists at", filepath.Join(".agents", "skills", "alpha"), "beta also exists at", filepath.Join("node_modules", "pkg", ".codex", "skills", "beta")} {
+		if !strings.Contains(out, want) {
+			t.Errorf("refusal lacks %q:\n%s", want, out)
+		}
+	}
+	if _, err := os.Stat(f.root("cursor")); !errors.Is(err, fs.ErrNotExist) {
+		t.Error("Cursor target was written despite collision refusal")
+	}
+	vout, err := f.verify()
+	if !errors.Is(err, errSkillsNotCurrent) || strings.Count(vout, "collision:") != 2 {
+		t.Errorf("verify = %v\n%s", err, vout)
+	}
+}
+
+func TestCursorCoverageDistinguishesEscapingSymlinkAndUnsafeSkill(t *testing.T) {
+	f := newSkillsFixture(t, "cursor")
+	outside := filepath.Join(t.TempDir(), "outside")
+	mustWrite(t, filepath.Join(outside, ".cursor", "skills", "alpha", "SKILL.md"), "outside")
+	if err := os.Symlink(outside, filepath.Join(f.Project, "linked-dependency")); err != nil {
+		t.Fatal(err)
+	}
+	scan, err := findCursorCollisions(resolvedTarget{Config: skillTarget{Harness: "cursor"}, Root: f.root("cursor")}, []string{"alpha", "beta"}, f.Project, f.Home)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(scan.Collisions) != 0 || !strings.Contains(strings.Join(scan.Coverage, "\n"), "coverage limitation: skipped directory symlink") {
+		t.Errorf("escaping symlink scan = %+v", scan)
+	}
+
+	mustMkdir(t, filepath.Join(f.Home, ".agents", "skills", "alpha"))
+	if err := os.Symlink(filepath.Join(outside, "not-a-skill"), filepath.Join(f.Home, ".agents", "skills", "alpha", "SKILL.md")); err != nil {
+		t.Fatal(err)
+	}
+	_, err = f.verify()
+	if !errors.Is(err, errSkillsNotCurrent) {
+		t.Fatalf("verify = %v, want incomplete coverage failure", err)
+	}
+}
+
+func TestCursorReportsGarageOwnedClaudeConflict(t *testing.T) {
+	f := newSkillsFixture(t, "claude-code", "cursor")
+	f.mustInstall(installOptions{Targets: []string{"claude-code"}})
+	out, err := f.install(installOptions{Targets: []string{"cursor"}})
+	if !errors.Is(err, errInstallRefused) || !strings.Contains(out, "existing Garage installation for Claude Code") {
+		t.Fatalf("Cursor collision ownership = %v\n%s", err, out)
 	}
 }
 
