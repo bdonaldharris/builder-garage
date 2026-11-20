@@ -19,7 +19,7 @@ body:
     id: members
     attributes:
       label: Member issues and pull requests
-      description: Every accepted issue and its pull request merged into staging for this version, each with a link to its approving review record. The promotion pull request closes each listed issue.
+      description: Every accepted issue and its pull request merged into staging for this version, each with a link to its approving review record. This is the expected member list for post-merge closure verification; release-member commits carry `Closes #N`, while the promotion pull request closes only this release issue.
       placeholder: |
         - #N, merged in #M; review: <link>
     validations:
