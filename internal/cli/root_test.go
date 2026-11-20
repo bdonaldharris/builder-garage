@@ -73,6 +73,7 @@ func TestHelpSummaryNamesCapabilities(t *testing.T) {
 		"records and reads private developer-local workflow events",
 		"installs and verifies the canonical skills and the manuals a project adopts at a project's harness targets",
 		"shows the read-only workflow status of an issue or pull request from GitHub",
+		"read-only local view",
 		"reports its own version",
 		"only when asked, checks GitHub for a newer release",
 	} {
@@ -89,7 +90,7 @@ func TestRegisteredCommands(t *testing.T) {
 	}
 	slices.Sort(got)
 
-	want := []string{"config", "history", "init", "record", "skills", "status", "update", "version"}
+	want := []string{"config", "history", "init", "record", "skills", "status", "update", "version", "web"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("registered commands = %v, want %v", got, want)
 	}

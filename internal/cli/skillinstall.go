@@ -892,42 +892,61 @@ var errSkillsNotCurrent = errors.New("installed skills are not all current")
 // verifySkills inspects the selected targets and writes a report. It never
 // writes to any skill target, the manifest, or the backups.
 func verifySkills(ctx context.Context, env skillsEnv, selected []string, w io.Writer) error {
-	sc, err := prepareSkills(ctx, env, selected)
+	verification, err := inspectSkills(ctx, env, selected)
 	if err != nil {
 		return err
 	}
-	revision := currentRevision(env.Build(), sc.SetDigest)
-	fmt.Fprintf(w, "Embedded skills: revision %s\n", revision)
+	fmt.Fprintf(w, "Embedded skills: revision %s\n", verification.Revision)
+	for _, report := range verification.Targets {
+		writeTargetReport(w, report, verification.Repository)
+	}
+	if verification.Problems > 0 {
+		return fmt.Errorf("%w: %d problem(s) found", errSkillsNotCurrent, verification.Problems)
+	}
+	fmt.Fprintln(w, "\nAll managed skills and adopted manuals are Current, with no detected collisions in the inspected scope.")
+	return nil
+}
 
-	problems := 0
+// skillVerification is the shared typed read result used by presentation
+// adapters. It performs the same read-only inspection as `garage skills verify`.
+type skillVerification struct {
+	Revision   string
+	Repository manifestRepository
+	Targets    []targetReport
+	Problems   int
+}
+
+func inspectSkills(ctx context.Context, env skillsEnv, selected []string) (skillVerification, error) {
+	sc, err := prepareSkills(ctx, env, selected)
+	if err != nil {
+		return skillVerification{}, err
+	}
+	revision := currentRevision(env.Build(), sc.SetDigest)
+	result := skillVerification{Revision: revision, Repository: sc.Repository}
 	for _, target := range sc.Targets {
 		report, err := inspectTarget(ctx, env, sc, target, revision)
 		if err != nil {
-			return err
+			return skillVerification{}, err
 		}
-		writeTargetReport(w, report, sc.Repository)
+		result.Targets = append(result.Targets, report)
 		for _, s := range report.Skills {
 			if s.State != stateCurrent {
-				problems++
+				result.Problems++
 			}
 		}
 		for _, m := range report.Manuals {
 			switch {
 			case m.Adopted && m.State != stateCurrent:
-				problems++
+				result.Problems++
 			case !m.Adopted && len(withoutProject(m.Projects, sc.Repository)) == 0:
 				// Installed by Garage, but no project adopts it any longer:
 				// a modified copy that install left in place.
-				problems++
+				result.Problems++
 			}
 		}
-		problems += len(report.Extras) + len(report.Collisions) + incompleteCoverageCount(report.Coverage)
+		result.Problems += len(report.Extras) + len(report.Collisions) + incompleteCoverageCount(report.Coverage)
 	}
-	if problems > 0 {
-		return fmt.Errorf("%w: %d problem(s) found", errSkillsNotCurrent, problems)
-	}
-	fmt.Fprintln(w, "\nAll managed skills and adopted manuals are Current, with no detected collisions in the inspected scope.")
-	return nil
+	return result, nil
 }
 
 func writeTargetReport(w io.Writer, r targetReport, current manifestRepository) {
