@@ -171,6 +171,15 @@ garage version
 - **The Windows executables are not yet platform-signed** ([Platform trust](docs/release-verification.md#platform-trust)). The macOS executables are Developer ID signed and notarized from the first release built after macOS signing was added; a `curl` download is not quarantined, so macOS runs earlier, unsigned ones too.
 - **Windows:** a PowerShell installer follows platform signing ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)). On Windows, download and verify a release as [Verifying a release](docs/release-verification.md#windows-powershell) shows.
 
+On macOS and Linux, you can also install a release with npm, from the first release published there ([#158](https://github.com/bdonaldharris/builder-garage/issues/158)). It needs Node.js 20 or later:
+
+```sh
+npm install -g @buildergarage/garage
+garage version
+```
+
+Always use the full name, `@buildergarage/garage`: the unscoped npm package `garage` is unrelated. Windows is not offered through npm yet. See [npm](docs/release-verification.md#npm) for how the packages relate to the release, and how to verify them.
+
 #### Install from source
 
 On macOS and Linux, `install.sh` also builds `garage` from a checkout. Run as a file in a checkout, that is what it does, unless you pass `--release`:
@@ -267,7 +276,7 @@ sh .github/scripts/test-install.sh
 
 - Releases are published from `v0.1.1`. The [release workflow](.github/workflows/release.yml) builds archives with GoReleaser, with a signed checksum manifest and attestations ([ADR 0003](docs/adr/0003-release-distribution.md)). On macOS and Linux, [`install.sh`](#install-a-release) installs a verified release, or builds from source.
 - Windows executables are not yet Authenticode-signed ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)), and SmartScreen may warn. macOS executables are Developer ID signed and notarized from the first release built after macOS signing was added; earlier releases' are not, and Gatekeeper may restrict them. Verifying a release establishes its integrity and origin; on Windows, it does not establish operating-system publisher trust. See [Verifying a release](docs/release-verification.md#platform-trust).
-- Linux `.deb` and `.rpm` packages ship from `v0.2.0` ([#123](https://github.com/bdonaldharris/builder-garage/issues/123)). A Homebrew cask is offered on Linux from Builder Garage's tap ([#124](https://github.com/bdonaldharris/builder-garage/issues/124)). On macOS and Linux, [`install.sh`](#install-a-release) installs a verified release from `v0.2.2` ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)). macOS `.pkg` and Windows `.msi` installers, Homebrew on macOS, Scoop, winget, and a Windows release installer are later work of [#120](https://github.com/bdonaldharris/builder-garage/issues/120). They wait for platform signing.
+- Linux `.deb` and `.rpm` packages ship from `v0.2.0` ([#123](https://github.com/bdonaldharris/builder-garage/issues/123)). A Homebrew cask is offered on Linux from Builder Garage's tap ([#124](https://github.com/bdonaldharris/builder-garage/issues/124)). On macOS and Linux, [`install.sh`](#install-a-release) installs a verified release from `v0.2.2` ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)), and npm installs `@buildergarage/garage` ([#158](https://github.com/bdonaldharris/builder-garage/issues/158)); Windows is not offered through npm yet. macOS `.pkg` and Windows `.msi` installers, Homebrew on macOS, Scoop, winget, and a Windows release installer are later work of [#120](https://github.com/bdonaldharris/builder-garage/issues/120). They wait for platform signing.
 - The CLI initializes, shows, and changes configuration, records local workflow history, installs and verifies skills and the manuals a project adopts, and shows read-only workflow status only. It does not implement Workbench, Crew, Inspection, or Shipping capabilities, and its only Manuals capability is delivering adopted manuals to agents as skills.
 - `garage status` needs the `gh` command, installed and authenticated, to read GitHub.
 - The canonical skills read `.garage/config.yaml` only through `garage config validate`, so an agent needs a `garage` binary on its `PATH` to resolve a configured value; [`install.sh`](#install-from-source) puts one there. The configuration configures no agents, plugins, providers, or remote services.

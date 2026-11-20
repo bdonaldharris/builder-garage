@@ -316,13 +316,20 @@ func updateGuidance(tag, goos string) string {
 			"    git fetch --tags && git checkout %s && ./install.sh\n",
 		updateRepository, tag, tag, tag)
 
+	// npm offers macOS and Linux only, until the clean Windows 11 test decides
+	// Windows's status (#158).
+	npm := fmt.Sprintf("\n  With npm:\n"+
+		"    npm install -g @buildergarage/garage@%s\n", strings.TrimPrefix(tag, "v"))
+
 	var b strings.Builder
 	b.WriteString("Update with the method you installed garage with:\n\n")
 	switch goos {
 	case "darwin":
 		b.WriteString(installSh)
+		b.WriteString(npm)
 	case "linux":
 		b.WriteString(installSh)
+		b.WriteString(npm)
 		b.WriteString("\n  With Homebrew:\n" +
 			"    brew upgrade --cask bdonaldharris/tap/garage\n")
 		fmt.Fprintf(&b, "\n  With a .deb or .rpm package: download and verify the %s package, then\n"+
