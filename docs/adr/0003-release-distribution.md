@@ -6,7 +6,8 @@
   - [#120](https://github.com/bdonaldharris/builder-garage/issues/120), its [correction](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6930428330), its [amendment to decision 5](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6935475192), and its [amendment to decision 4](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-6938614931) (2026-11-17);
   - [#121's decisions](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935474831), and those recorded in its readiness reports, [the first](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6935931327) and [the follow-up after the decision 4 amendment](https://github.com/bdonaldharris/builder-garage/issues/121#issuecomment-6938700447);
   - [#123's decisions](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952041049), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/123#issuecomment-6952505748) (2026-11-17): Linux packages and the release inventory;
-  - [#124's decisions](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959529918), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959615104) (2026-11-17): package-manager channels, starting with the Homebrew cask on Linux.
+  - [#124's decisions](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959529918), and those recorded in [its readiness](https://github.com/bdonaldharris/builder-garage/issues/124#issuecomment-6959615104) (2026-11-17): package-manager channels, starting with the Homebrew cask on Linux;
+  - #120's [amendment to decision 4 for npm](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-7027245596), and the decisions recorded in [#158's readiness](https://github.com/bdonaldharris/builder-garage/issues/158#issuecomment-7027540094) (2026-11-19): the npm channel.
 
 ## Context
 
@@ -30,7 +31,7 @@ This record covers the program's decisions and the foundation's design.
 | Assets | Exactly the release's inventory (see [Release inventory](#6-release-inventory)). Inventory v1 (to `v0.1.x`) is the six archives, a SHA-256 checksum manifest, and its Sigstore bundle. Inventory v2 (from `v0.2.0`) adds the four Linux packages. No skills or manuals bundle. |
 | Integrity | The manifest is signed with keyless Sigstore/cosign. Every archive and package also gets a GitHub artifact attestation, as additional provenance. |
 | Verification identity | `https://github.com/bdonaldharris/builder-garage/.github/workflows/release.yml@refs/tags/<tag>`, with issuer `https://token.actions.githubusercontent.com`. |
-| Platform trust | macOS signing and notarization, and Windows Authenticode signing (#122), are required before platform-native installers, packages, or package-manager channels are introduced. They are not required for the archive release. Until #122 is complete, release notes and verification docs disclose that macOS and Windows executables are not platform-signed. For the direct-download Linux `.deb` and `.rpm` packages, the signed checksum manifest and attestations are their platform trust: there is no PGP package-signing key, and the docs explain verifying a package before installing it. |
+| Platform trust | macOS signing and notarization, and Windows Authenticode signing (#122), are required before platform-native installers, packages, or package-manager channels are introduced. They are not required for the archive release. #122 ships one platform at a time: macOS first, then Windows. Until a platform is signed, release notes and verification docs disclose that its executables are not platform-signed. For the direct-download Linux `.deb` and `.rpm` packages, the signed checksum manifest and attestations are their platform trust: there is no PGP package-signing key, and the docs explain verifying a package before installing it. |
 | Trigger | Manual dispatch of the release workflow, from an existing `vMAJOR.MINOR.PATCH` tag whose commit is on `main` only. |
 | First published release | `v0.1.1`. `v0.1.0` stays at `db2fcac` as a tag-only source snapshot. |
 | Permissions | Separate jobs, each with the least privilege it needs. |
@@ -55,8 +56,8 @@ Every executable embeds the canonical skills and manuals from the tagged commit,
 | Job | Permissions | Purpose |
 | --- | --- | --- |
 | `guard` | `contents: read` | Accepts only a `vMAJOR.MINOR.PATCH` tag whose commit is on `main`, and a known mode. |
-| `build` | `contents: read` | Builds, archives, packages, checksums, and validates the release inventory's files and the executables from the clean tagged commit. Runs the linux/amd64 archive. Uses no environment and no secrets. |
-| `run-check` | `contents: read` | Release mode only. Runs every archive on its own platform: `garage version` reports the tag, and `garage skills install` installs skills whose revision is the tagged commit. |
+| `build` | `contents: read`, in the `macos-signing` environment | Builds, archives, packages, checksums, and validates the release inventory's files and the executables from the clean tagged commit. In release mode, signs and notarizes the macOS executables before archiving, with the environment's five secrets (#122); in dry-run mode, it passes them to no step. Runs the linux/amd64 archive. |
+| `run-check` | `contents: read` | Release mode only. Runs every archive on its own platform: `garage version` reports the tag, and `garage skills install` installs skills whose revision is the tagged commit. On macOS, it first checks the executable's Developer ID signature, Team ID, notarization, and a quarantined run (#122). |
 | `package-check` | `contents: read` | Release mode only, from inventory v2. Installs, checks, and removes each Linux package with its own package manager (`apt` on Ubuntu, `dnf` in a digest-pinned Fedora container), on amd64 and arm64. |
 | `sign` | `id-token: write` | Signs the manifest with keyless cosign. |
 | `attest` | `id-token: write`, `attestations: write` | Attests every archive and package listed in the manifest. |
@@ -67,13 +68,16 @@ Every executable embeds the canonical skills and manuals from the tagged commit,
 | `channel-verify` | `contents: read` | Installs the cask from the tap on amd64 and arm64 Linux, checks `garage`, and uninstalls it. |
 
 - **Dry runs.** `dry-run` mode stops after `build`. It signs, attests, uploads, and publishes nothing, so no public trust material exists for artifacts not meant for distribution. Pull-request CI also builds a GoReleaser snapshot on every pull request, read-only and without secrets.
-- **Platform signing.** Its place is a GoReleaser post-build hook ([`platform-sign.sh`](../../.github/scripts/platform-sign.sh)), before archiving, so the checksums, signature, and attestations cover signed executables.
-  - Until #122 implements it, the hook leaves every binary unchanged in every mode, so no release mixes signed and unsigned platforms.
+- **Platform signing** happens after the build and before archiving, so the checksums, signature, and attestations cover signed executables.
+  - **macOS (#122).** In release mode, GoReleaser's `notarize.macos` signs the darwin executables with the Developer ID Application identity, with the hardened runtime and a secure timestamp, and notarizes them, in the `build` job, which stays on Linux with `contents: read`.
+    - The five credentials are in the `macos-signing` environment: `v*` tags only, no reviewers. They reach only the two steps that need them, in release mode.
+    - A release fails closed: [`check-macos-signing-env.sh`](../../.github/scripts/check-macos-signing-env.sh) refuses missing credentials, before GoReleaser and again in the post-build hook ([`platform-sign.sh`](../../.github/scripts/platform-sign.sh)). `run-check` requires Gatekeeper's "Notarized Developer ID" verdict, the signing Team ID, and a quarantined run ([`check-macos-notarization.sh`](../../.github/scripts/check-macos-notarization.sh)) before the manifest is signed.
+    - Snapshot and dry-run builds are unsigned.
+  - **Windows** executables are not yet Authenticode-signed (#122, phase 2). A release may therefore mix signed macOS and unsigned Windows executables, and its notes say so.
   - An unset or unknown mode still fails the build.
-  - #122 adds platform signing, and any credentials and environment it needs.
-- **Platform-trust disclosure.** Until #122 is complete, the release notes ([`release-notes.sh`](../../.github/scripts/release-notes.sh)) and [Verifying a release](../release-verification.md) state that:
-  - macOS executables are not yet Developer ID signed and notarized, and Gatekeeper may restrict them;
-  - Windows executables are not yet Authenticode-signed, and SmartScreen may warn;
+- **Platform-trust disclosure.** The release notes ([`release-notes.sh`](../../.github/scripts/release-notes.sh)) and [Verifying a release](../release-verification.md) state, per platform, that:
+  - macOS executables are signed by `Developer ID Application: BRIAN DONALD HARRIS (38397A2FG6)` and notarized, and how to check that;
+  - until #122's Windows phase is complete, Windows executables are not yet Authenticode-signed, and SmartScreen may warn;
   - checksum-signature and attestation verification establish integrity and origin, not operating-system publisher trust.
 
   They recommend downloading, verifying, and extracting from a terminal. They never advise removing quarantine, or bypassing Gatekeeper or SmartScreen.
@@ -83,7 +87,7 @@ Every executable embeds the canonical skills and manuals from the tagged commit,
 
 - **Release environments.**
   - The `release` environment requires the Workflow Owner's review, allows only `v*` tags, and does not let administrators bypass its rules.
-  - Platform-signing credentials, when #122 introduces them, are held in a protected environment available only to the release workflow.
+  - The macOS signing credentials are held in the `macos-signing` environment, available only to the release workflow's `build` job, from `v*` tags (#122).
 - **Immutable releases** are enabled before the first release, so a published release's assets and tag cannot change.
 - **Two tag rulesets:**
   - one blocks updating or deleting `refs/tags/v*`, with no bypass;
@@ -123,8 +127,9 @@ The files a release publishes are its **release inventory**: a versioned, explic
 
 - **Phasing.**
   - The Homebrew cask on **Linux** ships first. The release's signed checksum manifest and attestations are its trust, as for the Linux packages.
-  - Homebrew on **macOS** waits for notarized macOS executables (#122). Homebrew quarantines every cask download, and macOS kills a quarantined unsigned executable.
+  - Homebrew on **macOS** needs notarized macOS executables (#122), because Homebrew quarantines every cask download and macOS kills a quarantined unsigned executable. It is added by its own change (#124).
   - **Scoop and winget** wait for Windows platform trust (#122).
+  - **npm** (#158) ships macOS and Linux. Windows is excepted from the platform-trust requirement for npm only ([#120 amendment](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-7027245596)): unsigned Windows executables may be published with a disclosure that never advises disabling a Windows protection. Whether Windows is published at all follows a clean Windows 11 test, recorded on #158; until then, it is not.
 - **The cask.**
   - GoReleaser generates it, as `homebrew_casks`, from the release's own Linux archives and checksums. There is no hand-maintained formula.
   - It selects only the Linux archives: the build is defined once and split into Linux and other platforms with a YAML anchor, so asset names do not change. Homebrew on macOS therefore refuses it ("This cask requires Linux.").
@@ -133,12 +138,19 @@ The files a release publishes are its **release inventory**: a versioned, explic
   - Channels are published only after the immutable release has passed `post-verify`, which follows the Workflow Owner's release approval.
   - `channel-publish` first re-verifies the published release, then checks that the cask's downloads are exactly the inventory's Linux archives, with the manifest's checksums ([`check-channel-cask.sh`](../../.github/scripts/check-channel-cask.sh)).
   - **A channel failure does not affect the release.** It is retried by re-running the failed job, within 30 days, against the same release; the generated cask is kept 30 days. After that, the next release updates the channel.
+- **npm publishing** is its own workflow, [`npm-publish.yml`](../../.github/workflows/npm-publish.yml), never called from `release.yml`.
+  - **Why separate:** npm trusted publishing identifies the publisher by its workflow filename, and needs `id-token: write`. In `release.yml`, that permission would let a job mint a Sigstore certificate as the release workflow, the identity users pin for the checksum manifest. Running from `main`, this workflow's identity is `npm-publish.yml@refs/heads/main`.
+  - **When:** it runs after every Release run, whatever its result, and decides from the release itself. The tag must pass `release-guard.sh`, its GitHub release must be published (not a draft or prerelease), and the release must pass `verify-release.sh`. A dry run has no release, so nothing is published. A manual dispatch, from `main`, recovers a failed publication or backfills a release, with the same checks.
+  - **What:** [`npm-packages.sh`](../../.github/scripts/npm-packages.sh) checks each archive against the signed manifest, then writes a launcher, `@buildergarage/garage`, and one package per platform, `@buildergarage/garage-<os>-<cpu>`, holding the archive's executable byte for byte. No package has an install script.
+  - **How:** [`npm-publish.sh`](../../.github/scripts/npm-publish.sh) publishes the platform packages, then the launcher, with provenance. A version already on npm is compared, not republished, so a partial failure is recovered by running again. [`npm-dist-tag.sh`](../../.github/scripts/npm-dist-tag.sh) never moves `latest` backward: a backfilled older release gets `release-MAJOR.MINOR`.
+  - **Credentials:** the `npm-publish` environment allows only `main`, has no reviewers (the Workflow Owner approved the release itself), and holds no secret: trusted publishing uses OIDC. A token is used once, only if npm requires one for the first publish, then deleted.
+  - **Verification:** the `verify` job installs from the registry on Linux and macOS, amd64 and arm64, runs `npm audit signatures`, and runs the archive checks through the npm-installed `garage` ([`check-npm-install.sh`](../../.github/scripts/check-npm-install.sh)). Pull-request CI runs the same checks on locally packed packages, including an upgrade.
 - **Repositories and credentials.**
   - Each channel has a dedicated, Builder Garage-owned repository: `bdonaldharris/homebrew-tap`, then `bdonaldharris/scoop-bucket` and a fork of `microsoft/winget-pkgs` when those phases begin.
   - Each has its own fine-grained credential, held in the protected `channel-publish` environment. It is never the release workflow's token, and never has access to this repository.
   - The tap and bucket receive direct commits. winget receives a pull request from the fork, and Microsoft's review is its own gate.
 - **Names.**
-  - Every channel uses the package name `garage`.
+  - Every channel uses the package name `garage`, except npm. There, `garage` belongs to an unrelated package, so npm uses the scoped `@buildergarage/garage` ([#120 amendment](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-7027245596)). The installed command is `garage` everywhere.
   - winget's publisher metadata is "B Donald Harris", describing project ownership. It does not claim an Authenticode publisher identity for unsigned executables.
 - **Users trust the tap explicitly** (`brew trust --tap bdonaldharris/tap`), as Homebrew requires. Nothing bypasses tap trust.
 
@@ -147,13 +159,13 @@ The files a release publishes are its **release inventory**: a versioned, explic
 - **A tag that fails cannot be reused.** A defect found after a tag exists ships under the next tag, because protected tags are never moved. A release-mode run that fails after signing leaves a public signature for that tag.
 - **The release workflow can run only from a tag that contains it.** GitHub runs a dispatched workflow as it exists at the dispatched ref, so the first release follows the merge of this design.
 - **The asset names and the workflow path are a public contract.** Verification commands depend on them.
-- **The first releases are not platform-signed.** `v0.1.1` and later releases publish unsigned macOS and Windows executables until #122 is complete, with the platform-trust disclosure in their notes. macOS `.pkg` and Windows `.msi` packages (#123), Homebrew on macOS, Scoop, and winget (#124), and any OS-native installer (#125) wait for #122.
+- **The first releases are not platform-signed.** `v0.1.1` and later releases publish unsigned macOS and Windows executables until #122 signs each platform, with the platform-trust disclosure in their notes. macOS is signed and notarized from the first release built after #122's macOS phase. macOS `.pkg` and Windows `.msi` packages (#123), Homebrew on macOS, Scoop, and winget (#124), and any OS-native installer (#125) wait for #122.
 - **The first package release must be `v0.2.0`.** A `v0.1.x` tag selects inventory v1, which has no packages, so a build that produces them fails its checks before anything is signed.
 - **Package names are public contract.** The package name `garage` and the path `/usr/bin/garage` carry upgrades between releases. So do the tap `bdonaldharris/tap` and its cask `garage`.
 - **A failed channel publication leaves a release without its channel update.** Re-run the job within 30 days, or the next release updates the channel.
 
 ## Still undecided
 
-- Platform-signing tooling and the Windows signing option (#122).
+- Windows signing (#122, phase 2).
 - macOS `.pkg` and Windows `.msi` packaging readiness, including the WiX license review (#123); Homebrew on macOS, Scoop, and winget, including whether a fine-grained credential can open the winget pull request (#124); and release installers and update (#125).
 - When a release is cut, and what moves the version (as in ADR 0002).

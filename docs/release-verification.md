@@ -15,11 +15,11 @@ The first published release is `v0.1.1`. The design is recorded in [ADR 0003](ad
 
 ## Platform trust
 
-Until platform signing ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)) is complete:
+Platform signing ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)) ships one platform at a time. Each release's notes say which of its executables are platform-signed.
 
-- **macOS:** the executables are not yet Developer ID signed and notarized. You may encounter Gatekeeper restrictions.
+- **macOS:** from the first release built after macOS signing was added, the executables are signed with the Developer ID Application identity `Developer ID Application: BRIAN DONALD HARRIS (38397A2FG6)`, with the hardened runtime and a secure timestamp, and notarized by Apple. Earlier releases' macOS executables are not signed, and Gatekeeper may restrict them. See [macOS signature and notarization](#macos-signature-and-notarization).
 - **Windows:** the executables are not yet Authenticode-signed. You may encounter SmartScreen warnings.
-- **What verification proves:** the signed checksum manifest and the provenance attestations establish a release's integrity and origin. They do not replace your operating system's publisher trust.
+- **What verification proves:** the signed checksum manifest and the provenance attestations establish a release's integrity and origin. The macOS signature adds Apple's publisher trust. On Windows, nothing replaces your operating system's publisher trust yet.
 
 Download, verify, and extract from a terminal, as the steps below show:
 - download with `gh release download` or `curl`;
@@ -90,6 +90,28 @@ tar -xzf "garage_${VERSION}_linux_amd64.tar.gz" garage
 
 It prints `garage version v0.1.1`. Move `garage` to a directory on your `PATH`.
 
+## macOS signature and notarization
+
+From the first release built after macOS signing was added ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)), the macOS `garage` carries a Developer ID signature, and Apple has notarized it. These checks are in addition to the checksum and signature steps above, not instead of them. Run them on the extracted `garage`:
+
+```sh
+codesign --verify --strict --verbose=2 garage
+codesign -dvv garage 2>&1 | grep -E '^(Authority|TeamIdentifier|Timestamp)='
+spctl -a -vvv -t open --context context:primary-signature garage
+```
+
+- `codesign --verify` prints `valid on disk` and `satisfies its Designated Requirement`.
+- `codesign -dvv` shows `Authority=Developer ID Application: BRIAN DONALD HARRIS (38397A2FG6)`, then `Authority=Developer ID Certification Authority` and `Authority=Apple Root CA`. It also shows `TeamIdentifier=38397A2FG6` and a `Timestamp=` line. Any other Team ID means Builder Garage's release workflow did not sign it.
+- `spctl` prints `accepted` and `source=Notarized Developer ID`.
+
+Notes:
+
+- **Use `-t open --context context:primary-signature`.** `spctl -t execute` rejects every command-line tool, notarized or not, with "does not seem to be an app".
+- **A bare executable cannot be stapled.** Apple's notarization ticket is not attached to `garage`, so Gatekeeper and `spctl` look the notarization up with Apple online.
+- **When Gatekeeper is involved.** A `curl` or `gh release download` download, extracted with `tar`, is not quarantined, so Gatekeeper does not evaluate it. A browser download, extracted in Finder, is quarantined, and macOS runs the notarized `garage` after Gatekeeper checks it.
+
+The release workflow runs the same checks on both macOS architectures before it signs the checksum manifest. It also runs a quarantined copy.
+
 ## Linux packages
 
 From `v0.2.0`, each release also carries `.deb` and `.rpm` packages for amd64 and arm64. A package installs `/usr/bin/garage` and its license file, and nothing else. `apt`, `dpkg`, `dnf`, and `rpm` own upgrades and removal. Installing, upgrading, or removing a package never touches project configuration, installed skills, manuals, or local history.
@@ -145,11 +167,44 @@ Homebrew requires you to trust a third-party tap before it uses its casks. `brew
 - **What it installs.** The cask downloads the same Linux archive as the release, pinned to the SHA-256 in the release's signed checksum manifest, and installs `garage` on Homebrew's `bin`.
 - **How the tap is updated.** After each release passes its final verification, the release workflow commits the cask to the tap. Before committing, it checks the cask's checksums against the published, cosign-verified manifest.
 - **Upgrade and removal.** Upgrade with `brew upgrade --cask bdonaldharris/tap/garage`, and remove it with `brew uninstall --cask bdonaldharris/tap/garage`.
-- **macOS isn't offered yet.** The cask serves Linux only until macOS executables are notarized ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)). On macOS, Homebrew refuses it with "This cask requires Linux."
+- **macOS isn't offered yet.** The cask serves Linux only until Homebrew on macOS is added ([#124](https://github.com/bdonaldharris/builder-garage/issues/124)). On macOS, Homebrew refuses it with "This cask requires Linux."
 
 To check the archive the cask uses yourself, verify the release's manifest as above. Then compare the cask's `sha256` for your architecture with the manifest's entry for `garage_<version>_linux_<arch>.tar.gz`.
 
 Use one installation method at a time: the Homebrew cask, a Linux package (`/usr/bin`), or [`install.sh`](../install.sh) (`~/.local/bin`), so that only one `garage` is on your `PATH`.
+
+## npm
+
+On macOS and Linux, `garage` is also published to npm as [`@buildergarage/garage`](https://www.npmjs.com/package/@buildergarage/garage), from the first release published there ([#158](https://github.com/bdonaldharris/builder-garage/issues/158)). It needs Node.js 20 or later.
+
+```sh
+npm install -g @buildergarage/garage
+garage version
+```
+
+Or run it once with `npx @buildergarage/garage version`.
+
+**Always use the full name, `@buildergarage/garage`.** The unscoped npm package `garage` is unrelated to Builder Garage: `npx garage` runs it instead, and npm refuses to install both, since each installs a `garage` command.
+
+- **What it installs.** `@buildergarage/garage` is a small Node.js launcher. npm installs one platform package beside it, `@buildergarage/garage-<os>-<cpu>`, for macOS or Linux on arm64 or x64. That package holds the `garage` executable from the release archive for the same platform, byte for byte. Nothing runs at install time.
+- **How it is published.** After a release is published and verified, Builder Garage's [npm workflow](../.github/workflows/npm-publish.yml) checks each archive against the release's signed checksum manifest, then publishes the packages from those archives, with [npm provenance](https://docs.npmjs.com/generating-provenance-statements).
+- **Upgrade and removal.** Upgrade with `npm install -g @buildergarage/garage@latest`, and remove it with `npm uninstall -g @buildergarage/garage`.
+- **Platform trust.** npm does not quarantine what it installs, so macOS does not ask Gatekeeper about an npm-installed `garage`, notarized or not.
+- **Windows** is not offered through npm yet. Unsigned Windows executables may be offered later, with a disclosure of what Windows may do with them, after a test on a clean Windows 11 machine ([#158](https://github.com/bdonaldharris/builder-garage/issues/158)). Until then, the launcher says so on Windows: download and verify a release archive, as [Windows (PowerShell)](#windows-powershell) shows.
+
+To check the packages yourself:
+
+1. **Provenance.** In a project that depends on `@buildergarage/garage`, run `npm audit signatures`. It verifies the registry signatures and the provenance attestations, which name this repository and its npm workflow.
+2. **The executable.** Verify the release's manifest and your platform's archive as [macOS and Linux](#macos-and-linux) shows. Then compare the archive's `garage` with the npm-installed one. For example, on Linux arm64:
+
+   ```sh
+   tar -xzf "garage_${VERSION}_linux_arm64.tar.gz" garage
+   sha256sum garage "$(npm root -g)/@buildergarage/garage/node_modules/@buildergarage/garage-linux-arm64/bin/garage"
+   ```
+
+   The two checksums are the same.
+
+Use one installation method at a time, so that only one `garage` is on your `PATH`.
 
 ## Windows (PowerShell)
 

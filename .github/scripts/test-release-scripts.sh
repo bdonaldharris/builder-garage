@@ -9,9 +9,22 @@
 #     branch, in a throwaway repository;
 #   - release-inventory.sh selects inventory v1 up to v0.1.x and v2 from
 #     v0.2.0, names every file exactly, and refuses a malformed version;
-#   - platform-sign.sh leaves every binary unchanged in every known mode,
-#     since nothing is platform-signed until #122, and refuses an unset or
-#     unknown mode and a missing binary.
+#   - platform-sign.sh never changes a binary, refuses an unset or unknown
+#     mode and a missing binary, and refuses a darwin release build unless
+#     every macOS signing credential is set (#122);
+#   - check-macos-signing-env.sh requires all five macOS signing credentials
+#     in release mode only, each certificate and key as one line of base64,
+#     and never prints a credential's value;
+#   - on macOS only, check-macos-notarization.sh refuses an executable that
+#     is not Developer ID signed and notarized;
+#   - npm-packages.sh writes the launcher and the macOS and Linux platform
+#     packages, pinned to one version, with no install scripts and no
+#     Windows package, and refuses a missing or mismatched archive or a
+#     malformed version; npm-dist-tag.sh never moves "latest" backward and
+#     refuses prereleases; npm-publish.sh refuses bad arguments; and the npm
+#     launcher runs its platform's executable, passing arguments and exit
+#     status through, or says npm does not provide garage (#158). The
+#     launcher checks need node, and are skipped without it.
 # CI runs it on every pull request. It runs on macOS and Linux.
 
 set -eu
@@ -143,19 +156,163 @@ for v in 0.1.1 0.2.1; do
 	done
 done
 
-# platform-sign.sh
+# check-macos-signing-env.sh and platform-sign.sh
+# Dummy credentials, never real ones: the scripts check presence and shape.
+creds=$scripts/check-macos-signing-env.sh
 sign=$scripts/platform-sign.sh
+p12=$(printf 'not a real p12' | base64 | tr -d '\n')
+p8=$(printf 'not a real p8 key' | base64 | tr -d '\n')
+with_creds() { # with_creds COMMAND...: run with all five dummy credentials
+	MACOS_SIGN_P12=$p12 MACOS_SIGN_PASSWORD=dummy-password MACOS_NOTARY_KEY=$p8 \
+		MACOS_NOTARY_KEY_ID=DUMMYKEYID MACOS_NOTARY_ISSUER_ID=dummy-issuer "$@"
+}
+no_creds() { # no_creds COMMAND...: run with none of them
+	env -u MACOS_SIGN_P12 -u MACOS_SIGN_PASSWORD -u MACOS_NOTARY_KEY \
+		-u MACOS_NOTARY_KEY_ID -u MACOS_NOTARY_ISSUER_ID "$@"
+}
+without() { # without NAME COMMAND...: all five but NAME, which is empty
+	name=$1
+	shift
+	with_creds env "$name=" "$@"
+}
+
+accepts "credentials not required in snapshot mode" no_creds sh "$creds" snapshot
+accepts "credentials not required in dry-run mode" no_creds sh "$creds" dry-run
+refuses "credentials required in release mode" no_creds sh "$creds" release
+accepts "release mode accepts all five credentials" with_creds sh "$creds" release
+for name in MACOS_SIGN_P12 MACOS_SIGN_PASSWORD MACOS_NOTARY_KEY MACOS_NOTARY_KEY_ID MACOS_NOTARY_ISSUER_ID; do
+	refuses "release mode refuses an empty $name" without "$name" sh "$creds" release
+	if without "$name" sh "$creds" release 2>&1 | grep -Fq "$name"; then
+		pass "the refusal names $name"
+	else
+		fail "the refusal names $name"
+	fi
+done
+refuses "release mode refuses a certificate split over two lines" \
+	with_creds env "MACOS_SIGN_P12=$(printf 'not a real p12' | base64 | fold -w 8)" sh "$creds" release
+refuses "release mode refuses a key given as a file path" \
+	with_creds env "MACOS_NOTARY_KEY=/tmp/AuthKey.p8" sh "$creds" release
+refuses "credentials check refuses an unknown mode" with_creds sh "$creds" publish
+if with_creds sh "$creds" release 2>&1 | grep -Eq "$p12|dummy-password|$p8|DUMMYKEYID|dummy-issuer"; then
+	fail "credentials check prints no credential value"
+else
+	pass "credentials check prints no credential value"
+fi
+
 bin=$work/garage
 printf 'binary' >"$bin"
 for mode in snapshot dry-run release; do
-	for os in darwin linux windows; do
-		accepts "hook passes a $os binary in $mode mode" sh "$sign" "$mode" "$os" "$bin"
+	for os in linux windows; do
+		accepts "hook passes a $os binary in $mode mode" no_creds sh "$sign" "$mode" "$os" "$bin"
 	done
 done
+accepts "hook passes a darwin binary in snapshot mode without credentials" no_creds sh "$sign" snapshot darwin "$bin"
+accepts "hook passes a darwin binary in dry-run mode without credentials" no_creds sh "$sign" dry-run darwin "$bin"
+refuses "hook refuses a darwin binary in release mode without credentials" no_creds sh "$sign" release darwin "$bin"
+refuses "hook refuses a darwin binary in release mode without the notary key" \
+	without MACOS_NOTARY_KEY sh "$sign" release darwin "$bin"
+accepts "hook passes a darwin binary in release mode with every credential" with_creds sh "$sign" release darwin "$bin"
 if [ "$(cat "$bin")" = binary ]; then pass "hook did not modify the binary"; else fail "hook did not modify the binary"; fi
 refuses "hook refuses an unset mode" sh "$sign" unset linux "$bin"
 refuses "hook refuses an unknown mode" sh "$sign" publish linux "$bin"
 refuses "hook refuses a missing binary" sh "$sign" dry-run linux "$work/absent"
+
+# check-macos-notarization.sh, on macOS: an Apple platform binary is signed,
+# but neither by a Developer ID Application identity nor notarized.
+notary=$scripts/check-macos-notarization.sh
+if [ "$(uname -s)" = Darwin ]; then
+	mkdir "$work/platform"
+	cp /bin/ls "$work/platform/garage"
+	tar -czf "$work/platform.tar.gz" -C "$work/platform" garage
+	refuses "notarization check refuses an executable that is not Developer ID signed" \
+		sh "$notary" "$work/platform.tar.gz" 38397A2FG6
+else
+	refuses "notarization check refuses to run off macOS" sh "$notary" "$bin" 38397A2FG6
+fi
+
+# npm-packages.sh, npm-dist-tag.sh, npm-publish.sh, and the npm launcher
+npmpk=$scripts/npm-packages.sh
+disttag=$scripts/npm-dist-tag.sh
+npmpub=$scripts/npm-publish.sh
+if command -v sha256sum >/dev/null 2>&1; then
+	sha() { sha256sum "$1" | cut -d' ' -f1; }
+else
+	sha() { shasum -a 256 "$1" | cut -d' ' -f1; }
+fi
+# Fake archives for every target, and their manifest.
+arch=$work/npm-archives
+mkdir -p "$arch/src"
+printf 'MIT\n' >"$arch/src/LICENSE"
+printf 'readme\n' >"$arch/src/README.md"
+for t in darwin_arm64 darwin_amd64 linux_arm64 linux_amd64 windows_arm64 windows_amd64; do
+	printf '#!/bin/sh\necho %s\n' "$t" >"$arch/src/garage"
+	tar -czf "$arch/garage_9.8.7_$t.tar.gz" -C "$arch/src" garage LICENSE README.md
+	printf '%s  %s\n' "$(sha "$arch/garage_9.8.7_$t.tar.gz")" "garage_9.8.7_$t.tar.gz" >>"$arch/garage_9.8.7_checksums.txt"
+done
+accepts "npm-packages writes the packages" sh "$npmpk" 9.8.7 "$arch" "$work/npm"
+check_eq "npm-packages writes the launcher and four platform packages" "$(ls "$work/npm" | tr '\n' ' ')" \
+	"garage garage-darwin-arm64 garage-darwin-x64 garage-linux-arm64 garage-linux-x64 "
+check_eq "the linux-x64 package holds the linux_amd64 executable" "$(sh "$work/npm/garage-linux-x64/bin/garage")" linux_amd64
+check_eq "the darwin-arm64 package holds the darwin_arm64 executable" "$(sh "$work/npm/garage-darwin-arm64/bin/garage")" darwin_arm64
+if [ -x "$work/npm/garage-darwin-x64/bin/garage" ]; then pass "platform executables are executable"; else fail "platform executables are executable"; fi
+if grep -q '"os": \["linux"\]' "$work/npm/garage-linux-arm64/package.json" && grep -q '"cpu": \["arm64"\]' "$work/npm/garage-linux-arm64/package.json"; then
+	pass "platform packages declare npm's os and cpu"
+else
+	fail "platform packages declare npm's os and cpu"
+fi
+check_eq "the launcher pins every platform package to its version" \
+	"$(grep -c '"@buildergarage/garage-[a-z0-9-]*": "9.8.7"' "$work/npm/garage/package.json")" 4
+if grep -rq '"scripts"\|install"' "$work/npm"/*/package.json; then fail "no package has an install script"; else pass "no package has an install script"; fi
+if grep -q win32 "$work/npm/garage/package.json"; then fail "no Windows package is named"; else pass "no Windows package is named"; fi
+if grep -q '"url": "git+https://github.com/bdonaldharris/builder-garage.git"' "$work/npm/garage/package.json"; then
+	pass "packages name this repository, as provenance requires"
+else
+	fail "packages name this repository, as provenance requires"
+fi
+refuses "npm-packages refuses an existing output directory" sh "$npmpk" 9.8.7 "$arch" "$work/npm"
+refuses "npm-packages refuses a malformed version" sh "$npmpk" 9.8 "$arch" "$work/npm-bad-version"
+mkdir -p "$work/npm-missing"
+cp "$arch"/garage_9.8.7_checksums.txt "$arch"/garage_9.8.7_darwin_*.tar.gz "$work/npm-missing/"
+refuses "npm-packages refuses a missing archive" sh "$npmpk" 9.8.7 "$work/npm-missing" "$work/npm-out-missing"
+mkdir -p "$work/npm-tampered"
+cp "$arch"/garage_9.8.7_* "$work/npm-tampered/"
+printf 'x' >>"$work/npm-tampered/garage_9.8.7_linux_amd64.tar.gz"
+refuses "npm-packages refuses an archive that does not match the manifest" sh "$npmpk" 9.8.7 "$work/npm-tampered" "$work/npm-out-tampered"
+if [ ! -e "$work/npm-out-tampered" ]; then pass "npm-packages writes nothing when an archive is refused"; else fail "npm-packages writes nothing when an archive is refused"; fi
+
+check_eq "dist-tag for a first publish is latest" "$(sh "$disttag" 0.4.0)" latest
+check_eq "dist-tag for a newer version is latest" "$(sh "$disttag" 0.10.0 0.9.0)" latest
+check_eq "dist-tag for the same version is latest" "$(sh "$disttag" 0.4.0 0.4.0)" latest
+check_eq "dist-tag for an older version keeps latest" "$(sh "$disttag" 0.2.4 0.3.0)" release-0.2
+check_eq "dist-tag compares numerically" "$(sh "$disttag" 0.9.0 0.10.0)" release-0.9
+refuses "dist-tag refuses a prerelease" sh "$disttag" 0.4.0-rc.1
+refuses "dist-tag refuses a malformed current latest" sh "$disttag" 0.4.0 latest
+
+refuses "npm-publish refuses a missing packages directory" sh "$npmpub" "$work/absent" latest
+refuses "npm-publish refuses an empty dist-tag" sh "$npmpub" "$work/npm" ""
+refuses "npm-publish refuses an unknown option" sh "$npmpub" "$work/npm" latest --force
+
+if command -v node >/dev/null 2>&1; then
+	host=$(node -p 'process.platform + "-" + process.arch')
+	l=$work/launcher
+	mkdir -p "$l/bin" "$l/node_modules/@buildergarage/garage-$host/bin"
+	cp "$scripts/../../npm/garage.js" "$l/bin/garage.js"
+	printf '#!/bin/sh\necho "args: $*"\nexit 3\n' >"$l/node_modules/@buildergarage/garage-$host/bin/garage"
+	chmod 0755 "$l/node_modules/@buildergarage/garage-$host/bin/garage"
+	out=$(node "$l/bin/garage.js" one "two words" 2>&1) && st=0 || st=$?
+	check_eq "the launcher passes arguments through" "$out" "args: one two words"
+	check_eq "the launcher exits with the executable's status" "$st" 3
+	rm -rf "$l/node_modules"
+	out=$(node "$l/bin/garage.js" version 2>&1) && st=0 || st=$?
+	check_eq "the launcher fails without its platform package" "$st" 1
+	if printf '%s\n' "$out" | grep -q "npm does not provide garage for $host"; then
+		pass "the launcher says npm does not provide garage, and points to the docs"
+	else
+		fail "the launcher says npm does not provide garage, and points to the docs (got: $out)"
+	fi
+else
+	echo "skip the npm launcher checks: node is not installed"
+fi
 
 if [ "$failures" -ne 0 ]; then
 	echo "$failures check(s) failed"

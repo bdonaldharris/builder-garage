@@ -168,8 +168,17 @@ garage version
 - **Like the source install below,** it installs in `~/.local/bin` (or `--install-dir PATH`) for the current user, never edits shell startup files or `PATH`, and does not install skills.
 - **Re-running it replaces the installed binary in place,** for example to move to a newer release.
 - **To find out whether a newer release exists,** run `garage update check`, from the first release after `v0.2.2`. It makes one request to GitHub, only when you run it, and lists the update command for each way of installing `garage`. It installs nothing itself.
-- **The macOS and Windows executables are not yet platform-signed** ([Platform trust](docs/release-verification.md#platform-trust)). A `curl` download is not quarantined, so macOS runs it.
+- **The Windows executables are not yet platform-signed** ([Platform trust](docs/release-verification.md#platform-trust)). The macOS executables are Developer ID signed and notarized from the first release built after macOS signing was added; a `curl` download is not quarantined, so macOS runs earlier, unsigned ones too.
 - **Windows:** a PowerShell installer follows platform signing ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)). On Windows, download and verify a release as [Verifying a release](docs/release-verification.md#windows-powershell) shows.
+
+On macOS and Linux, you can also install a release with npm, from the first release published there ([#158](https://github.com/bdonaldharris/builder-garage/issues/158)). It needs Node.js 20 or later:
+
+```sh
+npm install -g @buildergarage/garage
+garage version
+```
+
+Always use the full name, `@buildergarage/garage`: the unscoped npm package `garage` is unrelated. Windows is not offered through npm yet. See [npm](docs/release-verification.md#npm) for how the packages relate to the release, and how to verify them.
 
 #### Install from source
 
@@ -193,7 +202,7 @@ Release archives for macOS, Linux, and Windows, with a signed checksum manifest 
 
 From `v0.2.0`, releases also carry `.deb` and `.rpm` packages for Linux on amd64 and arm64. A package installs `garage` system-wide at `/usr/bin/garage`, and `apt` or `dnf` upgrades and removes it. Verify it before installing, as [Verifying a release](docs/release-verification.md#linux-packages) shows. `install.sh` installs for one user in `~/.local/bin` instead: use one or the other, so that only one `garage` is on your `PATH`.
 
-On Linux, Homebrew users can install the release from Builder Garage's tap: `brew tap bdonaldharris/tap`, `brew trust --tap bdonaldharris/tap`, then `brew install --cask bdonaldharris/tap/garage` ([Homebrew (Linux)](docs/release-verification.md#homebrew-linux)). Use the full name: homebrew/core has an unrelated formula also called `garage`. The cask is offered on Linux only until macOS executables are notarized ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)).
+On Linux, Homebrew users can install the release from Builder Garage's tap: `brew tap bdonaldharris/tap`, `brew trust --tap bdonaldharris/tap`, then `brew install --cask bdonaldharris/tap/garage` ([Homebrew (Linux)](docs/release-verification.md#homebrew-linux)). Use the full name: homebrew/core has an unrelated formula also called `garage`. The cask is offered on Linux only until Homebrew on macOS is added ([#124](https://github.com/bdonaldharris/builder-garage/issues/124)).
 
 #### Build by hand
 
@@ -266,8 +275,8 @@ sh .github/scripts/test-install.sh
 ### Current limitations
 
 - Releases are published from `v0.1.1`. The [release workflow](.github/workflows/release.yml) builds archives with GoReleaser, with a signed checksum manifest and attestations ([ADR 0003](docs/adr/0003-release-distribution.md)). On macOS and Linux, [`install.sh`](#install-a-release) installs a verified release, or builds from source.
-- macOS executables are not yet Developer ID signed and notarized, and Windows executables are not yet Authenticode-signed ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)). Gatekeeper may restrict them, and SmartScreen may warn. Verifying a release establishes its integrity and origin, not operating-system publisher trust. See [Verifying a release](docs/release-verification.md#platform-trust).
-- Linux `.deb` and `.rpm` packages ship from `v0.2.0` ([#123](https://github.com/bdonaldharris/builder-garage/issues/123)). A Homebrew cask is offered on Linux from Builder Garage's tap ([#124](https://github.com/bdonaldharris/builder-garage/issues/124)). On macOS and Linux, [`install.sh`](#install-a-release) installs a verified release from `v0.2.2` ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)). macOS `.pkg` and Windows `.msi` installers, Homebrew on macOS, Scoop, winget, and a Windows release installer are later work of [#120](https://github.com/bdonaldharris/builder-garage/issues/120). They wait for platform signing.
+- Windows executables are not yet Authenticode-signed ([#122](https://github.com/bdonaldharris/builder-garage/issues/122)), and SmartScreen may warn. macOS executables are Developer ID signed and notarized from the first release built after macOS signing was added; earlier releases' are not, and Gatekeeper may restrict them. Verifying a release establishes its integrity and origin; on Windows, it does not establish operating-system publisher trust. See [Verifying a release](docs/release-verification.md#platform-trust).
+- Linux `.deb` and `.rpm` packages ship from `v0.2.0` ([#123](https://github.com/bdonaldharris/builder-garage/issues/123)). A Homebrew cask is offered on Linux from Builder Garage's tap ([#124](https://github.com/bdonaldharris/builder-garage/issues/124)). On macOS and Linux, [`install.sh`](#install-a-release) installs a verified release from `v0.2.2` ([#125](https://github.com/bdonaldharris/builder-garage/issues/125)), and npm installs `@buildergarage/garage` ([#158](https://github.com/bdonaldharris/builder-garage/issues/158)); Windows is not offered through npm yet. macOS `.pkg` and Windows `.msi` installers, Homebrew on macOS, Scoop, winget, and a Windows release installer are later work of [#120](https://github.com/bdonaldharris/builder-garage/issues/120). They wait for platform signing.
 - The CLI initializes, shows, and changes configuration, records local workflow history, installs and verifies skills and the manuals a project adopts, and shows read-only workflow status only. It does not implement Workbench, Crew, Inspection, or Shipping capabilities, and its only Manuals capability is delivering adopted manuals to agents as skills.
 - `garage status` needs the `gh` command, installed and authenticated, to read GitHub.
 - The canonical skills read `.garage/config.yaml` only through `garage config validate`, so an agent needs a `garage` binary on its `PATH` to resolve a configured value; [`install.sh`](#install-from-source) puts one there. The configuration configures no agents, plugins, providers, or remote services.
@@ -415,6 +424,8 @@ Shorthand is an invocation alias only. The canonical skill remains the single so
 | `eng-discovery` | `engineering-discovery-workflow` |
 | `pr-review` | `integration-pr-review` |
 | `author-issue` | `issue-authoring-workflow` |
+| `spec-design` | `project-spec-workflow` |
+| `prompt-author` | `prompt-authoring-workflow` |
 
 ## Skills
 
@@ -425,6 +436,8 @@ Canonical reusable engineering procedures live under `skills/`.
 - [`implementation-readiness-workflow`](skills/implementation-readiness-workflow/SKILL.md) (`readiness-workflow`) — Determines whether a defined change is sufficiently understood to implement responsibly by resolving material architectural, contract, data, authorization, integration, validation, and scope questions before coding begins.
 - [`independent-implementation-review`](skills/independent-implementation-review/SKILL.md) (`indep-review`) — Executes as **Agent #2 — Independent Review Agent** and defines the narrow three-question review contract, complete-artifact review, required verified durable Issue/PR disposition comments, bounded sibling-state review, the supplemental PR-review procedure, and auditable independent disposition of every material automated-review finding. Agent #2 never performs implementation/correction work, and its invocation is not complete until the governing Issue/PR record has been successfully written and verified.
 - [`issue-authoring-workflow`](skills/issue-authoring-workflow/SKILL.md) (`author-issue`) — Executes as the **planner** Technician. It authors a GitHub issue from durable evidence or a durable decision, and only with the Builder's explicit authorization. It checks for duplicates read-only, resolves the repository's template or Garage's fallback, confirms the full draft, and records the authoring role and evidence ([Issue authoring](docs/issue-authoring.md)). An authored issue never authorizes implementing it. The discovery, implementation, and review skills author their own follow-ups from their own records, under the same procedure.
+- [`project-spec-workflow`](skills/project-spec-workflow/SKILL.md) (`spec-design`) — Executes as the **planner** Technician. It drafts a project-level specification for a greenfield project, or for an existing project from a verified discovery report. It asks about intent rather than invent it, keeps observed behavior apart from intended behavior, and lists unmade decisions as pending for the product-intent acceptor. It writes no file: the spec reaches `docs/specs/` through a reviewed change whose issue names it ([Project specs](docs/project-specs.md)).
+- [`prompt-authoring-workflow`](skills/prompt-authoring-workflow/SKILL.md) (`prompt-author`) — Executes as the **planner** Technician. It turns a developer's stated intent into a prompt for working with agents: a workflow invocation that names the action, location, and canonical skill, a question or exploration request, or a reusable template with marked placeholders. It reports missing requirements as gaps that belong in the issue, and owns the prompt rules the other skills follow. It displays the prompt, and saves it only when asked, to the Builder's path or `.garage/prompts/`, never committing it. A prompt never declares that work is ready to begin.
 - [`integration-pr-review`](skills/integration-pr-review/SKILL.md) (`pr-review`) — Executes as **Agent #1 — Implementation Agent** for PR-side integration/finalization responsibilities. It governs durable PR workflow-state comments, artifact equivalence with the issue-approved change, the PR-review triggers and the role-based Agent #2 PR Review Request, hard Agent #2 disposition boundaries, required verified Agent #2 disposition on the PR itself when a PR review occurs, Agent #2-owned final correction approval, Environment / Deployment Requirements gating, and merge convergence without a post-correction review loop. Automated reviewers are optional input.
 
 ## Engineering principles

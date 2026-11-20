@@ -12,8 +12,8 @@
 #
 # It checks that:
 #   - the cask is "garage", at VERSION, installing the "garage" binary;
-#   - it serves Linux only: no macOS block and no darwin archive, since macOS
-#     executables are not notarized yet (#122);
+#   - it serves Linux only: no macOS block and no darwin archive, until
+#     Homebrew on macOS is added (#124);
 #   - its downloads are exactly the release inventory's Linux archives
 #     (release-inventory.sh), each from this repository's release at
 #     vVERSION, each with the SHA-256 the manifest lists for it.

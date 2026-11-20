@@ -118,14 +118,15 @@ func TestUpdateGuidanceListsEveryChannelForTheOS(t *testing.T) {
 	brew := "brew upgrade --cask bdonaldharris/tap/garage"
 	packages := "https://github.com/bdonaldharris/builder-garage/blob/v0.2.2/docs/release-verification.md#linux-packages"
 	windows := "https://github.com/bdonaldharris/builder-garage/blob/v0.2.2/docs/release-verification.md#windows-powershell"
-	all := []string{installSh, checkout, brew, packages, windows}
+	npm := "npm install -g @buildergarage/garage@0.2.2"
+	all := []string{installSh, checkout, brew, packages, windows, npm}
 
 	for _, tc := range []struct {
 		goos string
 		want []string
 	}{
-		{"linux", []string{installSh, checkout, brew, packages}},
-		{"darwin", []string{installSh, checkout}},
+		{"linux", []string{installSh, checkout, npm, brew, packages}},
+		{"darwin", []string{installSh, checkout, npm}},
 		{"windows", []string{windows}},
 		{"freebsd", []string{"https://github.com/bdonaldharris/builder-garage/blob/v0.2.2/docs/release-verification.md\n"}},
 	} {

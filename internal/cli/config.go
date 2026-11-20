@@ -468,8 +468,6 @@ func checkUniqueTexts(p *configProblems, field string, values []string) {
 	}
 }
 
-// checkBranchName applies the subset of git's branch-name rules that can be
-// checked without running git.
 // effectiveIntegrationBranch is the configured integration branch (E1), or
 // its canonical default when E1 is omitted.
 func effectiveIntegrationBranch(pc *projectChoices) string {
@@ -479,6 +477,8 @@ func effectiveIntegrationBranch(pc *projectChoices) string {
 	return defaultIntegrationBranch
 }
 
+// checkBranchName applies the subset of git's branch-name rules that can be
+// checked without running git.
 func checkBranchName(name string) error {
 	switch {
 	case name == "":

@@ -5,6 +5,8 @@
 
 A project's Builder Garage configuration lives in one file, `.garage/config.yaml`, at the project root. It is the sole canonical source of the project's configured choices. It is tracked with the project and changes through the project's normal review process.
 
+`.garage/` may also hold `.garage/prompts/`, where [prompt-authoring-workflow](../skills/prompt-authoring-workflow/SKILL.md) saves prompts by default when the Builder asks to save one. Saved prompts are not configuration: `garage` never reads them, and no skill takes a project value from one.
+
 The file has two sections:
 
 - **`project`** holds the project's values at the extension points that the [extension-point registry](extension-points.md) declares. Nothing else in the responsibility model is configurable, and no value can weaken the [responsibility floor](responsibility-floor.md).

@@ -75,7 +75,17 @@ var harnessCommands = map[string]string{
 	"copilot-cli": "copilot",
 }
 
-var harnessVersionPattern = regexp.MustCompile(`\d+\.\d+\.\d+(?:-[0-9A-Za-z.]+)?`)
+// harnessVersionPattern matches a version number: three numeric parts and an
+// optional pre-release of dot-separated identifiers. A dot must sit between
+// identifiers, so a period that ends a sentence, such as Copilot CLI's
+// "1.0.93-1.", is not part of the version (#152).
+var harnessVersionPattern = regexp.MustCompile(`\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:\.[0-9A-Za-z]+)*)?`)
+
+// harnessVersionFrom returns the first version number in a harness's
+// "--version" output, or "" when there is none.
+func harnessVersionFrom(output string) string {
+	return harnessVersionPattern.FindString(output)
+}
 
 // probeHarnessVersion runs "<harness command> --version" and returns the
 // first version number in its output.
@@ -93,7 +103,7 @@ func probeHarnessVersion(ctx context.Context, harness string) (string, error) {
 	if err := cmd.Run(); err != nil {
 		return "", fmt.Errorf("%s --version: %w", name, err)
 	}
-	version := harnessVersionPattern.FindString(out.String())
+	version := harnessVersionFrom(out.String())
 	if version == "" {
 		return "", fmt.Errorf("%s --version printed no version number", name)
 	}
