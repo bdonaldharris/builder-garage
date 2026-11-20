@@ -10,8 +10,9 @@
 #               anything is published. With OLDER_PACKAGES, it first installs
 #               those, then upgrades to PACKAGES.
 #   --registry  install @buildergarage/garage@VERSION from the npm registry,
-#               as a user would, after waiting a bounded time for it to
-#               appear, and check its signatures with "npm audit signatures"
+#               as a user would, after waiting a bounded time for both the
+#               launcher and its platform packages to appear, and check its
+#               signatures with "npm audit signatures"
 #
 # Everything happens under a temporary npm prefix and cache, which is
 # removed afterwards, so the machine's own npm installation is untouched.
@@ -127,13 +128,30 @@ case $mode in
 	rev=$3
 	spec=$name@$version
 	label=$spec
-	# The registry may take a while to serve a new version.
-	i=0
-	until [ "$(npm view "$spec" version 2>/dev/null)" = "$version" ]; do
-		i=$((i + 1))
-		[ "$i" -lt 20 ] || break
-		sleep 15
-	done
+	# The registry may serve the launcher before an optional platform package.
+	# Wait for the launcher, then use its declared package list as the source
+	# of truth for waiting for every platform package it names.
+	sh "$scripts/npm-wait-for-packages.sh" "$version" "$name"
+	if ! deps_json=$(npm view "$spec" optionalDependencies --json 2>"$work/deps.err"); then
+		cat "$work/deps.err" >&2
+		echo "cannot read platform packages declared by $spec" >&2
+		exit 1
+	fi
+	deps=$(printf '%s' "$deps_json" | node -e '
+		let text = "";
+		process.stdin.on("data", chunk => { text += chunk; });
+		process.stdin.on("end", () => {
+			const dependencies = JSON.parse(text);
+			console.log(Object.keys(dependencies).join("\\n"));
+		});
+	')
+	[ -n "$deps" ] || {
+		echo "$spec declares no platform packages" >&2
+		exit 1
+	}
+	# npm package names contain no whitespace.
+	set -- $deps
+	sh "$scripts/npm-wait-for-packages.sh" "$version" "$@"
 	;;
 esac
 

@@ -23,8 +23,10 @@
 #     malformed version; npm-dist-tag.sh never moves "latest" backward and
 #     refuses prereleases; npm-publish.sh refuses bad arguments; and the npm
 #     launcher runs its platform's executable, passing arguments and exit
-#     status through, or says npm does not provide garage (#158). The
-#     launcher checks need node, and are skipped without it.
+#     status through, or says npm does not provide garage (#158). The bounded
+#     registry wait succeeds only after every named package is served and
+#     fails without publishing when one never appears. The launcher checks
+#     need node, and are skipped without it.
 # CI runs it on every pull request. It runs on macOS and Linux.
 
 set -eu
@@ -234,6 +236,8 @@ fi
 npmpk=$scripts/npm-packages.sh
 disttag=$scripts/npm-dist-tag.sh
 npmpub=$scripts/npm-publish.sh
+npmwait=$scripts/npm-wait-for-packages.sh
+npmcheck=$scripts/check-npm-install.sh
 if command -v sha256sum >/dev/null 2>&1; then
 	sha() { sha256sum "$1" | cut -d' ' -f1; }
 else
@@ -291,6 +295,81 @@ refuses "dist-tag refuses a malformed current latest" sh "$disttag" 0.4.0 latest
 refuses "npm-publish refuses a missing packages directory" sh "$npmpub" "$work/absent" latest
 refuses "npm-publish refuses an empty dist-tag" sh "$npmpub" "$work/npm" ""
 refuses "npm-publish refuses an unknown option" sh "$npmpub" "$work/npm" latest --force
+
+# The wait helper is exercised against a fake registry. It has no publish
+# command, proving both paths run without publishing anything.
+mkdir "$work/npm-stub"
+cat >"$work/npm-stub/npm" <<'EOF'
+#!/bin/sh
+set -eu
+[ "$1" = view ] || exit 97
+spec=$2
+case ":${NPM_STUB_PRESENT:-}:" in
+*":$spec:"*) printf '%s\n' "${spec##*@}" ;;
+*) echo E404 >&2; exit 1 ;;
+esac
+EOF
+chmod 0755 "$work/npm-stub/npm"
+accepts "npm wait accepts every platform package once served" \
+	env NPM_STUB_PRESENT='@buildergarage/garage-linux-x64@9.8.7:@buildergarage/garage-darwin-arm64@9.8.7' \
+	GARAGE_NPM_WAIT_ATTEMPTS=2 GARAGE_NPM_WAIT_SECONDS=0 PATH="$work/npm-stub:$PATH" \
+	sh "$npmwait" 9.8.7 @buildergarage/garage-linux-x64 @buildergarage/garage-darwin-arm64
+refuses "npm wait fails before installation when a platform package never appears" \
+	env NPM_STUB_PRESENT='@buildergarage/garage-linux-x64@9.8.7' \
+	GARAGE_NPM_WAIT_ATTEMPTS=2 GARAGE_NPM_WAIT_SECONDS=0 PATH="$work/npm-stub:$PATH" \
+	sh "$npmwait" 9.8.7 @buildergarage/garage-linux-x64 @buildergarage/garage-darwin-arm64
+refuses "npm wait refuses zero attempts" \
+	env GARAGE_NPM_WAIT_ATTEMPTS=0 sh "$npmwait" 9.8.7 @buildergarage/garage-linux-x64
+
+mkdir "$work/npm-install-stub"
+cat >"$work/npm-install-stub/npm" <<'EOF'
+#!/bin/sh
+set -eu
+case $1 in
+view)
+	case "$2 $3" in
+	'@buildergarage/garage@9.8.7 version') printf '9.8.7\n' ;;
+	'@buildergarage/garage@9.8.7 optionalDependencies')
+		printf '{"@buildergarage/garage-linux-x64":"9.8.7","@buildergarage/garage-darwin-arm64":"9.8.7"}\n' ;;
+	'@buildergarage/garage-linux-x64@9.8.7 version') printf '9.8.7\n' ;;
+	*) echo E404 >&2; exit 1 ;;
+	esac
+	;;
+install) echo install >>"$NPM_STUB_LOG"; exit 97 ;;
+*) exit 97 ;;
+esac
+EOF
+chmod 0755 "$work/npm-install-stub/npm"
+install_log=$work/npm-install.log
+refuses "registry install waits for every platform package before installing" \
+	env NPM_STUB_LOG="$install_log" GARAGE_NPM_WAIT_ATTEMPTS=1 GARAGE_NPM_WAIT_SECONDS=0 \
+	PATH="$work/npm-install-stub:$PATH" sh "$npmcheck" --registry 9.8.7 v9.8.7 revision
+if [ -e "$install_log" ]; then
+	fail "registry install does not run npm install before every platform package is served"
+else
+	pass "registry install does not run npm install before every platform package is served"
+fi
+
+mkdir "$work/npm-publish-stub"
+cat >"$work/npm-publish-stub/npm" <<'EOF'
+#!/bin/sh
+set -eu
+case $1 in
+view) echo E404 >&2; exit 1 ;;
+publish) basename "$2" >>"$NPM_STUB_LOG" ;;
+*) exit 97 ;;
+esac
+EOF
+chmod 0755 "$work/npm-publish-stub/npm"
+publish_log=$work/npm-publish.log
+refuses "npm-publish fails before publishing the launcher when platform packages are not served" \
+	env NPM_STUB_LOG="$publish_log" GARAGE_NPM_WAIT_ATTEMPTS=1 GARAGE_NPM_WAIT_SECONDS=0 \
+	PATH="$work/npm-publish-stub:$PATH" sh "$npmpub" "$work/npm" latest
+if grep -q '^garage$' "$publish_log" 2>/dev/null; then
+	fail "npm-publish does not publish the launcher before every platform package is served"
+else
+	pass "npm-publish does not publish the launcher before every platform package is served"
+fi
 
 if command -v node >/dev/null 2>&1; then
 	host=$(node -p 'process.platform + "-" + process.arch')
