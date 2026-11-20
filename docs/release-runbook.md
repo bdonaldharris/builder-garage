@@ -40,9 +40,9 @@ git push origin origin/staging:refs/heads/release/vX.Y.Z-rc.1
 
 Open a pull request from `release/vX.Y.Z-rc.N` to `main`, using the pull request template:
 
-- **`## Governing issue`:** the release issue.
+- **Each release-member commit:** its substantive commit message says `Closes #N` for the one member issue that commit completes. The issue stays open when the commit merges into `staging`; GitHub closes it when that retained commit reaches default branch `main` through the promotion.
+- **`## Governing issue`:** `Closes #N` for the release issue only. Do not add member issues as closing lines in the promotion PR body.
 - **`## Pull request kind`:** `promotion`.
-- **`Closes #N`:** one line for the release issue and each member issue. They close when the promotion merges, because `main` is the default branch.
 
 Then:
 
@@ -64,7 +64,7 @@ The Workflow Owner records acceptance of the promotion on the release issue.
 
 Merge the promotion pull request with a merge commit, the only method `main` allows. After the merge:
 
-- the member issues and the release issue close;
+- confirm that the release issue closes;
 - the candidate branch is deleted automatically;
 - confirm that the merge commit's tree equals the candidate head's tree:
 
@@ -72,6 +72,7 @@ Merge the promotion pull request with a merge commit, the only method `main` all
   git fetch origin
   test "$(git rev-parse 'origin/main^{tree}')" = "$(git rev-parse '<candidate head commit>^{tree}')"
   ```
+- **Verify every member issue listed on the release issue is closed.** For a member that remains open, first check that its accepted change is present in the release. Only then close it manually, and add a durable note on the release issue naming the member, the completion check, and the manual-closure fallback. Do not treat a promotion-PR body closing line as this verification.
 
 No synchronization into `staging` is needed after a promotion. The promotion's merge commit adds nothing `staging` lacks ([ADR 0004, decision 4](adr/0004-release-promotion.md#4-the-promotion-invariant)).
 
