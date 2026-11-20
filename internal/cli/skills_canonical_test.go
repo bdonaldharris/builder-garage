@@ -8,7 +8,7 @@ import (
 )
 
 // canonicalRoles are the Technician roles of the canonical skills (#33
-// decision 3, #57 decision 2, #65 decision, #149 decision 4).
+// decision 3, #57 decision 2, #65 decision, #149 decision 4, #142 decision 1).
 var canonicalRoles = map[string]string{
 	"application-implementation-workflow": "implementer",
 	"engineering-discovery-workflow":      "discovery",
@@ -17,6 +17,7 @@ var canonicalRoles = map[string]string{
 	"integration-pr-review":               "implementer",
 	"issue-authoring-workflow":            "planner",
 	"project-spec-workflow":               "planner",
+	"prompt-authoring-workflow":           "planner",
 }
 
 // authoringSkills may author issues, each from its own evidence, and the

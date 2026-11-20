@@ -1,6 +1,6 @@
 # Builder Garage Skill Adoption Profile
 
-Builder Garage adopts the seven canonical engineering [skills](../skills/) it publishes, as its own engineering workflow. This profile makes that adoption explicit, points to Builder Garage's configured choices, and records the other project choices that qualify the skill text. The skills themselves are not repeated here.
+Builder Garage adopts the eight canonical engineering [skills](../skills/) it publishes, as its own engineering workflow. This profile makes that adoption explicit, points to Builder Garage's configured choices, and records the other project choices that qualify the skill text. The skills themselves are not repeated here.
 
 The skills are framework artifacts that any project can adopt. This profile is Builder Garage's adoption record as a project. Builder Garage's adoption of the Go Manual is recorded separately, in the [Go Manual profile](go-manual.md).
 
@@ -15,6 +15,7 @@ The skills are framework artifacts that any project can adopt. This profile is B
 | [integration-pr-review](../skills/integration-pr-review/SKILL.md) | `pr-review` |
 | [issue-authoring-workflow](../skills/issue-authoring-workflow/SKILL.md) | `author-issue` |
 | [project-spec-workflow](../skills/project-spec-workflow/SKILL.md) | `spec-design` |
+| [prompt-authoring-workflow](../skills/prompt-authoring-workflow/SKILL.md) | `prompt-author` |
 
 Builder Garage keeps no project spec of its own yet. That is deferred under the [#149 decision](https://github.com/bdonaldharris/builder-garage/issues/149#issuecomment-7010610605), item 8.
 

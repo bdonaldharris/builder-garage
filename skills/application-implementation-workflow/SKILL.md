@@ -875,15 +875,11 @@ It does not mean the application must have zero known suggestions or historical 
 
 ---
 
-# Prompt-generation requirement
+# Prompts and operational handoffs
 
-Prompts generated from this workflow should stay small.
+## Prompts
 
-The Issue/PR supplies the what and durable workflow history/state; the skill supplies the how; the prompt supplies only the action/location.
-
-Do not restate the whole workflow in each prompt.
-
-Small means concise and non-duplicative, not incomplete.
+Prompts generated from this workflow, including Agent #1, Agent #2, correction, integration-PR, and correction-finalization prompts, follow the prompt rules in `prompt-authoring-workflow` (`prompt-author`), under its "Prompt rules" section. That skill owns them; this skill does not restate them.
 
 ## Whole-artifact operational handoff
 
@@ -891,8 +887,6 @@ When producing an operational artifact intended for the orchestrating developer 
 
 This applies to:
 
-- agent prompts;
-- review/correction prompts;
 - SQL scripts;
 - migration execution scripts;
 - shell/CLI command sequences;
@@ -903,19 +897,7 @@ If an operational artifact changes, provide a new complete version. Do not requi
 
 A diff, patch, changed section, or comparison is appropriate only when the developer explicitly asks for one.
 
-This rule does not prohibit normal code diffs used during engineering review. It governs copy/paste operational handoffs to the orchestrating developer.
-
-In particular:
-
-- Agent #1 prompts preserve the no-commit/no-push/no-PR hold point, or, when they ask for commit-stage review, the push-but-no-PR hold point;
-- Agent #1 prompts do not need to repeat the global continuation invariant, universal pre-return completion gate, or valid terminal states; this skill owns those rules;
-- Agent #1 inspects existing architecture before inventing new structures;
-- material ambiguity is clarified instead of guessed through;
-- Agent #2 prompts use the three-question review contract;
-- correction prompts address only demonstrated current-implementation blockers;
-- suggestions do not expand implementation scope;
-- integration PR prompts invoke `integration-pr-review`;
-- correction-finalization prompts require Agent #1 to commit/push exactly the Agent #2-approved correction, verify artifact equivalence, make no implementation changes after approval, and proceed without another review unless the artifact changes after Agent #2 approval; a changed artifact returns to Agent #2 review.
+This rule does not prohibit normal code diffs used during engineering review. It governs copy/paste operational handoffs to the orchestrating developer. Prompts are handed over complete under the prompt rules in `prompt-authoring-workflow`.
 
 ---
 

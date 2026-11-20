@@ -15,6 +15,7 @@ Engineering skills currently remain in [`../skills/`](../skills/) to preserve ex
 - [Issue authoring](../skills/issue-authoring-workflow/SKILL.md)
 - [Project spec](../skills/project-spec-workflow/SKILL.md)
   - [Project spec template](../skills/project-spec-workflow/templates/project-spec.md): an optional starting point for a project's specification, with the sections of the skill's [spec output](../skills/project-spec-workflow/SKILL.md#spec-output). Filling it in is not an accepted spec. See [Project specs](../docs/project-specs.md).
+- [Prompt authoring](../skills/prompt-authoring-workflow/SKILL.md)
 
 Follow the canonical skill contracts, not a summary here.
 
