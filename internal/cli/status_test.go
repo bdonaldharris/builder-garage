@@ -432,6 +432,20 @@ func statusTestEnv(t *testing.T, dir string, gh ghRunner) statusEnv {
 	}
 }
 
+func TestRunStatusOutsideRepositoryReturnsErrorWithoutPanic(t *testing.T) {
+	var out bytes.Buffer
+	err := runStatus(context.Background(), 1, statusEnv{
+		WorkDir: t.TempDir(),
+		Git:     func(context.Context, string, ...string) ([]byte, error) { return nil, &exec.ExitError{} },
+	}, &out)
+	if !errors.Is(err, errNotRepository) {
+		t.Fatalf("error = %v, want errNotRepository", err)
+	}
+	if out.Len() != 0 {
+		t.Fatalf("unexpected output: %q", out.String())
+	}
+}
+
 func TestRunStatusWithoutGitHubReportsNoWorkflowState(t *testing.T) {
 	dir := newGitRepo(t, "https://github.com/o/r.git")
 	isolateUserCache(t)

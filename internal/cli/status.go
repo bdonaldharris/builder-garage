@@ -105,12 +105,24 @@ func parseStatusTarget(arg string) (int, error) {
 // GitHub cannot be read, it prints what it can, reports no workflow state, and
 // returns errGitHubNotConsulted.
 func runStatus(ctx context.Context, number int, env statusEnv, w io.Writer) error {
+	report, err := statusReportFor(ctx, number, env)
+	if report != nil {
+		if renderErr := report.render(w); renderErr != nil {
+			return renderErr
+		}
+	}
+	return err
+}
+
+// statusReportFor is the shared typed status operation. Command and web
+// adapters render its report independently; it never parses rendered output.
+func statusReportFor(ctx context.Context, number int, env statusEnv) (*statusReport, error) {
 	if ctx == nil {
 		ctx = context.Background()
 	}
 	repo, err := identifyRepository(ctx, env.WorkDir, env.Git)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	var cfg *projectConfig
@@ -127,7 +139,7 @@ func runStatus(ctx context.Context, number int, env statusEnv, w io.Writer) erro
 		item, err = fetchStatusItem(ctx, env.GH, ghRepo, number)
 	}
 	if errors.Is(err, errStatusNotFound) {
-		return fmt.Errorf("%s/%s #%d: %w", ghRepo.Owner, ghRepo.Name, number, errStatusNotFound)
+		return nil, fmt.Errorf("%s/%s #%d: %w", ghRepo.Owner, ghRepo.Name, number, errStatusNotFound)
 	}
 	reads := 1
 	if err == nil {
@@ -172,13 +184,10 @@ func runStatus(ctx context.Context, number int, env statusEnv, w io.Writer) erro
 	}
 	addLocalHistory(report, env, repo, kind, number, item == nil)
 
-	if err := report.render(w); err != nil {
-		return err
-	}
 	if item == nil {
-		return errGitHubNotConsulted
+		return report, errGitHubNotConsulted
 	}
-	return nil
+	return report, nil
 }
 
 // addLocalHistory appends local events for the target. When GitHub was not
