@@ -72,7 +72,8 @@ No release candidate may be cut or promoted unless `staging` incorporates every 
   - the Workflow Owner's acceptance on the release issue.
 
   Implementation-review gates do not apply to a declared, matching promotion, because each member was reviewed when it merged into `staging`.
-- **Member issues stay open until the promotion pull request closes them.** GitHub's closing keywords act only on a pull request into the default branch. A pull request into `staging` therefore leaves its issue open, and the promotion pull request's description lists `Closes #N` for the release issue and every member.
+- **Member closure uses retained commit messages.** Each substantive release-member commit says `Closes #N` for the member issue it completes. A pull request into `staging` leaves that issue open because `staging` is not the default branch; the retained commit closes it when the promotion reaches `main`. The promotion pull request's `## Governing issue` section names and closes the release issue only.
+- **Post-merge verification is required.** The maintainer compares the release issue's member list with the member issue states after the promotion. If a listed member remains open, the maintainer verifies its change is complete, manually closes it only when complete, and records that fallback on the release issue. This is a human recovery procedure, not GitHub API or workflow reconciliation.
 - **The release** is then tagged on the promotion's merge commit, dry-run, and released, under [ADR 0003](0003-release-distribution.md).
 
 ### 8. Hotfixes and synchronization

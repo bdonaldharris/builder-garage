@@ -23,6 +23,8 @@ short=$(printf '%s' "$commit" | cut -c1-7)
 version=${tag#v}
 inventory=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/release-inventory.sh
 packages=$(sh "$inventory" "$version" packages)
+linux_packages=$(printf '%s\n' "$packages" | grep -E '\.(deb|rpm)$' || true)
+macos_packages=$(printf '%s\n' "$packages" | grep -E '\.pkg$' || true)
 
 cat <<EOF
 \`garage\` $tag for macOS, Linux, and Windows, on amd64 and arm64.
@@ -36,7 +38,7 @@ cat <<EOF
 Download, verify, and extract from a terminal, as [Verifying a release]($url/blob/$tag/docs/release-verification.md) shows: \`gh release download\` or \`curl\`, verify, then \`tar\` on macOS and Linux, or \`Expand-Archive\` on Windows.
 EOF
 
-if [ -n "$packages" ]; then
+if [ -n "$linux_packages" ]; then
 	cat <<EOF
 
 ## Linux packages
@@ -44,12 +46,27 @@ if [ -n "$packages" ]; then
 \`.deb\` and \`.rpm\` packages install \`/usr/bin/garage\` and its license file, and nothing else. \`apt\`, \`dpkg\`, \`dnf\`, and \`rpm\` own upgrades and removal. No package touches your project configuration, installed skills, or local history.
 
 EOF
-	for p in $packages; do
+	for p in $linux_packages; do
 		echo "- \`$p\`"
 	done
 	cat <<EOF
 
 The packages carry no PGP signature. Verify the one you download against the signed checksum manifest before installing it, as [Verifying a release]($url/blob/$tag/docs/release-verification.md#linux-packages) shows. Then install it from the file, for example \`sudo apt install ./garage_${version}_linux_amd64.deb\` or \`sudo dnf install ./garage-${version}-1.x86_64.rpm\`.
+EOF
+fi
+
+if [ -n "$macos_packages" ]; then
+	cat <<EOF
+
+## macOS installer packages
+
+The architecture-specific flat installers are signed with the Developer ID Installer identity for Team ID \`38397A2FG6\`, notarized by Apple, and stapled. They install only Builder Garage's versioned package payload under \`/usr/local/lib/buildergarage/\` and the controlled \`/usr/local/bin/garage\` symlink. They refuse to overwrite a command owned by another installation method.
+
+EOF
+	for p in $macos_packages; do echo "- \`$p\`"; done
+	cat <<EOF
+
+Verify the package against the signed checksum manifest before installation. [Verifying a release]($url/blob/$tag/docs/release-verification.md#macos-installer-packages) documents installation, switching methods, and the package-owned uninstall procedure.
 EOF
 fi
 

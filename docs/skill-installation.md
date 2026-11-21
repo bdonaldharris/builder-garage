@@ -15,6 +15,7 @@
   | `claude-code` | `$CLAUDE_CONFIG_DIR/skills`, or `~/.claude/skills` |
   | `codex` | `$CODEX_HOME/skills`, or `~/.codex/skills` |
   | `copilot-cli` | `$COPILOT_HOME/skills`, or `~/.copilot/skills` |
+  | `cursor` | `~/.cursor/skills` (no override) |
 
 - **What Garage writes.** Garage writes only one directory per canonical skill, `<target>/<skill>/`, and one per delivered manual, `<target>/builder-garage-manual-<name>/`. It never changes or removes anything else in a target, such as `synced/`, `.trash/`, `.system/`, or another tool's skills.
 - **Its own state.** Garage keeps its manifest and backups under the user configuration directory (`os.UserConfigDir()`), in `builder-garage/`:
@@ -64,6 +65,30 @@ It also reports:
   | `copilot-cli` | `~/.agents/skills` (only when `COPILOT_HOME` is unset or `~/.copilot`), and the project's `.github/skills`, `.agents/skills`, and `.claude/skills` |
 
 - **Harness version.** Garage runs each harness's `--version`. A version that differs from the target's `confirmed_version`, or that cannot be determined, is reported as **Unverified**. That is a warning, separate from skill integrity: the harness's behavior is not confirmed until it is re-tested.
+
+### Cursor collision coverage
+
+For Cursor, Garage manages only `~/.cursor/skills`. Before installing or
+verifying it scans for same-named canonical skills in that root (including
+nested copies), `~/.agents/skills`, `~/.claude/skills`, `~/.codex/skills`,
+and `.cursor/skills`, `.agents/skills`, `.claude/skills`, and `.codex/skills`
+at the project directory containing `.garage/config.yaml` and below it.
+`.git` internals are excluded. This deliberately includes nested dependency
+directories, so it can take longer in large projects.
+
+The project directory and each user root are separate traversal boundaries.
+Garage deduplicates resolved directories and does not follow a directory
+symlink outside its boundary. Such skipped locations, and Cursor sources
+outside the local boundary (for example ancestor workspaces or non-local
+sources), are reported as coverage limitations only. A candidate root or
+`SKILL.md` that cannot be safely inspected is incomplete coverage: install
+refuses and verify fails. A missing optional root is normal. A clean result
+means only no detected same-name collision in the inspected scope; it does
+not prove that Cursor has no other effective instruction.
+
+Every collision names its skill and path. A conflicting Garage installation
+for Claude Code or Codex is identified as such. Garage never removes,
+overwrites, adopts, or relocates a conflicting copy.
 
 `verify` exits successfully only when every canonical skill and every manual the project adopts is Current at every selected target, with no Extra skill, no leftover modified manual, and no collision. It writes nothing.
 

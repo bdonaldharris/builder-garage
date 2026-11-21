@@ -39,6 +39,7 @@ const (
 	historyFileExt  = ".jsonl"
 	maxURLLength    = 512
 	maxArtifactLen  = 256
+	maxRoleLength   = 80
 	maxTargetNumber = 1_000_000_000
 )
 
@@ -91,6 +92,7 @@ type historyEvent struct {
 	Outcome  string `json:"outcome"`
 	URL      string `json:"url,omitempty"`
 	Artifact string `json:"artifact,omitempty"`
+	Role     string `json:"role,omitempty"`
 }
 
 // validate checks every field of an event against the permitted values.
@@ -118,7 +120,10 @@ func (e historyEvent) validate() error {
 	if err := validateEventURL(e.URL); err != nil {
 		return err
 	}
-	return validateArtifact(e.Artifact)
+	if err := validateArtifact(e.Artifact); err != nil {
+		return err
+	}
+	return validateRole(e.Role)
 }
 
 func validateTarget(kind string, number int) error {
@@ -162,6 +167,21 @@ func validateArtifact(raw string) error {
 	if len(raw) > maxArtifactLen || !artifactPattern.MatchString(raw) {
 		return fmt.Errorf("%w: artifact must be a single printable token of at most %d characters",
 			errHistoryInput, maxArtifactLen)
+	}
+	return nil
+}
+
+// validateRole accepts an optional, human-readable role that was explicitly
+// supplied at record time. It is intentionally not derived from event type,
+// outcome, or a configured harness.
+func validateRole(raw string) error {
+	if raw == "" {
+		return nil
+	}
+	if len(raw) > maxRoleLength || strings.TrimSpace(raw) != raw || strings.IndexFunc(raw, func(r rune) bool {
+		return r < ' ' || r == 0x7f
+	}) >= 0 {
+		return fmt.Errorf("%w: role must be trimmed single-line text of at most %d characters", errHistoryInput, maxRoleLength)
 	}
 	return nil
 }
@@ -357,7 +377,7 @@ func writeHistory(path string, content []byte) error {
 	if info, err := os.Lstat(path); err == nil && !info.Mode().IsRegular() {
 		return fmt.Errorf("refusing to replace %s: it is not a regular file", path)
 	}
-	if err := commitConfigReplacement(tempPath, path); err != nil {
+	if err := commitHistoryReplacement(tempPath, path); err != nil {
 		return fmt.Errorf("cannot write the history: %w", err)
 	}
 	committed = true

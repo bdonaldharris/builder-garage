@@ -5,8 +5,10 @@ Closes #
 <!--
 Substantive changes require an issue. Name it here as #N, Closes #N, Fixes #N, Resolves #N, or
 Refs #N; garage status reads this section. Into staging, GitHub does not close the issue on merge:
-it stays open until its release is promoted. A promotion pull request lists the release issue and
-"Closes #N" for every member issue.
+it stays open until its release is promoted. A promotion pull request names and closes only its
+release issue here. Each release-member commit carries `Closes #N` for the member issue it completes;
+after promotion, the release issue's member list is checked and any unexpected open member follows the
+release runbook's manual fallback.
 For a small correction that changes no meaning (typo, broken link, formatting), replace the line
 above with "None - small correction". See CONTRIBUTING.md.
 -->

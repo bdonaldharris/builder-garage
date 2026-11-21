@@ -259,7 +259,7 @@ func (f *skillsFixture) writeConfigWithManuals(manuals []string, harnesses ...st
 	if len(harnesses) > 0 {
 		content += "tooling:\n  skill_targets:\n"
 		for _, h := range harnesses {
-			content += skillTargetYAML(h, map[string]string{"claude-code": "2.1.277", "codex": "0.137.0", "copilot-cli": "1.0.93-1"}[h])
+			content += skillTargetYAML(h, map[string]string{"claude-code": "2.1.277", "codex": "0.137.0", "copilot-cli": "1.0.93-1", "cursor": "2026.11.19-f005e9d"}[h])
 		}
 	}
 	mustMkdir(f.t, filepath.Join(f.Project, garageDirName))

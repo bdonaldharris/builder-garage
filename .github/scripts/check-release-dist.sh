@@ -3,16 +3,25 @@
 # GoReleaser wrote to dist/, and how each executable was built
 # (.goreleaser.yaml). The expected file names come from release-inventory.sh.
 #
-#   check-release-dist.sh DIST ARCHIVE_VERSION BINARY_VERSION REVISION
+#   check-release-dist.sh DIST ARCHIVE_VERSION BINARY_VERSION REVISION [SET]
 #
 #   DIST             GoReleaser's output directory, usually dist
 #   ARCHIVE_VERSION  the version in asset names, for example 0.1.1
 #   BINARY_VERSION   what "garage version" must report, for example v0.1.1
 #   REVISION         the full commit the release is built from
+#   SET              which of the release inventory's files DIST must hold,
+#                    as a release-inventory.sh selection:
+#                      manifest    every file of the checksum manifest,
+#                                  macOS installer packages included (the
+#                                  default; the release's final check)
+#                      goreleaser  only the files GoReleaser builds, for a
+#                                  check of GoReleaser's own dist, before
+#                                  the macOS installer packages exist
 #
 # It checks that:
-#   - dist holds exactly the archives and packages of ARCHIVE_VERSION's
-#     release inventory, with the expected names, and no others;
+#   - dist holds exactly SET's archives and native packages of
+#     ARCHIVE_VERSION's release inventory, with the expected names, and no
+#     others;
 #   - each archive holds exactly the executable, LICENSE, and README.md;
 #   - the checksum manifest lists exactly those files, and matches them;
 #   (check-release-package.sh checks each package's contents on its platform)
@@ -24,14 +33,22 @@
 
 set -eu
 
-if [ "$#" -ne 4 ]; then
-	echo "usage: check-release-dist.sh DIST ARCHIVE_VERSION BINARY_VERSION REVISION" >&2
+if [ "$#" -ne 4 ] && [ "$#" -ne 5 ]; then
+	echo "usage: check-release-dist.sh DIST ARCHIVE_VERSION BINARY_VERSION REVISION [manifest|goreleaser]" >&2
 	exit 2
 fi
 dist=$1
 aver=$2
 bver=$3
 rev=$4
+selection=${5:-manifest}
+case $selection in
+manifest | goreleaser) ;;
+*)
+	echo "check-release-dist: unknown set '$selection' (want manifest or goreleaser)" >&2
+	exit 2
+	;;
+esac
 
 targets="darwin_amd64 darwin_arm64 linux_amd64 linux_arm64 windows_amd64 windows_arm64"
 
@@ -67,7 +84,8 @@ trap 'rm -rf -- "$work"' EXIT
 
 inventory=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)/release-inventory.sh
 inv_id=$(sh "$inventory" "$aver" id)
-echo "release inventory $inv_id for $aver"
+echo "release inventory $inv_id for $aver, set $selection"
+want_list=$(sh "$inventory" "$aver" "$selection")
 
 # Archives: names and contents.
 for name in $(sh "$inventory" "$aver" archives); do
@@ -90,13 +108,15 @@ for name in $(sh "$inventory" "$aver" archives); do
 	if [ "$got" = "$want" ]; then pass "$name holds exactly $want"; else fail "$name holds exactly $want (got: $got)"; fi
 done
 
-for name in $(sh "$inventory" "$aver" packages); do
+# The inventory's packages that the selected set includes.
+sh "$inventory" "$aver" packages >"$work/packages"
+for name in $(printf '%s\n' "$want_list" | grep -Fx -f "$work/packages" || true); do
 	if [ -f "$dist/$name" ]; then pass "package $name exists"; else fail "package $name exists"; fi
 done
 
 # Exactly the inventory's archives and packages, and no other.
-want=$(sh "$inventory" "$aver" manifest | tr '\n' ' ')
-found=$(cd "$dist" && ls -1 | grep -E '\.(tar\.gz|zip|deb|rpm)$' | LC_ALL=C sort | tr '\n' ' ')
+want=$(printf '%s\n' "$want_list" | tr '\n' ' ')
+found=$(cd "$dist" && ls -1 | grep -E '\.(tar\.gz|zip|deb|rpm|pkg)$' | LC_ALL=C sort | tr '\n' ' ')
 if [ "$found" = "$want" ]; then pass "dist holds exactly the inventory $inv_id archives and packages"; else
 	fail "dist holds exactly the inventory $inv_id archives and packages (got: $found)"
 fi

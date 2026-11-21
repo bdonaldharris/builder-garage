@@ -55,6 +55,8 @@ fi
 work=$(mktemp -d "${TMPDIR:-/tmp}/garage-npm-publish.XXXXXX")
 trap 'rm -rf -- "$work"' EXIT
 
+scripts=$(CDPATH='' cd -- "$(dirname -- "$0")" && pwd)
+
 field() { node -p "require(process.argv[1])[process.argv[2]]" "$(CDPATH='' cd -- "$1" && pwd)/package.json" "$2"; }
 deps() { node -p "JSON.stringify(require(process.argv[1]).optionalDependencies || {})" "$1/package.json"; }
 
@@ -108,4 +110,16 @@ for dir in "$packages"/garage-*; do
 	[ -d "$dir" ] || refuse "no platform package was generated in $packages"
 	publish "$dir"
 done
+# npm can accept a publish before every registry replica serves the version.
+# Do not make the launcher visible until all packages it names are served.
+launcher_deps=$(node -e 'console.log(Object.keys(require(process.argv[1]).optionalDependencies || {}).join("\\n"))' "$packages/garage/package.json")
+[ -n "$launcher_deps" ] || refuse "$packages/garage has no platform optionalDependencies"
+# Package names contain no whitespace. Keep the dependency source of truth in
+# the launcher package rather than duplicate the platform list here.
+set -- $launcher_deps
+if [ -z "$dry" ]; then
+	sh "$scripts/npm-wait-for-packages.sh" "$(field "$packages/garage" version)" "$@"
+else
+	echo "npm-publish: dry run; not waiting for registry replication"
+fi
 publish "$packages/garage"

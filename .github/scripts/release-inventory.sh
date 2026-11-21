@@ -2,23 +2,29 @@
 # release-inventory.sh: the single definition of the files a garage release
 # publishes (docs/adr/0003-release-distribution.md, "Release inventory").
 #
-#   release-inventory.sh VERSION [all | manifest | archives | packages | id]
+#   release-inventory.sh VERSION [all | manifest | goreleaser | archives | packages | id]
 #
 # VERSION is the release version without its "v", for example 0.2.0. A
 # snapshot version such as 0.2.0-snapshot+abc1234 selects the inventory of
 # its base version.
 #
-#   all       every release asset: the manifest entries, the checksum
-#             manifest, and its Sigstore bundle (the default)
-#   manifest  the files the checksum manifest lists
-#   archives  the six platform archives
-#   packages  the Linux packages (none in inventory v1)
-#   id        the inventory's name: v1 or v2
+#   all         every release asset: the manifest entries, the checksum
+#               manifest, and its Sigstore bundle (the default)
+#   manifest    the files the checksum manifest lists
+#   goreleaser  the files GoReleaser itself builds: the manifest entries
+#               without the macOS installer packages, which macOS runners
+#               build afterwards from its darwin archives (inventory v3).
+#               For v1 and v2 it equals manifest.
+#   archives    the six platform archives
+#   packages    native packages (none in inventory v1)
+#   id          the inventory's name: v1, v2, or v3
 #
 # Inventories:
 #   v1  up to v0.1.x: six archives, the manifest, and its bundle (8 files)
-#   v2  from v0.2.0: v1, plus .deb and .rpm packages for linux/amd64 and
-#       linux/arm64 (12 files)
+#   v2  v0.2.0 through v0.4.x: v1, plus .deb and .rpm packages for
+#       linux/amd64 and linux/arm64 (12 files)
+#   v3  from v0.5.0: v2, plus signed, notarized installer packages for
+#       darwin/amd64 and darwin/arm64 (14 files)
 #
 # Names are printed one per line, sorted. Every check that needs a release's
 # file names reads them from here, so no other list exists.
@@ -46,8 +52,10 @@ minor=${rest%%.*}
 
 if [ "$major" -eq 0 ] && [ "$minor" -lt 2 ]; then
 	id=v1
-else
+elif [ "$major" -eq 0 ] && [ "$minor" -lt 5 ]; then
 	id=v2
+else
+	id=v3
 fi
 
 archives() {
@@ -59,8 +67,12 @@ archives() {
 	done
 }
 
-packages() {
-	[ "$id" = v2 ] || return 0
+# The Linux packages GoReleaser builds with nfpm.
+linux_packages() {
+	case $id in
+	v1) return 0 ;;
+	v2 | v3) ;;
+	esac
 	# rpm versions cannot contain "-": nfpm writes a pre-release as "~".
 	rpm_version=$(printf '%s\n' "$version" | sed 's/-/~/')
 	echo "garage_${version}_linux_amd64.deb"
@@ -69,11 +81,25 @@ packages() {
 	echo "garage-${rpm_version}-1.aarch64.rpm"
 }
 
+# The macOS installer packages, built after GoReleaser on macOS runners.
+macos_packages() {
+	if [ "$id" = v3 ]; then
+		echo "garage_${version}_darwin_amd64.pkg"
+		echo "garage_${version}_darwin_arm64.pkg"
+	fi
+}
+
+packages() {
+	linux_packages
+	macos_packages
+}
+
 manifest=garage_${version}_checksums.txt
 
 case $what in
 all) { archives; packages; echo "$manifest"; echo "$manifest.sigstore.json"; } | LC_ALL=C sort ;;
 manifest) { archives; packages; } | LC_ALL=C sort ;;
+goreleaser) { archives; linux_packages; } | LC_ALL=C sort ;;
 archives) archives | LC_ALL=C sort ;;
 packages) packages | LC_ALL=C sort ;;
 id) echo "$id" ;;

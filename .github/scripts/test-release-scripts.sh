@@ -7,8 +7,13 @@
 #   - release-guard.sh refuses every ref but a vMAJOR.MINOR.PATCH tag, any
 #     unknown mode, and any tag whose commit is not on the released-code
 #     branch, in a throwaway repository;
-#   - release-inventory.sh selects inventory v1 up to v0.1.x and v2 from
-#     v0.2.0, names every file exactly, and refuses a malformed version;
+#   - release-inventory.sh selects inventory v1 up to v0.1.x, v2 from v0.2.0,
+#     and v3 from v0.5.0, names every file exactly, leaves the macOS
+#     installer packages out of its goreleaser selection, and refuses a
+#     malformed version;
+#   - check-release-dist.sh requires the macOS installer packages by default,
+#     and only the files GoReleaser builds with its goreleaser set, and
+#     refuses an unknown set (#179);
 #   - platform-sign.sh never changes a binary, refuses an unset or unknown
 #     mode and a missing binary, and refuses a darwin release build unless
 #     every macOS signing credential is set (#122);
@@ -23,8 +28,10 @@
 #     malformed version; npm-dist-tag.sh never moves "latest" backward and
 #     refuses prereleases; npm-publish.sh refuses bad arguments; and the npm
 #     launcher runs its platform's executable, passing arguments and exit
-#     status through, or says npm does not provide garage (#158). The
-#     launcher checks need node, and are skipped without it.
+#     status through, or says npm does not provide garage (#158). The bounded
+#     registry wait succeeds only after every named package is served and
+#     fails without publishing when one never appears. The launcher checks
+#     need node, and are skipped without it.
 # CI runs it on every pull request. It runs on macOS and Linux.
 
 set -eu
@@ -122,7 +129,9 @@ check_eq() { # check_eq NAME GOT WANT
 check_eq "inventory v1 for 0.1.1" "$(sh "$inv" 0.1.1 id)" v1
 check_eq "inventory v1 for 0.1.99" "$(sh "$inv" 0.1.99 id)" v1
 check_eq "inventory v2 for 0.2.0" "$(sh "$inv" 0.2.0 id)" v2
-check_eq "inventory v2 for 1.0.0" "$(sh "$inv" 1.0.0 id)" v2
+check_eq "inventory v3 for 1.0.0" "$(sh "$inv" 1.0.0 id)" v3
+check_eq "inventory v2 for 0.4.9" "$(sh "$inv" 0.4.9 id)" v2
+check_eq "inventory v3 for 0.5.0" "$(sh "$inv" 0.5.0 id)" v3
 check_eq "inventory v1 has 8 assets" "$(count 0.1.1)" 8
 check_eq "inventory v1 has no packages" "$(sh "$inv" 0.1.1 packages | grep -c . || true)" 0
 check_eq "inventory v2 has 12 assets" "$(count 0.2.0)" 12
@@ -131,6 +140,19 @@ check_eq "inventory v2 packages" "$(sh "$inv" 0.2.0 packages | tr '\n' ' ')" \
 	"garage-0.2.0-1.aarch64.rpm garage-0.2.0-1.x86_64.rpm garage_0.2.0_linux_amd64.deb garage_0.2.0_linux_arm64.deb "
 check_eq "inventory v2 assets include the manifest and bundle" \
 	"$(sh "$inv" 0.2.0 all | grep -c '^garage_0.2.0_checksums.txt')" 2
+check_eq "inventory v3 has 14 assets" "$(count 0.5.0)" 14
+check_eq "inventory v3 manifest lists 12 files" "$(count 0.5.0 manifest)" 12
+check_eq "inventory v3 packages include macOS installers" \
+	"$(sh "$inv" 0.5.0 packages | grep -c '^garage_0.5.0_darwin_.*\.pkg$')" 2
+check_eq "inventory v3 goreleaser selection lists 10 files" "$(count 0.5.0 goreleaser)" 10
+check_eq "inventory v3 goreleaser selection has no macOS installer" \
+	"$(sh "$inv" 0.5.0 goreleaser | grep -c '\.pkg$' || true)" 0
+check_eq "inventory v3 goreleaser selection is the manifest without the installers" \
+	"$(sh "$inv" 0.5.0 goreleaser | tr '\n' ' ')" "$(sh "$inv" 0.5.0 manifest | grep -v '\.pkg$' | tr '\n' ' ')"
+check_eq "inventory v2 goreleaser selection equals its manifest" \
+	"$(sh "$inv" 0.2.0 goreleaser | tr '\n' ' ')" "$(sh "$inv" 0.2.0 manifest | tr '\n' ' ')"
+check_eq "inventory v1 goreleaser selection equals its manifest" \
+	"$(sh "$inv" 0.1.1 goreleaser | tr '\n' ' ')" "$(sh "$inv" 0.1.1 manifest | tr '\n' ' ')"
 check_eq "a snapshot selects its base version's inventory" "$(sh "$inv" 0.2.0-snapshot+abc1234 id)" v2
 check_eq "a snapshot rpm name writes the pre-release with ~" \
 	"$(sh "$inv" 0.2.0-snapshot+abc1234 packages | grep x86_64)" "garage-0.2.0~snapshot+abc1234-1.x86_64.rpm"
@@ -199,6 +221,19 @@ else
 	pass "credentials check prints no credential value"
 fi
 
+# The Installer certificate is deliberately separate from the Application
+# certificate. Its preflight shares only the existing notarization values.
+installer_creds=$scripts/check-macos-installer-env.sh
+with_installer_creds() {
+	MACOS_INSTALLER_P12=$p12 MACOS_INSTALLER_PASSWORD=dummy-installer-password MACOS_NOTARY_KEY=$p8 \
+		MACOS_NOTARY_KEY_ID=DUMMYKEYID MACOS_NOTARY_ISSUER_ID=dummy-issuer "$@"
+}
+accepts "Installer credentials are not required in snapshot mode" sh "$installer_creds" snapshot
+refuses "Installer credentials are required in release mode" sh "$installer_creds" release
+accepts "Installer preflight accepts dedicated credentials" with_installer_creds sh "$installer_creds" release
+refuses "Installer preflight refuses an Application certificate in place of an Installer certificate" \
+	env MACOS_SIGN_P12=$p12 MACOS_SIGN_PASSWORD=dummy-password MACOS_NOTARY_KEY=$p8 MACOS_NOTARY_KEY_ID=DUMMYKEYID MACOS_NOTARY_ISSUER_ID=dummy-issuer sh "$installer_creds" release
+
 bin=$work/garage
 printf 'binary' >"$bin"
 for mode in snapshot dry-run release; do
@@ -231,9 +266,113 @@ else
 fi
 
 # npm-packages.sh, npm-dist-tag.sh, npm-publish.sh, and the npm launcher
+# check-release-dist.sh: which inventory files a dist must hold (#179).
+# A fake GoReleaser dist for inventory v3: the six archives, each holding a
+# real (tiny) Go executable, the four Linux packages, and their manifest, but
+# no macOS installer packages, which GoReleaser never builds. Only the
+# inventory checks are asserted; the executables' build settings fail by
+# design, so the script's overall status is not.
+distchk=$scripts/check-release-dist.sh
+refuses "dist check refuses an unknown set" sh "$distchk" "$work" 0.5.0 0.5.0 HEAD archives
+refuses "dist check refuses a sixth argument" sh "$distchk" "$work" 0.5.0 0.5.0 HEAD goreleaser extra
+if command -v sha256sum >/dev/null 2>&1; then
+	dsha() { sha256sum "$1" | cut -d' ' -f1; }
+else
+	dsha() { shasum -a 256 "$1" | cut -d' ' -f1; }
+fi
+mkzip() { # mkzip ZIP DIR FILE...: a zip of FILEs in DIR, with zip or python3
+	z=$1
+	d=$2
+	shift 2
+	if command -v zip >/dev/null 2>&1; then
+		(cd "$d" && zip -q "$z" "$@")
+	else
+		(cd "$d" && python3 -I -m zipfile -c "$z" "$@")
+	fi
+}
+if command -v go >/dev/null 2>&1 && { command -v zip >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1; }; then
+	gd=$work/distchk
+	v=0.5.0-snapshot+abc1234
+	mkdir -p "$gd/mod" "$gd/src" "$gd/dist"
+	printf 'module example.invalid/garage\n\ngo 1.21\n' >"$gd/mod/go.mod"
+	printf 'package main\n\nfunc main() {}\n' >"$gd/mod/main.go"
+	(cd "$gd/mod" && CGO_ENABLED=0 GOFLAGS=-buildvcs=false go build -trimpath -o "$gd/src/garage" .)
+	cp "$gd/src/garage" "$gd/src/garage.exe"
+	printf 'MIT\n' >"$gd/src/LICENSE"
+	printf 'readme\n' >"$gd/src/README.md"
+	for name in $(sh "$inv" "$v" archives); do
+		case $name in
+		*.zip) mkzip "$gd/dist/$name" "$gd/src" garage.exe LICENSE README.md ;;
+		*) tar -czf "$gd/dist/$name" -C "$gd/src" garage LICENSE README.md ;;
+		esac
+	done
+	for name in $(sh "$inv" "$v" packages | grep -v '\.pkg$'); do printf 'pkg\n' >"$gd/dist/$name"; done
+	manifest() { # manifest: GoReleaser's checksum manifest for the files in dist
+		: >"$gd/dist/garage_${v}_checksums.txt"
+		for f in $(cd "$gd/dist" && ls -1 | grep -E '\.(tar\.gz|zip|deb|rpm|pkg)$' | LC_ALL=C sort); do
+			printf '%s  %s\n' "$(dsha "$gd/dist/$f")" "$f" >>"$gd/dist/garage_${v}_checksums.txt"
+		done
+	}
+	manifest
+	distrun() { sh "$distchk" "$gd/dist" "$v" "$v" HEAD "$@" 2>&1 || true; }
+	has() { # has NAME LINE OUTPUT: OUTPUT contains LINE exactly
+		if printf '%s\n' "$3" | grep -Fxq -- "$2"; then pass "$1"; else
+			printf '%s\n' "$3"
+			fail "$1"
+		fi
+	}
+	out=$(distrun goreleaser)
+	has "v3 GoReleaser dist holds exactly the goreleaser set" "ok   dist holds exactly the inventory v3 archives and packages" "$out"
+	has "v3 GoReleaser manifest lists exactly the goreleaser set" "ok   manifest lists exactly the inventory v3 files" "$out"
+	has "v3 GoReleaser dist matches its manifest" "ok   manifest matches the files" "$out"
+	has "v3 goreleaser set still requires each Linux package" "ok   package garage_${v}_linux_amd64.deb exists" "$out"
+	if printf '%s\n' "$out" | grep -q '\.pkg'; then
+		printf '%s\n' "$out"
+		fail "v3 goreleaser set does not require the macOS installer packages"
+	else pass "v3 goreleaser set does not require the macOS installer packages"; fi
+	out=$(distrun)
+	has "the default set still requires the macOS installer packages" "FAIL package garage_${v}_darwin_arm64.pkg exists" "$out"
+	has "the default set refuses a dist without them" "FAIL dist holds exactly the inventory v3 archives and packages (got: $(cd "$gd/dist" && ls -1 | grep -E '\.(tar\.gz|zip|deb|rpm|pkg)$' | LC_ALL=C sort | tr '\n' ' '))" "$out"
+	out=$(distrun manifest)
+	has "set manifest is the default" "FAIL package garage_${v}_darwin_amd64.pkg exists" "$out"
+	rpm=$(sh "$inv" "$v" packages | grep x86_64)
+	mv "$gd/dist/$rpm" "$gd/rpm"
+	manifest
+	out=$(distrun goreleaser)
+	has "the goreleaser set fails without a Linux package" "FAIL package $rpm exists" "$out"
+	mv "$gd/rpm" "$gd/dist/$rpm"
+	printf 'pkg\n' >"$gd/dist/garage_${v}_darwin_amd64.pkg"
+	manifest
+	out=$(distrun goreleaser)
+	if printf '%s\n' "$out" | grep -Fq "FAIL dist holds exactly the inventory v3 archives and packages"; then
+		pass "the goreleaser set fails with an extra package"
+	else
+		printf '%s\n' "$out"
+		fail "the goreleaser set fails with an extra package"
+	fi
+	rm "$gd/dist/garage_${v}_darwin_amd64.pkg"
+	v=0.2.0-snapshot+abc1234
+	rm -rf "$gd/dist"
+	mkdir "$gd/dist"
+	for name in $(sh "$inv" "$v" archives); do
+		case $name in
+		*.zip) mkzip "$gd/dist/$name" "$gd/src" garage.exe LICENSE README.md ;;
+		*) tar -czf "$gd/dist/$name" -C "$gd/src" garage LICENSE README.md ;;
+		esac
+	done
+	for name in $(sh "$inv" "$v" packages); do printf 'pkg\n' >"$gd/dist/$name"; done
+	manifest
+	has "v2: the default set accepts a GoReleaser dist" "ok   dist holds exactly the inventory v2 archives and packages" "$(distrun)"
+	has "v2: the goreleaser set accepts the same dist" "ok   dist holds exactly the inventory v2 archives and packages" "$(distrun goreleaser)"
+else
+	echo "skip the dist inventory checks: go, and zip or python3, are required"
+fi
+
 npmpk=$scripts/npm-packages.sh
 disttag=$scripts/npm-dist-tag.sh
 npmpub=$scripts/npm-publish.sh
+npmwait=$scripts/npm-wait-for-packages.sh
+npmcheck=$scripts/check-npm-install.sh
 if command -v sha256sum >/dev/null 2>&1; then
 	sha() { sha256sum "$1" | cut -d' ' -f1; }
 else
@@ -291,6 +430,81 @@ refuses "dist-tag refuses a malformed current latest" sh "$disttag" 0.4.0 latest
 refuses "npm-publish refuses a missing packages directory" sh "$npmpub" "$work/absent" latest
 refuses "npm-publish refuses an empty dist-tag" sh "$npmpub" "$work/npm" ""
 refuses "npm-publish refuses an unknown option" sh "$npmpub" "$work/npm" latest --force
+
+# The wait helper is exercised against a fake registry. It has no publish
+# command, proving both paths run without publishing anything.
+mkdir "$work/npm-stub"
+cat >"$work/npm-stub/npm" <<'EOF'
+#!/bin/sh
+set -eu
+[ "$1" = view ] || exit 97
+spec=$2
+case ":${NPM_STUB_PRESENT:-}:" in
+*":$spec:"*) printf '%s\n' "${spec##*@}" ;;
+*) echo E404 >&2; exit 1 ;;
+esac
+EOF
+chmod 0755 "$work/npm-stub/npm"
+accepts "npm wait accepts every platform package once served" \
+	env NPM_STUB_PRESENT='@buildergarage/garage-linux-x64@9.8.7:@buildergarage/garage-darwin-arm64@9.8.7' \
+	GARAGE_NPM_WAIT_ATTEMPTS=2 GARAGE_NPM_WAIT_SECONDS=0 PATH="$work/npm-stub:$PATH" \
+	sh "$npmwait" 9.8.7 @buildergarage/garage-linux-x64 @buildergarage/garage-darwin-arm64
+refuses "npm wait fails before installation when a platform package never appears" \
+	env NPM_STUB_PRESENT='@buildergarage/garage-linux-x64@9.8.7' \
+	GARAGE_NPM_WAIT_ATTEMPTS=2 GARAGE_NPM_WAIT_SECONDS=0 PATH="$work/npm-stub:$PATH" \
+	sh "$npmwait" 9.8.7 @buildergarage/garage-linux-x64 @buildergarage/garage-darwin-arm64
+refuses "npm wait refuses zero attempts" \
+	env GARAGE_NPM_WAIT_ATTEMPTS=0 sh "$npmwait" 9.8.7 @buildergarage/garage-linux-x64
+
+mkdir "$work/npm-install-stub"
+cat >"$work/npm-install-stub/npm" <<'EOF'
+#!/bin/sh
+set -eu
+case $1 in
+view)
+	case "$2 $3" in
+	'@buildergarage/garage@9.8.7 version') printf '9.8.7\n' ;;
+	'@buildergarage/garage@9.8.7 optionalDependencies')
+		printf '{"@buildergarage/garage-linux-x64":"9.8.7","@buildergarage/garage-darwin-arm64":"9.8.7"}\n' ;;
+	'@buildergarage/garage-linux-x64@9.8.7 version') printf '9.8.7\n' ;;
+	*) echo E404 >&2; exit 1 ;;
+	esac
+	;;
+install) echo install >>"$NPM_STUB_LOG"; exit 97 ;;
+*) exit 97 ;;
+esac
+EOF
+chmod 0755 "$work/npm-install-stub/npm"
+install_log=$work/npm-install.log
+refuses "registry install waits for every platform package before installing" \
+	env NPM_STUB_LOG="$install_log" GARAGE_NPM_WAIT_ATTEMPTS=1 GARAGE_NPM_WAIT_SECONDS=0 \
+	PATH="$work/npm-install-stub:$PATH" sh "$npmcheck" --registry 9.8.7 v9.8.7 revision
+if [ -e "$install_log" ]; then
+	fail "registry install does not run npm install before every platform package is served"
+else
+	pass "registry install does not run npm install before every platform package is served"
+fi
+
+mkdir "$work/npm-publish-stub"
+cat >"$work/npm-publish-stub/npm" <<'EOF'
+#!/bin/sh
+set -eu
+case $1 in
+view) echo E404 >&2; exit 1 ;;
+publish) basename "$2" >>"$NPM_STUB_LOG" ;;
+*) exit 97 ;;
+esac
+EOF
+chmod 0755 "$work/npm-publish-stub/npm"
+publish_log=$work/npm-publish.log
+refuses "npm-publish fails before publishing the launcher when platform packages are not served" \
+	env NPM_STUB_LOG="$publish_log" GARAGE_NPM_WAIT_ATTEMPTS=1 GARAGE_NPM_WAIT_SECONDS=0 \
+	PATH="$work/npm-publish-stub:$PATH" sh "$npmpub" "$work/npm" latest
+if grep -q '^garage$' "$publish_log" 2>/dev/null; then
+	fail "npm-publish does not publish the launcher before every platform package is served"
+else
+	pass "npm-publish does not publish the launcher before every platform package is served"
+fi
 
 if command -v node >/dev/null 2>&1; then
 	host=$(node -p 'process.platform + "-" + process.arch')

@@ -102,7 +102,10 @@ jobs:
       - name: Check the snapshot's archives, packages, manifest, and executables
         run: |
           version=$(jq -r .version dist/metadata.json)
-          sh .github/scripts/check-release-dist.sh dist "$version" "$version" "$(git rev-parse HEAD)"
+          # GoReleaser's dist holds only the files GoReleaser builds: from
+          # inventory v3, the macOS installer packages are built and checked
+          # by the macOS package jobs, and the release checks the full set.
+          sh .github/scripts/check-release-dist.sh dist "$version" "$version" "$(git rev-parse HEAD)" goreleaser
           sh .github/scripts/check-release-archive.sh "dist/garage_${version}_linux_${{ matrix.arch }}.tar.gz" "$version" "$(git rev-parse HEAD)"
       - name: Check the Homebrew cask (Linux only)
         run: |
@@ -141,6 +144,54 @@ jobs:
           sh .github/scripts/npm-packages.sh "$older" "$RUNNER_TEMP/older" "$RUNNER_TEMP/npm-older"
           sh .github/scripts/npm-packages.sh "$version" dist "$RUNNER_TEMP/npm"
           sh .github/scripts/check-npm-install.sh --local "$RUNNER_TEMP/npm" "$version" "$(git rev-parse HEAD)" "$RUNNER_TEMP/npm-older"
+
+  macos-package-config:
+    name: macOS package configuration (${{ matrix.arch }})
+    # A disposable macOS runner exercises the unsigned snapshot package's
+    # layout, install, controlled upgrade path, and explicit uninstall. It
+    # never receives Installer or notarization credentials.
+    runs-on: ${{ matrix.runner }}
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { arch: amd64, runner: macos-15-intel }
+          - { arch: arm64, runner: macos-latest }
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-go@v7
+        with:
+          go-version-file: go.mod
+      - uses: goreleaser/goreleaser-action@a4f02ab5355a589de60d917a659ce617ed19b3de # v7.3.0
+        with:
+          distribution: goreleaser
+          version: v2.20.2
+          install-only: true
+      - name: Build an older unsigned snapshot installer
+        env:
+          GARAGE_RELEASE_MODE: snapshot
+          GARAGE_SNAPSHOT_BASE: 0.4.99
+        run: |
+          goreleaser release --snapshot --clean --skip=publish
+          version=$(jq -r .version dist/metadata.json)
+          sh .github/scripts/build-macos-package.sh snapshot "$version" "${{ matrix.arch }}" "dist/garage_${version}_darwin_${{ matrix.arch }}.tar.gz" "$RUNNER_TEMP/garage_${version}_darwin_${{ matrix.arch }}.pkg"
+          rm -rf dist
+      - name: Build an unsigned snapshot installer
+        env:
+          GARAGE_RELEASE_MODE: snapshot
+        run: |
+          goreleaser release --snapshot --clean --skip=publish
+          version=$(jq -r .version dist/metadata.json)
+          sh .github/scripts/build-macos-package.sh snapshot "$version" "${{ matrix.arch }}" "dist/garage_${version}_darwin_${{ matrix.arch }}.tar.gz" "dist/garage_${version}_darwin_${{ matrix.arch }}.pkg"
+      - name: Inspect, install, and remove the snapshot installer
+        env:
+          GARAGE_MACOS_PACKAGE_CHECK: 1
+        run: |
+          version=$(jq -r .version dist/metadata.json)
+          older=$(ls "$RUNNER_TEMP"/garage_*_darwin_${{ matrix.arch }}.pkg)
+          sh .github/scripts/check-macos-package.sh snapshot "dist/garage_${version}_darwin_${{ matrix.arch }}.pkg" "$version" "$version" "$(git rev-parse HEAD)" "$older"
 
   install:
     name: Source installer (${{ matrix.os }})

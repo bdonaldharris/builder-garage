@@ -73,6 +73,7 @@ var harnessCommands = map[string]string{
 	"claude-code": "claude",
 	"codex":       "codex",
 	"copilot-cli": "copilot",
+	"cursor":      "agent",
 }
 
 // harnessVersionPattern matches a version number: three numeric parts and an
@@ -140,15 +141,17 @@ type resolvedTarget struct {
 // resolveSkillRoot applies a confirmed path rule: the override, when its
 // environment variable is set, before the default under the home directory.
 func resolveSkillRoot(rule skillPathRule, getenv func(string) string, home string) (string, error) {
-	name, rest, ok := strings.Cut(strings.TrimPrefix(rule.Override, "$"), "/")
-	if !ok || !strings.HasPrefix(rule.Override, "$") {
-		return "", fmt.Errorf("unsupported override rule %q", rule.Override)
-	}
-	if value := getenv(name); value != "" {
-		if !filepath.IsAbs(value) {
-			return "", fmt.Errorf("%s is set to %q, which is not an absolute path", name, value)
+	if rule.Override != "" {
+		name, rest, ok := strings.Cut(strings.TrimPrefix(rule.Override, "$"), "/")
+		if !ok || !strings.HasPrefix(rule.Override, "$") {
+			return "", fmt.Errorf("unsupported override rule %q", rule.Override)
 		}
-		return filepath.Join(value, filepath.FromSlash(rest)), nil
+		if value := getenv(name); value != "" {
+			if !filepath.IsAbs(value) {
+				return "", fmt.Errorf("%s is set to %q, which is not an absolute path", name, value)
+			}
+			return filepath.Join(value, filepath.FromSlash(rest)), nil
+		}
 	}
 	defaultRest, ok := strings.CutPrefix(rule.Default, "~/")
 	if !ok {
@@ -194,6 +197,7 @@ func otherReadPaths(target resolvedTarget, projectDir, home string, getenv func(
 type skillCollision struct {
 	Skill string
 	Path  string
+	Owner string
 }
 
 func (c skillCollision) describe(harness string) string {
@@ -201,10 +205,22 @@ func (c skillCollision) describe(harness string) string {
 	if harness == "codex" {
 		effect = "is shown to Codex alongside the managed copy"
 	}
-	return fmt.Sprintf("%s also exists at %s, which %s", c.Skill, c.Path, effect)
+	text := fmt.Sprintf("%s also exists at %s, which %s", c.Skill, c.Path, effect)
+	if c.Owner != "" {
+		text += fmt.Sprintf("; it is an existing Garage installation for %s", c.Owner)
+	}
+	return text
 }
 
-func findCollisions(target resolvedTarget, names []string, projectDir, home string, getenv func(string) string) ([]skillCollision, error) {
+type collisionScan struct {
+	Collisions []skillCollision
+	Coverage   []string
+}
+
+func findCollisions(target resolvedTarget, names []string, projectDir, home string, getenv func(string) string) (collisionScan, error) {
+	if target.Config.Harness == "cursor" {
+		return findCursorCollisions(target, names, projectDir, home)
+	}
 	var found []skillCollision
 	for _, dir := range otherReadPaths(target, projectDir, home, getenv) {
 		for _, name := range names {
@@ -216,11 +232,164 @@ func findCollisions(target resolvedTarget, names []string, projectDir, home stri
 			case errors.Is(err, fs.ErrNotExist), errors.Is(err, syscall.ENOTDIR):
 				// Absent, or a path component is a file: not a skill.
 			default:
-				return nil, fmt.Errorf("cannot inspect %s: %w", p, err)
+				return collisionScan{}, fmt.Errorf("cannot inspect %s: %w", p, err)
 			}
 		}
 	}
-	return found, nil
+	return collisionScan{Collisions: found}, nil
+}
+
+var cursorProjectRoots = map[string]bool{".cursor": true, ".agents": true, ".claude": true, ".codex": true}
+
+// findCursorCollisions implements #157's bounded collision contract. It
+// never follows a directory symlink beyond the root currently being scanned.
+func findCursorCollisions(target resolvedTarget, names []string, projectDir, home string) (collisionScan, error) {
+	var scan collisionScan
+	nameSet := make(map[string]bool, len(names))
+	for _, name := range names {
+		nameSet[name] = true
+	}
+	seen := map[string]bool{}
+	add := func(skill, dir string) {
+		scan.Collisions = append(scan.Collisions, skillCollision{Skill: skill, Path: dir})
+	}
+	for _, root := range []string{target.Root, filepath.Join(home, ".agents", "skills"), filepath.Join(home, ".claude", "skills"), filepath.Join(home, ".codex", "skills")} {
+		if err := walkCursorRoot(root, root, seen, func(skill, dir string) {
+			if filepath.Clean(dir) != filepath.Join(filepath.Clean(target.Root), skill) {
+				add(skill, dir)
+			}
+		}, &scan.Coverage, nameSet, false); err != nil {
+			return collisionScan{}, err
+		}
+	}
+	if err := walkCursorRoot(projectDir, projectDir, seen, add, &scan.Coverage, nameSet, true); err != nil {
+		return collisionScan{}, err
+	}
+	sort.Slice(scan.Collisions, func(i, j int) bool {
+		if scan.Collisions[i].Skill == scan.Collisions[j].Skill {
+			return scan.Collisions[i].Path < scan.Collisions[j].Path
+		}
+		return scan.Collisions[i].Skill < scan.Collisions[j].Skill
+	})
+	return scan, nil
+}
+
+// walkCursorRoot scans one boundary. Missing roots are optional. A root or a
+// candidate SKILL.md that cannot be inspected is recorded as incomplete
+// coverage; a directory symlink escaping the boundary is only a notice.
+func walkCursorRoot(root, boundary string, seen map[string]bool, found func(string, string), coverage *[]string, names map[string]bool, project bool) error {
+	info, err := os.Lstat(root)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil
+	}
+	if err != nil {
+		*coverage = append(*coverage, fmt.Sprintf("incomplete collision coverage: cannot inspect candidate skill root %s: %v", root, err))
+		return nil
+	}
+	if !info.IsDir() || info.Mode()&fs.ModeSymlink != 0 {
+		*coverage = append(*coverage, fmt.Sprintf("incomplete collision coverage: candidate skill root %s is not a plain directory", root))
+		return nil
+	}
+	resolvedBoundary, err := filepath.EvalSymlinks(boundary)
+	if err != nil {
+		*coverage = append(*coverage, fmt.Sprintf("incomplete collision coverage: cannot resolve boundary %s: %v", boundary, err))
+		return nil
+	}
+	var visit func(string) error
+	visit = func(dir string) error {
+		resolved, err := filepath.EvalSymlinks(dir)
+		if err != nil {
+			*coverage = append(*coverage, fmt.Sprintf("incomplete collision coverage: cannot resolve %s: %v", dir, err))
+			return nil
+		}
+		inside, err := isWithin(resolved, resolvedBoundary)
+		if err != nil {
+			return err
+		}
+		if !inside {
+			*coverage = append(*coverage, fmt.Sprintf("coverage limitation: skipped directory symlink %s outside %s", dir, boundary))
+			return nil
+		}
+		if seen[resolved] {
+			return nil
+		}
+		seen[resolved] = true
+		entries, err := os.ReadDir(dir)
+		if err != nil {
+			*coverage = append(*coverage, fmt.Sprintf("incomplete collision coverage: cannot inspect %s: %v", dir, err))
+			return nil
+		}
+		for _, entry := range entries {
+			p := filepath.Join(dir, entry.Name())
+			info, err := os.Lstat(p)
+			if err != nil {
+				*coverage = append(*coverage, fmt.Sprintf("incomplete collision coverage: cannot inspect %s: %v", p, err))
+				continue
+			}
+			if entry.Name() == skillEntryFile {
+				parent := filepath.Dir(p)
+				skill := filepath.Base(parent)
+				if names[skill] && cursorSkillPath(root, p, project) {
+					if info.Mode()&fs.ModeSymlink != 0 || !info.Mode().IsRegular() {
+						*coverage = append(*coverage, fmt.Sprintf("incomplete collision coverage: candidate SKILL.md %s is not a regular file", p))
+					} else {
+						found(skill, parent)
+					}
+				}
+				continue
+			}
+			if info.IsDir() || info.Mode()&fs.ModeSymlink != 0 && entry.Type()&fs.ModeSymlink != 0 {
+				if entry.Name() == ".git" {
+					continue
+				}
+				if info.Mode()&fs.ModeSymlink != 0 {
+					if cursorRootPath(root, p, project) {
+						*coverage = append(*coverage, fmt.Sprintf("incomplete collision coverage: candidate skill root %s is not a plain directory", p))
+						continue
+					}
+					resolvedChild, e := filepath.EvalSymlinks(p)
+					if e != nil {
+						*coverage = append(*coverage, fmt.Sprintf("incomplete collision coverage: cannot resolve directory symlink %s: %v", p, e))
+						continue
+					}
+					childInfo, e := os.Stat(resolvedChild)
+					if e != nil || !childInfo.IsDir() {
+						continue
+					}
+				}
+				if err := visit(p); err != nil {
+					return err
+				}
+				continue
+			}
+		}
+		return nil
+	}
+	return visit(root)
+}
+
+func cursorSkillPath(root, path string, project bool) bool {
+	if !project {
+		return true
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	return len(parts) >= 4 && cursorProjectRoots[parts[len(parts)-4]] && parts[len(parts)-3] == "skills"
+}
+
+func cursorRootPath(root, path string, project bool) bool {
+	if !project {
+		return false
+	}
+	rel, err := filepath.Rel(root, path)
+	if err != nil {
+		return false
+	}
+	parts := strings.Split(filepath.ToSlash(rel), "/")
+	return len(parts) >= 2 && cursorProjectRoots[parts[len(parts)-2]] && parts[len(parts)-1] == "skills"
 }
 
 // skillState classifies one canonical skill at one target.
@@ -621,6 +790,7 @@ type targetReport struct {
 	Manuals    []manualInspection
 	Extras     []manifestSkill
 	Collisions []skillCollision
+	Coverage   []string
 }
 
 // manualInspection is the observed state of one manual skill at a target:
@@ -695,11 +865,23 @@ func inspectTarget(ctx context.Context, env skillsEnv, sc skillsContext, target 
 		}
 	}
 	names := append(skillNames(sc.Skills), adoptedManualSkillNames(sc)...)
-	collisions, err := findCollisions(target, names, sc.ProjectDir, sc.Home, env.Getenv)
+	scan, err := findCollisions(target, names, sc.ProjectDir, sc.Home, env.Getenv)
 	if err != nil {
 		return report, err
 	}
-	report.Collisions = collisions
+	for i := range scan.Collisions {
+		for _, h := range []string{"claude-code", "codex"} {
+			root, err := resolveSkillRoot(supportedSkillTargets[h], env.Getenv, sc.Home)
+			if err != nil || filepath.Clean(scan.Collisions[i].Path) != filepath.Join(filepath.Clean(root), scan.Collisions[i].Skill) {
+				continue
+			}
+			if owner := sc.Manifest.target(root); owner != nil && owner.skill(scan.Collisions[i].Skill) != nil {
+				scan.Collisions[i].Owner = map[string]string{"claude-code": "Claude Code", "codex": "Codex"}[h]
+			}
+		}
+	}
+	report.Collisions = scan.Collisions
+	report.Coverage = scan.Coverage
 	return report, nil
 }
 
@@ -710,42 +892,61 @@ var errSkillsNotCurrent = errors.New("installed skills are not all current")
 // verifySkills inspects the selected targets and writes a report. It never
 // writes to any skill target, the manifest, or the backups.
 func verifySkills(ctx context.Context, env skillsEnv, selected []string, w io.Writer) error {
-	sc, err := prepareSkills(ctx, env, selected)
+	verification, err := inspectSkills(ctx, env, selected)
 	if err != nil {
 		return err
 	}
-	revision := currentRevision(env.Build(), sc.SetDigest)
-	fmt.Fprintf(w, "Embedded skills: revision %s\n", revision)
+	fmt.Fprintf(w, "Embedded skills: revision %s\n", verification.Revision)
+	for _, report := range verification.Targets {
+		writeTargetReport(w, report, verification.Repository)
+	}
+	if verification.Problems > 0 {
+		return fmt.Errorf("%w: %d problem(s) found", errSkillsNotCurrent, verification.Problems)
+	}
+	fmt.Fprintln(w, "\nAll managed skills and adopted manuals are Current, with no detected collisions in the inspected scope.")
+	return nil
+}
 
-	problems := 0
+// skillVerification is the shared typed read result used by presentation
+// adapters. It performs the same read-only inspection as `garage skills verify`.
+type skillVerification struct {
+	Revision   string
+	Repository manifestRepository
+	Targets    []targetReport
+	Problems   int
+}
+
+func inspectSkills(ctx context.Context, env skillsEnv, selected []string) (skillVerification, error) {
+	sc, err := prepareSkills(ctx, env, selected)
+	if err != nil {
+		return skillVerification{}, err
+	}
+	revision := currentRevision(env.Build(), sc.SetDigest)
+	result := skillVerification{Revision: revision, Repository: sc.Repository}
 	for _, target := range sc.Targets {
 		report, err := inspectTarget(ctx, env, sc, target, revision)
 		if err != nil {
-			return err
+			return skillVerification{}, err
 		}
-		writeTargetReport(w, report, sc.Repository)
+		result.Targets = append(result.Targets, report)
 		for _, s := range report.Skills {
 			if s.State != stateCurrent {
-				problems++
+				result.Problems++
 			}
 		}
 		for _, m := range report.Manuals {
 			switch {
 			case m.Adopted && m.State != stateCurrent:
-				problems++
+				result.Problems++
 			case !m.Adopted && len(withoutProject(m.Projects, sc.Repository)) == 0:
 				// Installed by Garage, but no project adopts it any longer:
 				// a modified copy that install left in place.
-				problems++
+				result.Problems++
 			}
 		}
-		problems += len(report.Extras) + len(report.Collisions)
+		result.Problems += len(report.Extras) + len(report.Collisions) + incompleteCoverageCount(report.Coverage)
 	}
-	if problems > 0 {
-		return fmt.Errorf("%w: %d problem(s) found", errSkillsNotCurrent, problems)
-	}
-	fmt.Fprintln(w, "\nAll managed skills and adopted manuals are Current, with no collisions.")
-	return nil
+	return result, nil
 }
 
 func writeTargetReport(w io.Writer, r targetReport, current manifestRepository) {
@@ -781,6 +982,19 @@ func writeTargetReport(w io.Writer, r targetReport, current manifestRepository) 
 	for _, c := range r.Collisions {
 		fmt.Fprintf(w, "  collision: %s\n", c.describe(r.Target.Config.Harness))
 	}
+	for _, c := range r.Coverage {
+		fmt.Fprintf(w, "  %s\n", c)
+	}
+}
+
+func incompleteCoverageCount(coverage []string) int {
+	count := 0
+	for _, c := range coverage {
+		if strings.HasPrefix(c, "incomplete collision coverage:") {
+			count++
+		}
+	}
+	return count
 }
 
 // describeManualState explains a manual skill's state relative to the
@@ -889,6 +1103,11 @@ func installSkills(ctx context.Context, env skillsEnv, opts installOptions, w io
 		for _, c := range report.Collisions {
 			refusals = append(refusals, fmt.Sprintf("%s: %s. Resolve it by hand; there is no override.",
 				target.Config.Harness, c.describe(target.Config.Harness)))
+		}
+		for _, c := range report.Coverage {
+			if strings.HasPrefix(c, "incomplete collision coverage:") {
+				refusals = append(refusals, fmt.Sprintf("%s: %s. Resolve it by hand; there is no override.", target.Config.Harness, c))
+			}
 		}
 		plan := targetPlan{Report: report}
 		for i, s := range report.Skills {
