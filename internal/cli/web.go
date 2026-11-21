@@ -207,13 +207,20 @@ func (s *webServer) guard(next http.Handler) http.Handler {
 		}
 		if r.Method == http.MethodPost {
 			origin := r.Header.Get("Origin")
-			if origin != "" && origin != "http://"+s.listener.Addr().String() {
+			if !s.acceptsOrigin(origin) {
 				http.Error(w, "invalid Origin", http.StatusForbidden)
 				return
 			}
 		}
 		next.ServeHTTP(w, r)
 	})
+}
+
+// acceptsOrigin permits the listener's exact origin and the no-port loopback
+// origin sent by the embedded local browser surface. The Host check above still
+// requires that the request be addressed to this specific server instance.
+func (s *webServer) acceptsOrigin(origin string) bool {
+	return origin == "" || origin == "http://"+s.listener.Addr().String() || origin == "http://127.0.0.1"
 }
 
 func (s *webServer) authorized(next http.HandlerFunc) http.HandlerFunc {

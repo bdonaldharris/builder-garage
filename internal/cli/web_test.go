@@ -99,6 +99,37 @@ func TestWebBootstrapDoesNotExposeCapability(t *testing.T) {
 	}
 }
 
+func TestWebAuthOriginGuard(t *testing.T) {
+	s, err := newWebServer(webProject(t), 0, webEnv{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer s.listener.Close()
+
+	for _, tc := range []struct {
+		name   string
+		origin string
+		want   int
+	}{
+		{name: "listener origin", origin: s.url()[:len(s.url())-1], want: http.StatusSeeOther},
+		{name: "embedded loopback origin", origin: "http://127.0.0.1", want: http.StatusSeeOther},
+		{name: "other loopback port", origin: "http://127.0.0.1:1", want: http.StatusForbidden},
+		{name: "other host", origin: "http://localhost", want: http.StatusForbidden},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodPost, s.url()+"auth", strings.NewReader("capability="+s.capability))
+			req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
+			req.Header.Set("Origin", tc.origin)
+			req.Host = s.listener.Addr().String()
+			rr := httptest.NewRecorder()
+			s.handler().ServeHTTP(rr, req)
+			if rr.Code != tc.want {
+				t.Fatalf("status = %d, want %d", rr.Code, tc.want)
+			}
+		})
+	}
+}
+
 func TestWebActivityReturnsNewestStructuredEventsAndFilters(t *testing.T) {
 	project := webProject(t)
 	cacheDir := t.TempDir()
