@@ -357,7 +357,7 @@ func writeHistory(path string, content []byte) error {
 	if info, err := os.Lstat(path); err == nil && !info.Mode().IsRegular() {
 		return fmt.Errorf("refusing to replace %s: it is not a regular file", path)
 	}
-	if err := commitConfigReplacement(tempPath, path); err != nil {
+	if err := commitHistoryReplacement(tempPath, path); err != nil {
 		return fmt.Errorf("cannot write the history: %w", err)
 	}
 	committed = true

@@ -204,7 +204,7 @@ func (s *webServer) guard(next http.Handler) http.Handler {
 		}
 		if r.Method == http.MethodPost {
 			origin := r.Header.Get("Origin")
-			if origin != "" && origin != s.url()[:len(s.url())-1] {
+			if origin != "" && origin != "http://"+s.listener.Addr().String() {
 				http.Error(w, "invalid Origin", http.StatusForbidden)
 				return
 			}
