@@ -99,6 +99,27 @@ func TestWebBootstrapDoesNotExposeCapability(t *testing.T) {
 	}
 }
 
+func TestWebDashboardUsesStructuredPanelsAndNewTabNavigation(t *testing.T) {
+	for _, want := range []string{
+		"grid-template-columns:minmax(0,1fr) minmax(0,2fr)",
+		"overflow-y:auto",
+		"Skills &amp; manuals",
+		"Workflow status",
+		"<dialog id=\"details\"",
+		"a.target='_blank'",
+		"a.rel='noopener noreferrer'",
+	} {
+		if !strings.Contains(webPage, want) {
+			t.Errorf("web dashboard is missing %q", want)
+		}
+	}
+	for _, want := range []string{"event-subject", "role-icon", "e.role||'Agent not recorded'"} {
+		if !strings.Contains(webPageMarkup(), want) {
+			t.Errorf("web activity attribution presentation is missing %q", want)
+		}
+	}
+}
+
 func TestWebAuthOriginGuard(t *testing.T) {
 	s, err := newWebServer(webProject(t), 0, webEnv{})
 	if err != nil {
@@ -143,18 +164,18 @@ func TestWebActivityReturnsNewestStructuredEventsAndFilters(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	encode := func(time, kind string, number int, typ, outcome, rawURL string) string {
+	encode := func(time, kind string, number int, typ, outcome, rawURL, role string) string {
 		t.Helper()
-		line, err := json.Marshal(historyEvent{Version: historySchemaVersion, Time: time, Repo: repo.Key, Kind: kind, Number: number, Type: typ, Outcome: outcome, URL: rawURL})
+		line, err := json.Marshal(historyEvent{Version: historySchemaVersion, Time: time, Repo: repo.Key, Kind: kind, Number: number, Type: typ, Outcome: outcome, URL: rawURL, Role: role})
 		if err != nil {
 			t.Fatal(err)
 		}
 		return string(line)
 	}
 	writeHistoryFile(t, filepath.Join(cacheDir, historyAppDir, historySubDir), repo.Key,
-		encode("2026-11-20T10:00:00Z", "issue", 12, "discovery", "complete", "https://github.com/example/activity/issues/12"),
-		encode("2026-11-20T11:00:00Z", "pr", 14, "review", "approved", "https://github.com/example/activity/pull/14"),
-		encode("2026-11-20T12:00:00Z", "issue", 12, "implementation", "ready", "https://github.com/example/activity/issues/12#issuecomment-1"),
+		encode("2026-11-20T10:00:00Z", "issue", 12, "discovery", "complete", "https://github.com/example/activity/issues/12", ""),
+		encode("2026-11-20T11:00:00Z", "pr", 14, "review", "approved", "https://github.com/example/activity/pull/14", "Agent #2"),
+		encode("2026-11-20T12:00:00Z", "issue", 12, "implementation", "ready", "https://github.com/example/activity/issues/12#issuecomment-1", "Agent #1"),
 	)
 	s, err := newWebServer(project, 0, webEnv{History: historyEnv{WorkDir: project, CacheDir: func() (string, error) { return cacheDir, nil }, Git: git}})
 	if err != nil {
@@ -179,7 +200,7 @@ func TestWebActivityReturnsNewestStructuredEventsAndFilters(t *testing.T) {
 	if err := json.NewDecoder(rr.Body).Decode(&all); err != nil {
 		t.Fatal(err)
 	}
-	if len(all.Events) != 3 || all.Events[0].Time != "2026-11-20T12:00:00Z" || all.Events[0].Type != "implementation" {
+	if len(all.Events) != 3 || all.Events[0].Time != "2026-11-20T12:00:00Z" || all.Events[0].Type != "implementation" || all.Events[0].Role != "Agent #1" || all.Events[1].Role != "Agent #2" || all.Events[2].Role != "" {
 		t.Fatalf("events = %#v, want newest-first structured events", all.Events)
 	}
 
@@ -254,9 +275,11 @@ func TestWebActivityPagesOlderEventsWithoutReturningFullHistory(t *testing.T) {
 func TestWebPagePreservesActivityFocusAndReadingPositionOnRedraw(t *testing.T) {
 	for _, want := range []string{
 		"row.dataset.eventKey=key(e)",
-		"scrollTop:list.scrollTop",
-		"list.scrollTop=position.scrollTop",
+		"top:list.scrollTop",
+		"list.scrollTop=p.top",
 		"target?.focus({preventScroll:true})",
+		"a.target='_blank'",
+		"a.rel='noopener noreferrer'",
 	} {
 		if !strings.Contains(webPage, want) {
 			t.Errorf("web page does not preserve activity focus/position: missing %q", want)

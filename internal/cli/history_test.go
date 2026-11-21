@@ -53,6 +53,9 @@ func TestHistoryEventValidation(t *testing.T) {
 		{"artifact with a diff", func(e *historyEvent) { e.Artifact = "diff --git a/x b/x\n+secret" }},
 		{"artifact with spaces", func(e *historyEvent) { e.Artifact = "two words" }},
 		{"overlong artifact", func(e *historyEvent) { e.Artifact = strings.Repeat("a", maxArtifactLen+1) }},
+		{"role with newline", func(e *historyEvent) { e.Role = "Agent #1\nAgent #2" }},
+		{"role with surrounding whitespace", func(e *historyEvent) { e.Role = " Agent #1" }},
+		{"overlong role", func(e *historyEvent) { e.Role = strings.Repeat("a", maxRoleLength+1) }},
 		{"malformed repository key", func(e *historyEvent) { e.Repo = "not-a-key" }},
 		{"malformed time", func(e *historyEvent) { e.Time = "yesterday" }},
 		{"wrong version", func(e *historyEvent) { e.Version = 2 }},
@@ -71,10 +74,11 @@ func TestHistoryEventValidation(t *testing.T) {
 	t.Run("valid event with optional fields", func(t *testing.T) {
 		event := validEvent()
 		event.Artifact = "sha256:7794ea3eac68adcd36b1a14b6eb47c6878c582f929546d832a6193148e308e16"
+		event.Role = "Agent #1"
 		if err := event.validate(); err != nil {
 			t.Fatalf("validate() = %v, want nil", err)
 		}
-		event.URL, event.Artifact = "", ""
+		event.URL, event.Artifact, event.Role = "", "", ""
 		if err := event.validate(); err != nil {
 			t.Fatalf("validate() without optional fields = %v, want nil", err)
 		}

@@ -19,6 +19,7 @@ type recordOptions struct {
 	Outcome  string
 	URL      string
 	Artifact string
+	Role     string
 }
 
 // recordEnv holds the external dependencies of recording, so tests can
@@ -61,7 +62,8 @@ authorizes, blocks, or advances work.
 
 Only these fields are stored: a timestamp, the repository key, the issue or
 pull request number, the event type, the outcome, an optional link to the
-durable GitHub record, and an optional artifact identity.
+durable GitHub record, an optional artifact identity, and an optional
+explicitly recorded role.
 
 Event types: ` + strings.Join(historyEventTypes, ", ") + `
 Outcomes:    ` + strings.Join(historyOutcomes, ", ") + `
@@ -93,6 +95,7 @@ printed and the command still exits successfully.`,
 	flags.StringVar(&opts.Outcome, "outcome", "", "event outcome (required)")
 	flags.StringVar(&opts.URL, "url", "", "https link to the durable GitHub record")
 	flags.StringVar(&opts.Artifact, "artifact", "", "artifact identity (format pending #34)")
+	flags.StringVar(&opts.Role, "role", "", "explicit recorded role, for example Agent #1")
 
 	return cmd
 }
@@ -159,6 +162,7 @@ func recordEvent(ctx context.Context, opts recordOptions, env recordEnv) (histor
 		Outcome:  opts.Outcome,
 		URL:      opts.URL,
 		Artifact: opts.Artifact,
+		Role:     opts.Role,
 	}
 	return appendHistoryEvent(cacheDir, event)
 }
