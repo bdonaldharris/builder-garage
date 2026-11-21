@@ -2,7 +2,7 @@
 
 This runbook is the procedure for releasing `garage` under [ADR 0004](adr/0004-release-promotion.md): from `staging`, through a short-lived release candidate, to `main`, a version tag, and a published release. The release workflow itself, and how to verify what it publishes, are in [ADR 0003](adr/0003-release-distribution.md) and [Verifying a release](release-verification.md).
 
-Every step that needs a human is the maintainer's. An agent never cuts a candidate, tags, or approves the `release` environment.
+Every step that needs a human is the maintainer's. An agent never tags or approves the `release` environment. An agent may execute a release-candidate cut only as [step 2](#2-cut-the-release-candidate) defines, after the Workflow Owner explicitly authorizes that exact cut. The authorization and the accountability stay with the human.
 
 ## Before you start
 
@@ -35,6 +35,38 @@ git push origin origin/staging:refs/heads/release/vX.Y.Z-rc.1
 - **The branch must be a commit on `staging`.** Cutting it from `origin/staging` guarantees that.
 - **`X.Y.Z` is the version** the release issue targets, written as a release tag is, without leading zeros. `N` starts at 1.
 - **A defect found in the candidate** is fixed by an ordinary issue into `staging`. Then cut `rc.(N+1)` from `staging` again. The candidate itself never receives commits.
+
+### An agent-executed cut
+
+The maintainer may have an agent execute the cut instead. Authorization, execution, and credentials stay separate:
+
+- the Workflow Owner authorizes the exact cut;
+- the agent executes it;
+- the push succeeds only because it is made with the credentials of an account that holds Repository admin.
+
+The agent holds no repository role of its own, and the "Restrict release-candidate creation" ruleset still applies.
+
+1. **Authorization.** The agent may proceed only after the Workflow Owner has explicitly authorized the exact branch name, `release/vX.Y.Z-rc.N`, and the full commit SHA, in a durable record on the release issue. A request in a conversation is not that authorization. An authorization covers only the branch name and SHA it names.
+2. **Recheck, immediately before the push.**
+
+   ```sh
+   git fetch origin
+   git rev-list --no-merges origin/staging..origin/main          # must print nothing
+   git rev-parse origin/staging                                  # must equal the authorized full SHA
+   git ls-remote --exit-code origin refs/heads/release/vX.Y.Z-rc.N  # must find nothing (exit status 2)
+   ```
+
+   - **If the provenance check prints anything,** or the branch already exists, the agent stops without pushing and reports the failure on the release issue.
+   - **The authorized SHA must still be the `staging` tip.** If `staging` has advanced, the agent stops without pushing. It reports the new tip's full SHA on the release issue and requests fresh authorization for that exact commit. An agent never silently substitutes a different commit for the authorized one.
+3. **Push the authorized SHA explicitly,** never a branch reference such as `origin/staging`, which may have moved since the authorization:
+
+   ```sh
+   git push origin <authorized full SHA>:refs/heads/release/vX.Y.Z-rc.N
+   ```
+
+4. **Record the cut on the release issue.** The record cites the Workflow Owner's authorization, names the agent as the executor, and includes the recheck output and the pushed SHA. GitHub attributes the push to the account whose credentials made it, so this record is what identifies the executor. An agent-executed cut is never described as manually performed.
+
+An agent never overwrites, moves, deletes, or force-pushes an existing candidate. If the authorized branch name already exists, the agent stops.
 
 ## 3. Open the promotion pull request
 
