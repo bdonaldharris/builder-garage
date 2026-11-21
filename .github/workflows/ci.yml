@@ -102,7 +102,10 @@ jobs:
       - name: Check the snapshot's archives, packages, manifest, and executables
         run: |
           version=$(jq -r .version dist/metadata.json)
-          sh .github/scripts/check-release-dist.sh dist "$version" "$version" "$(git rev-parse HEAD)"
+          # GoReleaser's dist holds only the files GoReleaser builds: from
+          # inventory v3, the macOS installer packages are built and checked
+          # by the macOS package jobs, and the release checks the full set.
+          sh .github/scripts/check-release-dist.sh dist "$version" "$version" "$(git rev-parse HEAD)" goreleaser
           sh .github/scripts/check-release-archive.sh "dist/garage_${version}_linux_${{ matrix.arch }}.tar.gz" "$version" "$(git rev-parse HEAD)"
       - name: Check the Homebrew cask (Linux only)
         run: |

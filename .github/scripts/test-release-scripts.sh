@@ -7,8 +7,13 @@
 #   - release-guard.sh refuses every ref but a vMAJOR.MINOR.PATCH tag, any
 #     unknown mode, and any tag whose commit is not on the released-code
 #     branch, in a throwaway repository;
-#   - release-inventory.sh selects inventory v1 up to v0.1.x and v2 from
-#     v0.2.0, names every file exactly, and refuses a malformed version;
+#   - release-inventory.sh selects inventory v1 up to v0.1.x, v2 from v0.2.0,
+#     and v3 from v0.5.0, names every file exactly, leaves the macOS
+#     installer packages out of its goreleaser selection, and refuses a
+#     malformed version;
+#   - check-release-dist.sh requires the macOS installer packages by default,
+#     and only the files GoReleaser builds with its goreleaser set, and
+#     refuses an unknown set (#179);
 #   - platform-sign.sh never changes a binary, refuses an unset or unknown
 #     mode and a missing binary, and refuses a darwin release build unless
 #     every macOS signing credential is set (#122);
@@ -139,6 +144,15 @@ check_eq "inventory v3 has 14 assets" "$(count 0.5.0)" 14
 check_eq "inventory v3 manifest lists 12 files" "$(count 0.5.0 manifest)" 12
 check_eq "inventory v3 packages include macOS installers" \
 	"$(sh "$inv" 0.5.0 packages | grep -c '^garage_0.5.0_darwin_.*\.pkg$')" 2
+check_eq "inventory v3 goreleaser selection lists 10 files" "$(count 0.5.0 goreleaser)" 10
+check_eq "inventory v3 goreleaser selection has no macOS installer" \
+	"$(sh "$inv" 0.5.0 goreleaser | grep -c '\.pkg$' || true)" 0
+check_eq "inventory v3 goreleaser selection is the manifest without the installers" \
+	"$(sh "$inv" 0.5.0 goreleaser | tr '\n' ' ')" "$(sh "$inv" 0.5.0 manifest | grep -v '\.pkg$' | tr '\n' ' ')"
+check_eq "inventory v2 goreleaser selection equals its manifest" \
+	"$(sh "$inv" 0.2.0 goreleaser | tr '\n' ' ')" "$(sh "$inv" 0.2.0 manifest | tr '\n' ' ')"
+check_eq "inventory v1 goreleaser selection equals its manifest" \
+	"$(sh "$inv" 0.1.1 goreleaser | tr '\n' ' ')" "$(sh "$inv" 0.1.1 manifest | tr '\n' ' ')"
 check_eq "a snapshot selects its base version's inventory" "$(sh "$inv" 0.2.0-snapshot+abc1234 id)" v2
 check_eq "a snapshot rpm name writes the pre-release with ~" \
 	"$(sh "$inv" 0.2.0-snapshot+abc1234 packages | grep x86_64)" "garage-0.2.0~snapshot+abc1234-1.x86_64.rpm"
@@ -252,6 +266,108 @@ else
 fi
 
 # npm-packages.sh, npm-dist-tag.sh, npm-publish.sh, and the npm launcher
+# check-release-dist.sh: which inventory files a dist must hold (#179).
+# A fake GoReleaser dist for inventory v3: the six archives, each holding a
+# real (tiny) Go executable, the four Linux packages, and their manifest, but
+# no macOS installer packages, which GoReleaser never builds. Only the
+# inventory checks are asserted; the executables' build settings fail by
+# design, so the script's overall status is not.
+distchk=$scripts/check-release-dist.sh
+refuses "dist check refuses an unknown set" sh "$distchk" "$work" 0.5.0 0.5.0 HEAD archives
+refuses "dist check refuses a sixth argument" sh "$distchk" "$work" 0.5.0 0.5.0 HEAD goreleaser extra
+if command -v sha256sum >/dev/null 2>&1; then
+	dsha() { sha256sum "$1" | cut -d' ' -f1; }
+else
+	dsha() { shasum -a 256 "$1" | cut -d' ' -f1; }
+fi
+mkzip() { # mkzip ZIP DIR FILE...: a zip of FILEs in DIR, with zip or python3
+	z=$1
+	d=$2
+	shift 2
+	if command -v zip >/dev/null 2>&1; then
+		(cd "$d" && zip -q "$z" "$@")
+	else
+		(cd "$d" && python3 -I -m zipfile -c "$z" "$@")
+	fi
+}
+if command -v go >/dev/null 2>&1 && { command -v zip >/dev/null 2>&1 || command -v python3 >/dev/null 2>&1; }; then
+	gd=$work/distchk
+	v=0.5.0-snapshot+abc1234
+	mkdir -p "$gd/mod" "$gd/src" "$gd/dist"
+	printf 'module example.invalid/garage\n\ngo 1.21\n' >"$gd/mod/go.mod"
+	printf 'package main\n\nfunc main() {}\n' >"$gd/mod/main.go"
+	(cd "$gd/mod" && CGO_ENABLED=0 GOFLAGS=-buildvcs=false go build -trimpath -o "$gd/src/garage" .)
+	cp "$gd/src/garage" "$gd/src/garage.exe"
+	printf 'MIT\n' >"$gd/src/LICENSE"
+	printf 'readme\n' >"$gd/src/README.md"
+	for name in $(sh "$inv" "$v" archives); do
+		case $name in
+		*.zip) mkzip "$gd/dist/$name" "$gd/src" garage.exe LICENSE README.md ;;
+		*) tar -czf "$gd/dist/$name" -C "$gd/src" garage LICENSE README.md ;;
+		esac
+	done
+	for name in $(sh "$inv" "$v" packages | grep -v '\.pkg$'); do printf 'pkg\n' >"$gd/dist/$name"; done
+	manifest() { # manifest: GoReleaser's checksum manifest for the files in dist
+		: >"$gd/dist/garage_${v}_checksums.txt"
+		for f in $(cd "$gd/dist" && ls -1 | grep -E '\.(tar\.gz|zip|deb|rpm|pkg)$' | LC_ALL=C sort); do
+			printf '%s  %s\n' "$(dsha "$gd/dist/$f")" "$f" >>"$gd/dist/garage_${v}_checksums.txt"
+		done
+	}
+	manifest
+	distrun() { sh "$distchk" "$gd/dist" "$v" "$v" HEAD "$@" 2>&1 || true; }
+	has() { # has NAME LINE OUTPUT: OUTPUT contains LINE exactly
+		if printf '%s\n' "$3" | grep -Fxq -- "$2"; then pass "$1"; else
+			printf '%s\n' "$3"
+			fail "$1"
+		fi
+	}
+	out=$(distrun goreleaser)
+	has "v3 GoReleaser dist holds exactly the goreleaser set" "ok   dist holds exactly the inventory v3 archives and packages" "$out"
+	has "v3 GoReleaser manifest lists exactly the goreleaser set" "ok   manifest lists exactly the inventory v3 files" "$out"
+	has "v3 GoReleaser dist matches its manifest" "ok   manifest matches the files" "$out"
+	has "v3 goreleaser set still requires each Linux package" "ok   package garage_${v}_linux_amd64.deb exists" "$out"
+	if printf '%s\n' "$out" | grep -q '\.pkg'; then
+		printf '%s\n' "$out"
+		fail "v3 goreleaser set does not require the macOS installer packages"
+	else pass "v3 goreleaser set does not require the macOS installer packages"; fi
+	out=$(distrun)
+	has "the default set still requires the macOS installer packages" "FAIL package garage_${v}_darwin_arm64.pkg exists" "$out"
+	has "the default set refuses a dist without them" "FAIL dist holds exactly the inventory v3 archives and packages (got: $(cd "$gd/dist" && ls -1 | grep -E '\.(tar\.gz|zip|deb|rpm|pkg)$' | LC_ALL=C sort | tr '\n' ' '))" "$out"
+	out=$(distrun manifest)
+	has "set manifest is the default" "FAIL package garage_${v}_darwin_amd64.pkg exists" "$out"
+	rpm=$(sh "$inv" "$v" packages | grep x86_64)
+	mv "$gd/dist/$rpm" "$gd/rpm"
+	manifest
+	out=$(distrun goreleaser)
+	has "the goreleaser set fails without a Linux package" "FAIL package $rpm exists" "$out"
+	mv "$gd/rpm" "$gd/dist/$rpm"
+	printf 'pkg\n' >"$gd/dist/garage_${v}_darwin_amd64.pkg"
+	manifest
+	out=$(distrun goreleaser)
+	if printf '%s\n' "$out" | grep -Fq "FAIL dist holds exactly the inventory v3 archives and packages"; then
+		pass "the goreleaser set fails with an extra package"
+	else
+		printf '%s\n' "$out"
+		fail "the goreleaser set fails with an extra package"
+	fi
+	rm "$gd/dist/garage_${v}_darwin_amd64.pkg"
+	v=0.2.0-snapshot+abc1234
+	rm -rf "$gd/dist"
+	mkdir "$gd/dist"
+	for name in $(sh "$inv" "$v" archives); do
+		case $name in
+		*.zip) mkzip "$gd/dist/$name" "$gd/src" garage.exe LICENSE README.md ;;
+		*) tar -czf "$gd/dist/$name" -C "$gd/src" garage LICENSE README.md ;;
+		esac
+	done
+	for name in $(sh "$inv" "$v" packages); do printf 'pkg\n' >"$gd/dist/$name"; done
+	manifest
+	has "v2: the default set accepts a GoReleaser dist" "ok   dist holds exactly the inventory v2 archives and packages" "$(distrun)"
+	has "v2: the goreleaser set accepts the same dist" "ok   dist holds exactly the inventory v2 archives and packages" "$(distrun goreleaser)"
+else
+	echo "skip the dist inventory checks: go, and zip or python3, are required"
+fi
+
 npmpk=$scripts/npm-packages.sh
 disttag=$scripts/npm-dist-tag.sh
 npmpub=$scripts/npm-publish.sh
