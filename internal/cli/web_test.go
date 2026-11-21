@@ -111,7 +111,7 @@ func TestWebAuthOriginGuard(t *testing.T) {
 		origin string
 		want   int
 	}{
-		{name: "listener origin", origin: s.url()[:len(s.url())-1], want: http.StatusSeeOther},
+		{name: "listener origin", origin: "http://" + s.listener.Addr().String(), want: http.StatusSeeOther},
 		{name: "embedded loopback origin", origin: "http://127.0.0.1", want: http.StatusSeeOther},
 		{name: "other loopback port", origin: "http://127.0.0.1:1", want: http.StatusForbidden},
 		{name: "other host", origin: "http://localhost", want: http.StatusForbidden},
