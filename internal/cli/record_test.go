@@ -84,7 +84,7 @@ func TestRecordCommandStoresEventOutsideRepository(t *testing.T) {
 	before := gitIn(t, repo, "status", "--porcelain", "--ignored")
 
 	stdout, stderr, err := runCLI(t, "dev", "record", "--issue", "39", "--type", "implementation",
-		"--outcome", "ready", "--url", "https://github.com/owner/repo/issues/39#issuecomment-1")
+		"--outcome", "ready", "--role", "Agent #1", "--url", "https://github.com/owner/repo/issues/39#issuecomment-1")
 	if err != nil {
 		t.Fatalf("garage record: %v", err)
 	}
@@ -105,7 +105,7 @@ func TestRecordCommandStoresEventOutsideRepository(t *testing.T) {
 	if len(files) != 1 {
 		t.Fatalf("history files in the user cache = %v, want exactly one", files)
 	}
-	if !strings.Contains(readFile(t, files[0]), `"kind":"issue","number":39,"type":"implementation","outcome":"ready"`) {
+	if !strings.Contains(readFile(t, files[0]), `"kind":"issue","number":39,"type":"implementation","outcome":"ready"`) || !strings.Contains(readFile(t, files[0]), `"role":"Agent #1"`) {
 		t.Fatalf("stored event = %s", readFile(t, files[0]))
 	}
 }
