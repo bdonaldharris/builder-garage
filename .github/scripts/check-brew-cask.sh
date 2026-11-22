@@ -146,11 +146,16 @@ check_installed() { # check_installed VERSION REVISION LABEL
 if [ -n "${older_cask:-}" ]; then
 	check_installed "$older_bver" "$older_rev" "older cask"
 	write_local_cask "$cask" "$dist"
-	if brew outdated --cask "$tap/garage" >"$work/outdated.out" 2>&1 && [ -s "$work/outdated.out" ]; then
+	printf 'garage\n' >"$work/expected-outdated.out"
+	outdated_status=0
+	brew outdated --cask "$tap/garage" >"$work/outdated.out" 2>"$work/outdated.err" || outdated_status=$?
+	if [ "$outdated_status" -eq 1 ] &&
+		cmp -s "$work/expected-outdated.out" "$work/outdated.out" &&
+		[ ! -s "$work/outdated.err" ]; then
 		pass "Homebrew reports the older cask as outdated"
 	else
-		cat "$work/outdated.out"
-		fail "Homebrew reports the older cask as outdated"
+		cat "$work/outdated.out" "$work/outdated.err"
+		fail "Homebrew reports the older cask as outdated (status: $outdated_status)"
 	fi
 	if brew upgrade --cask "$tap/garage" >"$work/upgrade.out" 2>&1; then pass "upgrades $tap/garage"; else
 		cat "$work/upgrade.out"
