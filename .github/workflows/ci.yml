@@ -50,6 +50,12 @@ jobs:
           go-version-file: go.mod
       - name: Test
         run: go test ./...
+      # The release scripts' macOS-only checks (the notarization refusal, and
+      # the installer-identity lookup against a throwaway keychain) are
+      # skipped on Linux, where the snapshot jobs run this script (#189).
+      - name: Exercise the release scripts on macOS
+        if: runner.os == 'macOS'
+        run: sh .github/scripts/test-release-scripts.sh
 
   release-config:
     name: Release configuration (snapshot, ${{ matrix.arch }})
