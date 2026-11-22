@@ -35,8 +35,11 @@
 #     launcher runs its platform's executable, passing arguments and exit
 #     status through, or says npm does not provide garage (#158). The bounded
 #     registry wait succeeds only after every named package is served and
-#     fails without publishing when one never appears. The launcher checks
-#     need node, and are skipped without it.
+#     fails without publishing when one never appears. npm-publish.sh and
+#     check-npm-install.sh --registry give the wait step each of the
+#     launcher's platform packages as a separate, valid name, and
+#     npm-publish.sh publishes the launcher after them (#186). The launcher
+#     and package-name checks need node, and are skipped without it.
 # CI runs it on every pull request. It runs on macOS and Linux.
 
 set -eu
@@ -592,6 +595,96 @@ if grep -q '^garage$' "$publish_log" 2>/dev/null; then
 	fail "npm-publish does not publish the launcher before every platform package is served"
 else
 	pass "npm-publish does not publish the launcher before every platform package is served"
+fi
+
+# Which names reach the wait step (#186). The launcher's platform packages
+# must be queried as four separate, valid names: the v0.5.1 publication
+# passed them as one argument joined by a literal "\n". This registry stub
+# records every "npm view" spec, serves a package once it is published, and
+# never serves anything else.
+platform_specs='@buildergarage/garage-darwin-arm64@9.8.7
+@buildergarage/garage-darwin-x64@9.8.7
+@buildergarage/garage-linux-arm64@9.8.7
+@buildergarage/garage-linux-x64@9.8.7'
+mkdir "$work/npm-names-stub"
+cat >"$work/npm-names-stub/npm" <<'EOF'
+#!/bin/sh
+set -eu
+case $1 in
+view)
+	printf '%s\n' "$2" >>"$NPM_STUB_VIEWS"
+	if [ "${3:-}" = optionalDependencies ]; then
+		printf '%s\n' "$NPM_STUB_DEPS_JSON"
+	elif grep -Fxq -- "$2" "$NPM_STUB_SERVED" 2>/dev/null; then
+		printf '%s\n' "${2##*@}"
+	else
+		echo E404 >&2
+		exit 1
+	fi
+	;;
+publish)
+	spec=$(node -p 'const p = require(process.argv[1] + "/package.json"); p.name + "@" + p.version' "$2")
+	printf '%s\n' "$spec" >>"$NPM_STUB_SERVED"
+	printf '%s\n' "$spec" >>"$NPM_STUB_PUBLISHED"
+	;;
+install) echo install >>"$NPM_STUB_INSTALL"; exit 97 ;;
+*) exit 97 ;;
+esac
+EOF
+chmod 0755 "$work/npm-names-stub/npm"
+# valid_specs FILE: every line is one package spec, with no backslash or
+# whitespace inside it.
+valid_specs() { ! grep -q '[\\[:space:]]' "$1"; }
+
+if command -v node >/dev/null 2>&1; then
+	nd=$work/npm-names
+	mkdir -p "$nd"
+	: >"$nd/served"
+	accepts "npm-publish publishes the launcher once its platform packages are served" \
+		env NPM_STUB_VIEWS="$nd/views" NPM_STUB_SERVED="$nd/served" NPM_STUB_PUBLISHED="$nd/published" \
+		NPM_STUB_INSTALL="$nd/install" NPM_STUB_DEPS_JSON='{}' \
+		GARAGE_NPM_WAIT_ATTEMPTS=1 GARAGE_NPM_WAIT_SECONDS=0 \
+		PATH="$work/npm-names-stub:$PATH" sh "$npmpub" "$work/npm" latest
+	if valid_specs "$nd/views"; then
+		pass "npm-publish queries only valid, separate package names"
+	else
+		cat "$nd/views"
+		fail "npm-publish queries only valid, separate package names"
+	fi
+	# Each platform package is queried twice: before publishing it, and by
+	# the wait step before the launcher.
+	check_eq "npm-publish's wait step queries each platform package separately" \
+		"$(grep -v '^@buildergarage/garage@' "$nd/views" | LC_ALL=C sort | uniq -c | awk '{ print $1, $2 }' | tr '\n' ' ')" \
+		"$(printf '%s\n' "$platform_specs" | sed 's/^/2 /' | tr '\n' ' ')"
+	check_eq "npm-publish publishes the four platform packages, then the launcher" \
+		"$(head -n 4 "$nd/published" | LC_ALL=C sort | tr '\n' ' ')|$(sed -n '5p' "$nd/published")|$(wc -l <"$nd/published" | tr -d ' ')" \
+		"$(printf '%s\n' "$platform_specs" | tr '\n' ' ')|@buildergarage/garage@9.8.7|5"
+
+	rd=$work/npm-registry-names
+	mkdir -p "$rd"
+	printf '%s\n' '@buildergarage/garage@9.8.7' "$platform_specs" >"$rd/served"
+	refuses "registry install stops at the stubbed npm install" \
+		env NPM_STUB_VIEWS="$rd/views" NPM_STUB_SERVED="$rd/served" NPM_STUB_PUBLISHED="$rd/published" \
+		NPM_STUB_INSTALL="$rd/install" \
+		NPM_STUB_DEPS_JSON='{"@buildergarage/garage-darwin-arm64":"9.8.7","@buildergarage/garage-darwin-x64":"9.8.7","@buildergarage/garage-linux-arm64":"9.8.7","@buildergarage/garage-linux-x64":"9.8.7"}' \
+		GARAGE_NPM_WAIT_ATTEMPTS=1 GARAGE_NPM_WAIT_SECONDS=0 \
+		PATH="$work/npm-names-stub:$PATH" sh "$npmcheck" --registry 9.8.7 v9.8.7 revision
+	if valid_specs "$rd/views"; then
+		pass "registry install queries only valid, separate package names"
+	else
+		cat "$rd/views"
+		fail "registry install queries only valid, separate package names"
+	fi
+	check_eq "registry install waits for each declared platform package separately" \
+		"$(grep -v '^@buildergarage/garage@' "$rd/views" | LC_ALL=C sort | tr '\n' ' ')" \
+		"$(printf '%s\n' "$platform_specs" | tr '\n' ' ')"
+	if [ -s "$rd/install" ]; then
+		pass "registry install proceeds to npm install once every platform package is served"
+	else
+		fail "registry install proceeds to npm install once every platform package is served"
+	fi
+else
+	echo "skip the npm package-name checks: node is not installed"
 fi
 
 if command -v node >/dev/null 2>&1; then

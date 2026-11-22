@@ -130,7 +130,8 @@ case $mode in
 	label=$spec
 	# The registry may serve the launcher before an optional platform package.
 	# Wait for the launcher, then use its declared package list as the source
-	# of truth for waiting for every platform package it names.
+	# of truth for waiting for every platform package it names. In the
+	# single-quoted program, "\n" is JavaScript's newline escape (#186).
 	sh "$scripts/npm-wait-for-packages.sh" "$version" "$name"
 	if ! deps_json=$(npm view "$spec" optionalDependencies --json 2>"$work/deps.err"); then
 		cat "$work/deps.err" >&2
@@ -142,7 +143,7 @@ case $mode in
 		process.stdin.on("data", chunk => { text += chunk; });
 		process.stdin.on("end", () => {
 			const dependencies = JSON.parse(text);
-			console.log(Object.keys(dependencies).join("\\n"));
+			console.log(Object.keys(dependencies).join("\n"));
 		});
 	')
 	[ -n "$deps" ] || {
