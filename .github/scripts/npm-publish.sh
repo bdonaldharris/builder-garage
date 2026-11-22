@@ -112,7 +112,9 @@ for dir in "$packages"/garage-*; do
 done
 # npm can accept a publish before every registry replica serves the version.
 # Do not make the launcher visible until all packages it names are served.
-launcher_deps=$(node -e 'console.log(Object.keys(require(process.argv[1]).optionalDependencies || {}).join("\\n"))' "$packages/garage/package.json")
+# In the single-quoted program, "\n" is JavaScript's newline escape: "\\n"
+# would join the names with a literal backslash-n, as one argument (#186).
+launcher_deps=$(node -e 'console.log(Object.keys(require(process.argv[1]).optionalDependencies || {}).join("\n"))' "$packages/garage/package.json")
 [ -n "$launcher_deps" ] || refuse "$packages/garage has no platform optionalDependencies"
 # Package names contain no whitespace. Keep the dependency source of truth in
 # the launcher package rather than duplicate the platform list here.
