@@ -97,9 +97,12 @@ jobs:
         run: |
           goreleaser release --snapshot --clean --skip=publish
           # Moved out of the checkout, so the next build's tree stays clean.
-          # The archives and manifest are kept for the npm upgrade check.
+          # Archives and manifests are kept for the npm and Homebrew upgrade checks.
+          version=$(jq -r .version dist/metadata.json)
           mkdir "$RUNNER_TEMP/older"
           mv dist/*.deb dist/*.rpm dist/*.tar.gz dist/*.zip dist/*_checksums.txt "$RUNNER_TEMP/older/"
+          cp dist/homebrew/Casks/garage.rb "$RUNNER_TEMP/older/garage.rb"
+          printf '%s\n' "$version" >"$RUNNER_TEMP/older/cask-version"
           rm -rf dist
       - name: Build a snapshot
         env:
@@ -113,17 +116,20 @@ jobs:
           # by the macOS package jobs, and the release checks the full set.
           sh .github/scripts/check-release-dist.sh dist "$version" "$version" "$(git rev-parse HEAD)" goreleaser
           sh .github/scripts/check-release-archive.sh "dist/garage_${version}_linux_${{ matrix.arch }}.tar.gz" "$version" "$(git rev-parse HEAD)"
-      - name: Check the Homebrew cask (Linux only)
+      - name: Check the Homebrew cask (macOS and Linux)
         run: |
           version=$(jq -r .version dist/metadata.json)
           sh .github/scripts/check-channel-cask.sh dist/homebrew/Casks/garage.rb "dist/garage_${version}_checksums.txt" "$version"
       - name: Set up Homebrew
         run: sh .github/scripts/setup-homebrew.sh
-      - name: Install and uninstall the cask from a local test tap
+      - name: Install, upgrade, and uninstall the cask from a local test tap
         run: |
           eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
           version=$(jq -r .version dist/metadata.json)
-          GARAGE_PACKAGE_CHECK=1 sh .github/scripts/check-brew-cask.sh --local dist/homebrew/Casks/garage.rb dist "$version" "$(git rev-parse HEAD)"
+          older_version=$(cat "$RUNNER_TEMP/older/cask-version")
+          GARAGE_PACKAGE_CHECK=1 sh .github/scripts/check-brew-cask.sh \
+            --local dist/homebrew/Casks/garage.rb dist "$version" "$(git rev-parse HEAD)" \
+            "$RUNNER_TEMP/older/garage.rb" "$RUNNER_TEMP/older" "$older_version" "$(git rev-parse HEAD)"
       - name: Install, upgrade, and remove the .deb with apt
         env:
           SUFFIX: ${{ matrix.deb }}
@@ -152,10 +158,10 @@ jobs:
           sh .github/scripts/check-npm-install.sh --local "$RUNNER_TEMP/npm" "$version" "$(git rev-parse HEAD)" "$RUNNER_TEMP/npm-older"
 
   macos-package-config:
-    name: macOS package configuration (${{ matrix.arch }})
-    # A disposable macOS runner exercises the unsigned snapshot package's
-    # layout, install, controlled upgrade path, and explicit uninstall. It
-    # never receives Installer or notarization credentials.
+    name: macOS package and Homebrew cask configuration (${{ matrix.arch }})
+    # Disposable macOS runners exercise the unsigned snapshot package and
+    # validate the generated Homebrew cask. Functional cask installation is
+    # verified after release, against notarized macOS archives.
     runs-on: ${{ matrix.runner }}
     strategy:
       fail-fast: false
@@ -191,6 +197,10 @@ jobs:
           goreleaser release --snapshot --clean --skip=publish
           version=$(jq -r .version dist/metadata.json)
           sh .github/scripts/build-macos-package.sh snapshot "$version" "${{ matrix.arch }}" "dist/garage_${version}_darwin_${{ matrix.arch }}.tar.gz" "dist/garage_${version}_darwin_${{ matrix.arch }}.pkg"
+      - name: Check the Homebrew cask and its release checksums
+        run: |
+          version=$(jq -r .version dist/metadata.json)
+          sh .github/scripts/check-channel-cask.sh dist/homebrew/Casks/garage.rb "dist/garage_${version}_checksums.txt" "$version"
       - name: Inspect, install, and remove the snapshot installer
         env:
           GARAGE_MACOS_PACKAGE_CHECK: 1

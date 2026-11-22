@@ -128,7 +128,7 @@ jobs:
           for f in $(sh .github/scripts/release-inventory.sh "$VERSION" archives); do test -f "dist/$f"; done
       - name: Run the linux/amd64 archive
         run: sh .github/scripts/check-release-archive.sh "dist/garage_${VERSION}_linux_amd64.tar.gz" "$TAG" "$(git rev-parse HEAD)"
-      - name: Check the Homebrew cask (Linux only)
+      - name: Check the Homebrew cask (macOS and Linux)
         run: sh .github/scripts/check-channel-cask.sh dist/homebrew/Casks/garage.rb "dist/garage_${VERSION}_checksums.txt" "$VERSION" "$GITHUB_REPOSITORY"
       - name: Keep the Homebrew cask for channel-publish
         if: inputs.mode == 'release'
@@ -465,7 +465,7 @@ jobs:
   # job, within 30 days, against the same release (the cask artifact is kept
   # 30 days).
   channel-publish:
-    name: Publish the Homebrew cask (Linux)
+    name: Publish the Homebrew cask
     needs: [guard, post-verify]
     runs-on: ubuntu-latest
     # Holds HOMEBREW_TAP_TOKEN: a fine-grained token for
@@ -524,7 +524,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        runner: [ubuntu-latest, ubuntu-24.04-arm]
+        runner: [ubuntu-latest, ubuntu-24.04-arm, macos-15-intel, macos-latest]
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
@@ -536,5 +536,7 @@ jobs:
         env:
           TAG: ${{ needs.guard.outputs.tag }}
         run: |
-          eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          if [ "$(uname -s)" = Linux ]; then
+            eval "$(/home/linuxbrew/.linuxbrew/bin/brew shellenv)"
+          fi
           GARAGE_PACKAGE_CHECK=1 sh .github/scripts/check-brew-cask.sh --tap bdonaldharris/tap "$TAG" "$GITHUB_SHA"

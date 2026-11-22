@@ -12,11 +12,10 @@
 #
 # It checks that:
 #   - the cask is "garage", at VERSION, installing the "garage" binary;
-#   - it serves Linux only: no macOS block and no darwin archive, until
-#     Homebrew on macOS is added (#124);
-#   - its downloads are exactly the release inventory's Linux archives
-#     (release-inventory.sh), each from this repository's release at
-#     vVERSION, each with the SHA-256 the manifest lists for it.
+#   - it has Linux and macOS blocks;
+#   - its downloads are exactly the release inventory's Linux and macOS
+#     archives (release-inventory.sh), each from this repository's release
+#     at vVERSION, each with the SHA-256 the manifest lists for it.
 
 set -eu
 
@@ -49,10 +48,8 @@ if grep -Eq '^cask "garage" do$' "$cask"; then pass "the cask is named garage"; 
 got_version=$(sed -n 's/^  version "\(.*\)"$/\1/p' "$cask")
 if [ "$got_version" = "$version" ]; then pass "the cask is at version $version"; else fail "the cask is at version $version (got: '$got_version')"; fi
 if grep -Eq '^  binary "garage"$' "$cask"; then pass "the cask installs the garage binary"; else fail "the cask installs the garage binary"; fi
-if grep -Eq 'on_macos|darwin' "$cask"; then fail "the cask serves Linux only (no on_macos, no darwin archive)"; else
-	pass "the cask serves Linux only (no on_macos, no darwin archive)"
-fi
 if grep -Eq '^  on_linux do$' "$cask"; then pass "the cask has an on_linux block"; else fail "the cask has an on_linux block"; fi
+if grep -Eq '^  on_macos do$' "$cask"; then pass "the cask has an on_macos block"; else fail "the cask has an on_macos block"; fi
 
 # Every download, as "<url> <sha256>", with the cask's #{version} expanded.
 got=$(awk -v v="$version" '
@@ -60,11 +57,11 @@ got=$(awk -v v="$version" '
 	/^ *url "/ { u = $2; gsub(/"/, "", u); gsub(/#\{version\}/, v, u); print u, s }
 ' "$cask" | LC_ALL=C sort)
 
-# What it must be: each Linux archive of the inventory, with its manifest
-# checksum.
+# What it must be: each Linux and macOS archive of the inventory, with its
+# manifest checksum.
 base=https://github.com/$repo/releases/download/v$version
 want=
-for name in $(sh "$scripts/release-inventory.sh" "$version" archives | grep '_linux_'); do
+for name in $(sh "$scripts/release-inventory.sh" "$version" archives | grep -E '_(linux|darwin)_'); do
 	sum=$(awk -v n="$name" '{ f = $2; sub(/^\*/, "", f); if (f == n) print $1 }' "$manifest")
 	if [ -z "$sum" ]; then
 		fail "the manifest lists $name"
@@ -76,9 +73,9 @@ done
 want=$(printf '%s' "$want" | LC_ALL=C sort)
 
 if [ -n "$got" ] && [ "$got" = "$want" ]; then
-	pass "the cask's downloads are exactly the Linux archives, with the manifest's checksums"
+	pass "the cask's downloads are exactly the Linux and macOS archives, with the manifest's checksums"
 else
-	fail "the cask's downloads are exactly the Linux archives, with the manifest's checksums"
+	fail "the cask's downloads are exactly the Linux and macOS archives, with the manifest's checksums"
 	printf 'want:\n%s\ngot:\n%s\n' "$want" "$got"
 fi
 

@@ -14,6 +14,8 @@
 #   - check-release-dist.sh requires the macOS installer packages by default,
 #     and only the files GoReleaser builds with its goreleaser set, and
 #     refuses an unknown set (#179);
+#   - check-channel-cask.sh requires both Linux and macOS cask stanzas, and
+#     pins exactly their release archives to the checksum manifest (#124);
 #   - macos-installer-identity.sh selects only a valid Developer ID Installer
 #     identity for Team ID 38397A2FG6, refuses any other, and names a matching
 #     identity that is present but not valid; build-macos-package.sh looks it
@@ -171,6 +173,60 @@ refuses "inventory refuses a version with v" sh "$inv" v0.2.0
 refuses "inventory refuses a partial version" sh "$inv" 0.2
 refuses "inventory refuses two pre-release dashes" sh "$inv" 0.2.0-rc-1
 refuses "inventory refuses an unknown selection" sh "$inv" 0.2.0 binaries
+
+# check-channel-cask.sh
+check_cask=$scripts/check-channel-cask.sh
+cask_version=0.5.0
+cask_repo=example/garage
+cask_sha=$(printf '%064d' 0)
+cask_manifest=$work/cask-checksums.txt
+for name in $(sh "$inv" "$cask_version" archives | grep -E '_(linux|darwin)_'); do
+	printf '%s *%s\n' "$cask_sha" "$name" >>"$cask_manifest"
+done
+cask=$work/garage.rb
+cat >"$cask" <<EOF
+cask "garage" do
+  version "$cask_version"
+  on_macos do
+    on_arm do
+      sha256 "$cask_sha"
+      url "https://github.com/$cask_repo/releases/download/v#{version}/garage_#{version}_darwin_arm64.tar.gz"
+    end
+    on_intel do
+      sha256 "$cask_sha"
+      url "https://github.com/$cask_repo/releases/download/v#{version}/garage_#{version}_darwin_amd64.tar.gz"
+    end
+  end
+  on_linux do
+    on_arm do
+      sha256 "$cask_sha"
+      url "https://github.com/$cask_repo/releases/download/v#{version}/garage_#{version}_linux_arm64.tar.gz"
+    end
+    on_intel do
+      sha256 "$cask_sha"
+      url "https://github.com/$cask_repo/releases/download/v#{version}/garage_#{version}_linux_amd64.tar.gz"
+    end
+  end
+  binary "garage"
+end
+EOF
+accepts "cask pins Linux and macOS archives to the manifest" \
+	sh "$check_cask" "$cask" "$cask_manifest" "$cask_version" "$cask_repo"
+no_macos=$work/no-macos.rb
+sed '/^  on_macos do$/d' "$cask" >"$no_macos"
+refuses "cask refuses a missing macOS stanza" \
+	sh "$check_cask" "$no_macos" "$cask_manifest" "$cask_version" "$cask_repo"
+bad_cask_manifest=$work/cask-checksums-bad.txt
+sed "s/^$cask_sha \\*garage_${cask_version}_darwin_arm64.tar.gz/$(printf '%064d' 1) *garage_${cask_version}_darwin_arm64.tar.gz/" \
+	"$cask_manifest" >"$bad_cask_manifest"
+refuses "cask refuses a checksum that differs from the manifest" \
+	sh "$check_cask" "$cask" "$bad_cask_manifest" "$cask_version" "$cask_repo"
+extra_cask=$work/extra-cask.rb
+cp "$cask" "$extra_cask"
+printf '  sha256 "%s"\n  url "https://github.com/%s/releases/download/v%s/garage_%s_windows_amd64.zip"\n' \
+	"$cask_sha" "$cask_repo" "$cask_version" "$cask_version" >>"$extra_cask"
+refuses "cask refuses an unexpected Windows download" \
+	sh "$check_cask" "$extra_cask" "$cask_manifest" "$cask_version" "$cask_repo"
 
 # install.sh's release mode names the archive with release-inventory.sh's
 # rule: the piped installer has no checkout, so it carries its own copy.
