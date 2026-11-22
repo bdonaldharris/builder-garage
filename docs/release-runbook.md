@@ -57,6 +57,7 @@ The agent holds no repository role of its own, and the "Restrict release-candida
    ```
 
    - **If the provenance check prints anything,** or the branch already exists, the agent stops without pushing and reports the failure on the release issue.
+   - **If any recheck command itself fails,** the agent also stops without pushing and reports it. That covers a failed `git fetch`, a failed provenance command, or a `git ls-remote` exit status other than 2, such as 128 on a network or authentication error. Only exit status 2 shows that the branch does not exist.
    - **The authorized SHA must still be the `staging` tip.** If `staging` has advanced, the agent stops without pushing. It reports the new tip's full SHA on the release issue and requests fresh authorization for that exact commit. An agent never silently substitutes a different commit for the authorized one.
 3. **Push the authorized SHA explicitly,** never a branch reference such as `origin/staging`, which may have moved since the authorization:
 

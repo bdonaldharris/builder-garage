@@ -38,8 +38,11 @@
 #     fails without publishing when one never appears. npm-publish.sh and
 #     check-npm-install.sh --registry give the wait step each of the
 #     launcher's platform packages as a separate, valid name, and
-#     npm-publish.sh publishes the launcher after them (#186). The launcher
-#     and package-name checks need node, and are skipped without it.
+#     npm-publish.sh publishes the launcher after them (#186). An already-
+#     published platform package is skipped when it matches, and publication
+#     continues to the launcher; one that differs fails the run, and no
+#     launcher is published (#189). The launcher and package-name checks need
+#     node, and are skipped without it.
 # CI runs it on every pull request. It runs on macOS and Linux.
 
 set -eu
@@ -273,7 +276,6 @@ else
 	refuses "notarization check refuses to run off macOS" sh "$notary" "$bin" 38397A2FG6
 fi
 
-# npm-packages.sh, npm-dist-tag.sh, npm-publish.sh, and the npm launcher
 # check-release-dist.sh: which inventory files a dist must hold (#179).
 # A fake GoReleaser dist for inventory v3: the six archives, each holding a
 # real (tiny) Go executable, the four Linux packages, and their manifest, but
@@ -459,6 +461,7 @@ else
 	echo "skip the find-identity invocation checks: not macOS"
 fi
 
+# npm-packages.sh, npm-dist-tag.sh, npm-publish.sh, and the npm launcher
 npmpk=$scripts/npm-packages.sh
 disttag=$scripts/npm-dist-tag.sh
 npmpub=$scripts/npm-publish.sh
@@ -628,6 +631,20 @@ publish)
 	printf '%s\n' "$spec" >>"$NPM_STUB_PUBLISHED"
 	;;
 install) echo install >>"$NPM_STUB_INSTALL"; exit 97 ;;
+pack)
+	# The published copy of NAME@VERSION, as a .tgz in the current directory,
+	# made from NPM_STUB_PACK_FROM's generated package of the same name. The
+	# package named by NPM_STUB_MISMATCH gets a different executable.
+	name=${2%@*}
+	base=${name#@buildergarage/}
+	tmp=$(mktemp -d)
+	cp -R "$NPM_STUB_PACK_FROM/$base" "$tmp/package"
+	if [ "$2" = "${NPM_STUB_MISMATCH:-}" ]; then
+		printf 'not the generated executable\n' >"$tmp/package/bin/garage"
+	fi
+	tar -czf "buildergarage-$base-${2##*@}.tgz" -C "$tmp" package
+	rm -rf "$tmp"
+	;;
 *) exit 97 ;;
 esac
 EOF
@@ -682,6 +699,47 @@ if command -v node >/dev/null 2>&1; then
 		pass "registry install proceeds to npm install once every platform package is served"
 	else
 		fail "registry install proceeds to npm install once every platform package is served"
+	fi
+
+	# The already-published path, which recovers a partial publication (#189).
+	# The four platform packages are already served at 9.8.7. When each
+	# published copy matches the generated package, none is published again,
+	# and processing continues: the launcher is published, once.
+	ad=$work/npm-already
+	mkdir -p "$ad"
+	printf '%s\n' "$platform_specs" >"$ad/served"
+	accepts "npm-publish recovers when the platform packages are already published and match" \
+		env NPM_STUB_VIEWS="$ad/views" NPM_STUB_SERVED="$ad/served" NPM_STUB_PUBLISHED="$ad/published" \
+		NPM_STUB_INSTALL="$ad/install" NPM_STUB_DEPS_JSON='{}' NPM_STUB_PACK_FROM="$work/npm" \
+		GARAGE_NPM_WAIT_ATTEMPTS=1 GARAGE_NPM_WAIT_SECONDS=0 \
+		PATH="$work/npm-names-stub:$PATH" sh "$npmpub" "$work/npm" latest
+	check_eq "npm-publish skips each matching already-published platform package" \
+		"$(grep -c 'is already published, and matches; not publishing it again' "$work/out" || true)" 4
+	check_eq "npm-publish then continues and publishes only the launcher" \
+		"$(tr '\n' ' ' <"$ad/published" 2>/dev/null)" "@buildergarage/garage@9.8.7 "
+
+	# One published copy differs from the generated package: the run fails,
+	# and the launcher is never published.
+	md=$work/npm-mismatch
+	mkdir -p "$md"
+	printf '%s\n' "$platform_specs" >"$md/served"
+	refuses "npm-publish fails when an already-published platform package differs" \
+		env NPM_STUB_VIEWS="$md/views" NPM_STUB_SERVED="$md/served" NPM_STUB_PUBLISHED="$md/published" \
+		NPM_STUB_INSTALL="$md/install" NPM_STUB_DEPS_JSON='{}' NPM_STUB_PACK_FROM="$work/npm" \
+		NPM_STUB_MISMATCH=@buildergarage/garage-linux-x64@9.8.7 \
+		GARAGE_NPM_WAIT_ATTEMPTS=1 GARAGE_NPM_WAIT_SECONDS=0 \
+		PATH="$work/npm-names-stub:$PATH" sh "$npmpub" "$work/npm" latest
+	if grep -q 'differs from the package generated here' "$work/out" 2>/dev/null; then
+		pass "npm-publish names the differing package"
+	else
+		cat "$work/out"
+		fail "npm-publish names the differing package"
+	fi
+	if [ -s "$md/published" ]; then
+		cat "$md/published"
+		fail "npm-publish publishes nothing, and no launcher, when a platform package differs"
+	else
+		pass "npm-publish publishes nothing, and no launcher, when a platform package differs"
 	fi
 else
 	echo "skip the npm package-name checks: node is not installed"

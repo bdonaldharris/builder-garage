@@ -32,7 +32,7 @@
 set -eu
 
 if [ "$#" -lt 1 ] || [ "$#" -gt 2 ]; then
-	echo "usage: release-inventory.sh VERSION [all|manifest|archives|packages|id]" >&2
+	echo "usage: release-inventory.sh VERSION [all|manifest|goreleaser|archives|packages|id]" >&2
 	exit 2
 fi
 version=$1
