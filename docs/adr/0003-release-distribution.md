@@ -131,16 +131,16 @@ The files a release publishes are its **release inventory**: a versioned, explic
 
 - **Phasing.**
   - The Homebrew cask on **Linux** ships first. The release's signed checksum manifest and attestations are its trust, as for the Linux packages.
-  - Homebrew on **macOS** needs notarized macOS executables (#122), because Homebrew quarantines every cask download and macOS kills a quarantined unsigned executable. It is added by its own change (#124).
-  - **Scoop and winget** wait for Windows platform trust (#122).
+  - Homebrew on **macOS** needs notarized macOS executables (#122), because Homebrew quarantines every cask download and macOS kills a quarantined unsigned executable. It was added by #124 after notarized releases became available.
+  - **Scoop and winget** were dropped from #124's scope; Windows distribution is tracked separately in #158.
   - **npm** (#158) ships macOS and Linux. Windows is excepted from the platform-trust requirement for npm only ([#120 amendment](https://github.com/bdonaldharris/builder-garage/issues/120#issuecomment-7027245596)): unsigned Windows executables may be published with a disclosure that never advises disabling a Windows protection. Whether Windows is published at all follows a clean Windows 11 test, recorded on #158; until then, it is not.
 - **The cask.**
-  - GoReleaser generates it, as `homebrew_casks`, from the release's own Linux archives and checksums. There is no hand-maintained formula.
-  - It selects only the Linux archives: the build is defined once and split into Linux and other platforms with a YAML anchor, so asset names do not change. Homebrew on macOS therefore refuses it ("This cask requires Linux.").
+  - GoReleaser generates it, as `homebrew_casks`, from the release's own Linux and macOS archives and checksums. There is no hand-maintained formula.
+  - It selects Linux and macOS archives: the build is defined once and split into Linux and other platforms with a YAML anchor, so asset names do not change. The macOS archives contain the signed, notarized executables.
   - It is not a release asset, and the release inventory is unchanged.
 - **The publication boundary.**
   - Channels are published only after the immutable release has passed `post-verify`, which follows the Workflow Owner's release approval.
-  - `channel-publish` first re-verifies the published release, then checks that the cask's downloads are exactly the inventory's Linux archives, with the manifest's checksums ([`check-channel-cask.sh`](../../.github/scripts/check-channel-cask.sh)).
+  - `channel-publish` first re-verifies the published release, then checks that the cask's downloads are exactly the inventory's Linux and macOS archives, with the manifest's checksums ([`check-channel-cask.sh`](../../.github/scripts/check-channel-cask.sh)).
   - **A channel failure does not affect the release.** It is retried by re-running the failed job, within 30 days, against the same release; the generated cask is kept 30 days. After that, the next release updates the channel.
 - **npm publishing** is its own workflow, [`npm-publish.yml`](../../.github/workflows/npm-publish.yml), never called from `release.yml`.
   - **Why separate:** npm trusted publishing identifies the publisher by its workflow filename, and needs `id-token: write`. In `release.yml`, that permission would let a job mint a Sigstore certificate as the release workflow, the identity users pin for the checksum manifest. Running from `main`, this workflow's identity is `npm-publish.yml@refs/heads/main`.
@@ -163,7 +163,7 @@ The files a release publishes are its **release inventory**: a versioned, explic
 - **A tag that fails cannot be reused.** A defect found after a tag exists ships under the next tag, because protected tags are never moved. A release-mode run that fails after signing leaves a public signature for that tag.
 - **The release workflow can run only from a tag that contains it.** GitHub runs a dispatched workflow as it exists at the dispatched ref, so the first release follows the merge of this design.
 - **The asset names and the workflow path are a public contract.** Verification commands depend on them.
-- **The first releases are not platform-signed.** `v0.1.1` and later releases publish unsigned macOS and Windows executables until #122 signs each platform, with the platform-trust disclosure in their notes. macOS is signed and notarized from the first release built after #122's macOS phase. macOS `.pkg` and Windows `.msi` packages (#123), Homebrew on macOS, Scoop, and winget (#124), and any OS-native installer (#125) wait for #122.
+- **The first releases are not platform-signed.** `v0.1.1` and later releases publish unsigned macOS and Windows executables until #122 signs each platform, with the platform-trust disclosure in their notes. macOS is signed and notarized from the first release built after #122's macOS phase. macOS `.pkg` packages (#123) and Homebrew on macOS (#124) followed that phase; Windows `.msi` and any OS-native installer (#125) remain separate follow-up work.
 - **The first package release must be `v0.2.0`.** A `v0.1.x` tag selects inventory v1, which has no packages, so a build that produces them fails its checks before anything is signed.
 - **Package names are public contract.** The package name `garage` and the path `/usr/bin/garage` carry upgrades between releases. So do the tap `bdonaldharris/tap` and its cask `garage`.
 - **A failed channel publication leaves a release without its channel update.** Re-run the job within 30 days, or the next release updates the channel.
@@ -171,5 +171,5 @@ The files a release publishes are its **release inventory**: a versioned, explic
 ## Still undecided
 
 - Windows signing (#122, phase 2).
-- Homebrew on macOS, Scoop, and winget (#124), and release installers and update (#125).
+- Release installers and update (#125).
 - When a release is cut, and what moves the version (as in ADR 0002).

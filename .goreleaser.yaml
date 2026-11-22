@@ -20,9 +20,8 @@ version: 2
 project_name: garage
 
 # Two builds with one definition (the YAML anchor): Linux, and the other
-# platforms. A channel can then select only the platforms it may serve: the
-# Homebrew cask serves Linux only until Homebrew on macOS is added (#124). The
-# asset names are the same as with one build.
+# platforms. A channel can select only the platforms it may serve; the
+# Homebrew cask uses the Linux and macOS archives without changing asset names.
 builds:
   - &build
     id: garage-linux
@@ -105,16 +104,14 @@ nfpms:
         dst: /usr/share/licenses/garage/LICENSE
         type: license
 
-# Homebrew cask (#124), Linux only: it selects only the Linux archives, so
-# Homebrew on macOS refuses it ("This cask requires Linux.") until #124 adds
-# macOS. GoReleaser writes it to
+# Homebrew cask (#124), for macOS and Linux. GoReleaser writes it to
 # dist/homebrew/Casks/garage.rb and never publishes it: the release
 # workflow's channel-publish job commits it to bdonaldharris/homebrew-tap,
 # after the release is published and verified. The URL template is needed
 # because GoReleaser's own release is disabled.
 homebrew_casks:
   - name: garage
-    ids: [garage-linux]
+    ids: [garage-linux, garage-other]
     url:
       # v{{ .Version }} is the release tag (the guard accepts only vX.Y.Z tags),
       # and in a snapshot it follows the snapshot version.

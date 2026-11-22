@@ -150,9 +150,9 @@ garage version
 
 Remove it with `sudo apt remove garage` or `sudo dnf remove garage`. The package installs `garage` system-wide in `/usr/bin`, while [`install.sh`](../install.sh) installs it for one user in `~/.local/bin`. Use one or the other, so that only one `garage` is on your `PATH`.
 
-## Homebrew (Linux)
+## Homebrew (macOS and Linux)
 
-On Linux, `garage` is also available as a Homebrew cask from Builder Garage's tap, [`bdonaldharris/homebrew-tap`](https://github.com/bdonaldharris/homebrew-tap):
+On macOS and Linux, `garage` is available as a Homebrew cask from Builder Garage's tap, [`bdonaldharris/homebrew-tap`](https://github.com/bdonaldharris/homebrew-tap):
 
 ```sh
 brew tap bdonaldharris/tap
@@ -165,12 +165,11 @@ garage version
 
 Homebrew requires you to trust a third-party tap before it uses its casks. `brew trust` is that explicit step: review the tap's [cask](https://github.com/bdonaldharris/homebrew-tap/blob/main/Casks/garage.rb) first if you want to see what it installs.
 
-- **What it installs.** The cask downloads the same Linux archive as the release, pinned to the SHA-256 in the release's signed checksum manifest, and installs `garage` on Homebrew's `bin`.
+- **What it installs.** The cask downloads the same macOS or Linux archive as the release, pinned to the SHA-256 in the release's signed checksum manifest, and installs `garage` on Homebrew's `bin`. The macOS archive contains the Developer ID-signed and notarized executable.
 - **How the tap is updated.** After each release passes its final verification, the release workflow commits the cask to the tap. Before committing, it checks the cask's checksums against the published, cosign-verified manifest.
 - **Upgrade and removal.** Upgrade with `brew upgrade --cask bdonaldharris/tap/garage`, and remove it with `brew uninstall --cask bdonaldharris/tap/garage`.
-- **macOS isn't offered yet.** The cask serves Linux only until Homebrew on macOS is added ([#124](https://github.com/bdonaldharris/builder-garage/issues/124)). On macOS, Homebrew refuses it with "This cask requires Linux."
 
-To check the archive the cask uses yourself, verify the release's manifest as above. Then compare the cask's `sha256` for your architecture with the manifest's entry for `garage_<version>_linux_<arch>.tar.gz`.
+To check the archive the cask uses yourself, verify the release's manifest as above. Then compare the cask's `sha256` for your platform and architecture with the manifest's entry for `garage_<version>_<darwin|linux>_<arch>.tar.gz`.
 
 Use one installation method at a time: the Homebrew cask, a Linux package (`/usr/bin`), or [`install.sh`](../install.sh) (`~/.local/bin`), so that only one `garage` is on your `PATH`.
 
