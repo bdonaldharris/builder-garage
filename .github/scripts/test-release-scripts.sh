@@ -14,6 +14,11 @@
 #   - check-release-dist.sh requires the macOS installer packages by default,
 #     and only the files GoReleaser builds with its goreleaser set, and
 #     refuses an unknown set (#179);
+#   - macos-installer-identity.sh selects only a valid Developer ID Installer
+#     identity for Team ID 38397A2FG6, refuses any other, and names a matching
+#     identity that is present but not valid; build-macos-package.sh looks it
+#     up with a find-identity policy the tool accepts; on macOS only, against
+#     a throwaway keychain, find-identity accepts that invocation (#182);
 #   - platform-sign.sh never changes a binary, refuses an unset or unknown
 #     mode and a missing binary, and refuses a darwin release build unless
 #     every macOS signing credential is set (#122);
@@ -366,6 +371,89 @@ if command -v go >/dev/null 2>&1 && { command -v zip >/dev/null 2>&1 || command 
 	has "v2: the goreleaser set accepts the same dist" "ok   dist holds exactly the inventory v2 archives and packages" "$(distrun goreleaser)"
 else
 	echo "skip the dist inventory checks: go, and zip or python3, are required"
+fi
+
+# macos-installer-identity.sh: the Developer ID Installer identity that
+# build-macos-package.sh signs with, from "security find-identity" listings
+# (#182). The listings are fixtures in find-identity's own format.
+ident=$scripts/macos-installer-identity.sh
+id_dir=$work/identity
+mkdir -p "$id_dir"
+printf '  1) 1111111111111111111111111111111111111111 "Developer ID Application: Example (38397A2FG6)"\n  2) 2222222222222222222222222222222222222222 "Developer ID Installer: Example (38397A2FG6)"\n     2 valid identities found\n' >"$id_dir/valid"
+printf '     0 valid identities found\n' >"$id_dir/none"
+printf '  1) 3333333333333333333333333333333333333333 "Developer ID Installer: Other (ABCDE12345)"\n     1 valid identities found\n' >"$id_dir/other-team"
+printf '  1) 1111111111111111111111111111111111111111 "Developer ID Application: Example (38397A2FG6)"\n     1 valid identities found\n' >"$id_dir/application-only"
+printf '\nPolicy: X.509 Basic\n  Matching identities\n  1) 4444444444444444444444444444444444444444 "Developer ID Installer: Example (38397A2FG6)" (CSSMERR_TP_NOT_TRUSTED)\n     1 identities found\n\n  Valid identities only\n     0 valid identities found\n' >"$id_dir/untrusted-all"
+check_eq "identity: selects the valid Developer ID Installer identity" \
+	"$(sh "$ident" "$id_dir/valid")" "Developer ID Installer: Example (38397A2FG6)"
+refuses "identity: refuses a keychain with no valid identity" sh "$ident" "$id_dir/none"
+refuses "identity: refuses another team's installer identity" sh "$ident" "$id_dir/other-team"
+refuses "identity: refuses a Developer ID Application identity" sh "$ident" "$id_dir/application-only"
+refuses "identity: refuses an untrusted identity" sh "$ident" "$id_dir/none" "$id_dir/untrusted-all"
+refuses "identity: refuses a missing listing" sh "$ident" "$id_dir/absent"
+refuses "identity: refuses no arguments" sh "$ident"
+if sh "$ident" "$id_dir/none" 2>&1 | grep -Fxq "macos-package: no Developer ID Installer identity for Team ID 38397A2FG6"; then
+	pass "identity: the refusal says no Developer ID Installer identity exists"
+else
+	fail "identity: the refusal says no Developer ID Installer identity exists"
+fi
+if sh "$ident" "$id_dir/none" "$id_dir/untrusted-all" 2>&1 | grep -Fq "'Developer ID Installer: Example (38397A2FG6)' is in the keychain but is not a valid identity"; then
+	pass "identity: the refusal names a matching identity that is present but not valid"
+else
+	fail "identity: the refusal names a matching identity that is present but not valid"
+fi
+if sh "$ident" "$id_dir/none" "$id_dir/none" 2>&1 | grep -Fq "is in the keychain"; then
+	fail "identity: no present-but-not-valid note without a matching identity"
+else
+	pass "identity: no present-but-not-valid note without a matching identity"
+fi
+# The release-mode lookup uses a policy find-identity accepts, and reports
+# the lookup's own failure apart from finding no identity.
+pkgbuilder=$scripts/build-macos-package.sh
+if grep -Fq 'find-identity -v -p installer' "$pkgbuilder"; then
+	fail "build-macos-package does not use the unsupported installer policy"
+else
+	pass "build-macos-package does not use the unsupported installer policy"
+fi
+if grep -Fq 'security find-identity -v -p basic "$keychain"' "$pkgbuilder" &&
+	grep -Fq 'macos-package: security find-identity failed (status $st)' "$pkgbuilder" &&
+	grep -Fq 'sh "$scripts/macos-installer-identity.sh"' "$pkgbuilder"; then
+	pass "build-macos-package looks the identity up with -v -p basic and the selection helper"
+else
+	fail "build-macos-package looks the identity up with -v -p basic and the selection helper"
+fi
+# On macOS: the invocation against a throwaway keychain, never a real one.
+if [ "$(uname -s)" = Darwin ] && command -v security >/dev/null 2>&1; then
+	kc=$id_dir/test.keychain-db
+	security create-keychain -p test-password "$kc" >/dev/null 2>&1
+	accepts "identity: find-identity accepts -v -p basic" security find-identity -v -p basic "$kc"
+	refuses "identity: find-identity rejects the installer policy" security find-identity -v -p installer "$kc"
+	security find-identity -v -p basic "$kc" >"$id_dir/kc-valid"
+	security find-identity -p basic "$kc" >"$id_dir/kc-all"
+	refuses "identity: an empty keychain has no installer identity" sh "$ident" "$id_dir/kc-valid" "$id_dir/kc-all"
+	if command -v openssl >/dev/null 2>&1; then
+		# A self-signed identity named like the real one is present, but not
+		# valid: it is refused, and named.
+		openssl req -x509 -newkey rsa:2048 -nodes -keyout "$id_dir/key.pem" -out "$id_dir/cert.pem" -days 2 \
+			-subj "/CN=Developer ID Installer: Test (38397A2FG6)/OU=38397A2FG6" >/dev/null 2>&1
+		openssl pkcs12 -export -legacy -inkey "$id_dir/key.pem" -in "$id_dir/cert.pem" -out "$id_dir/test.p12" -passout pass:test >/dev/null 2>&1 ||
+			openssl pkcs12 -export -inkey "$id_dir/key.pem" -in "$id_dir/cert.pem" -out "$id_dir/test.p12" -passout pass:test >/dev/null 2>&1
+		security unlock-keychain -p test-password "$kc" >/dev/null 2>&1
+		security import "$id_dir/test.p12" -k "$kc" -P test >/dev/null 2>&1
+		security find-identity -v -p basic "$kc" >"$id_dir/kc-valid"
+		security find-identity -p basic "$kc" >"$id_dir/kc-all"
+		refuses "identity: a self-signed installer identity is not valid" sh "$ident" "$id_dir/kc-valid" "$id_dir/kc-all"
+		if sh "$ident" "$id_dir/kc-valid" "$id_dir/kc-all" 2>&1 | grep -Fq "'Developer ID Installer: Test (38397A2FG6)' is in the keychain but is not a valid identity"; then
+			pass "identity: the self-signed identity is named as present but not valid"
+		else
+			fail "identity: the self-signed identity is named as present but not valid"
+		fi
+	else
+		echo "skip the self-signed identity check: openssl is not installed"
+	fi
+	security delete-keychain "$kc" >/dev/null 2>&1 || true
+else
+	echo "skip the find-identity invocation checks: not macOS"
 fi
 
 npmpk=$scripts/npm-packages.sh

@@ -156,8 +156,18 @@ security unlock-keychain -p "$keypass" "$keychain"
 printf '%s' "$MACOS_INSTALLER_P12" | base64 -D >"$work/installer.p12"
 security import "$work/installer.p12" -k "$keychain" -P "$MACOS_INSTALLER_PASSWORD" -T /usr/bin/productsign >/dev/null
 security set-key-partition-list -S apple-tool:,apple: -s -k "$keypass" "$keychain" >/dev/null
-identity=$(security find-identity -v -p installer "$keychain" | sed -n 's/.*"\(Developer ID Installer: .* (38397A2FG6)\)"/\1/p' | head -n 1)
-[ -n "$identity" ] || { echo "macos-package: no Developer ID Installer identity for Team ID 38397A2FG6" >&2; exit 1; }
+# find-identity has no installer policy (#182); "basic" evaluates plain X.509
+# validity, and -v keeps only valid identities. Its own failure is reported
+# apart from finding no identity: in a pipeline, it would be hidden.
+security find-identity -v -p basic "$keychain" >"$work/identities-valid" 2>"$work/find-identity.err" && st=0 || st=$?
+if [ "$st" -ne 0 ]; then
+	cat "$work/find-identity.err" >&2
+	echo "macos-package: security find-identity failed (status $st)" >&2
+	exit 1
+fi
+# The listing without -v only explains a refusal; its failure is not fatal.
+security find-identity -p basic "$keychain" >"$work/identities-all" 2>/dev/null || : >"$work/identities-all"
+identity=$(sh "$scripts/macos-installer-identity.sh" "$work/identities-valid" "$work/identities-all") || exit 1
 productsign --keychain "$keychain" --sign "$identity" "$work/unsigned.pkg" "$output"
 printf '%s' "$MACOS_NOTARY_KEY" | base64 -D >"$work/AuthKey.p8"
 xcrun notarytool submit "$output" --key "$work/AuthKey.p8" --key-id "$MACOS_NOTARY_KEY_ID" --issuer "$MACOS_NOTARY_ISSUER_ID" --wait
