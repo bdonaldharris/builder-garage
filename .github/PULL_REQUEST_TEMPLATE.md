@@ -63,3 +63,5 @@ Do not remove this section. If there are no additional requirements, write "None
 <!-- Nothing to complete here. -->
 
 Independent review approval does not authorize merge. A maintainer approves this pull request separately, and all required checks must pass.
+
+For a promotion pull request, before merging, record on the release issue the [step 4](https://github.com/bdonaldharris/builder-garage/blob/main/docs/release-runbook.md#4-confirm-the-precondition-again) precondition recheck, run immediately before the merge, and the Workflow Owner's [step 5](https://github.com/bdonaldharris/builder-garage/blob/main/docs/release-runbook.md#5-record-acceptance) acceptance.
