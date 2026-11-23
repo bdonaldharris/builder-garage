@@ -16,26 +16,30 @@ import (
 // GitHub access for "garage status".
 //
 // GitHub is read through the gh command (#19 decision): Garage never stores
-// or handles a token. An invocation makes one read, a single GraphQL query,
-// and at most one follow-up read: when a pull request's "## Governing issue"
-// section names issues its closing references do not supply, a second query
-// reads only those issues (#137 decision). The runner refuses anything that
-// is not a read-only query, so status can never write GitHub state, and
-// status never waits, retries, or polls.
+// or handles a token. An invocation makes one primary query and at most one
+// follow-up query. On the authorized repository, the primary query also reads
+// #192's registry; the follow-up reads body-declared governing issues and any
+// registry-authorized predecessor PR chain. The runner refuses anything that
+// is not a read-only query, so status can never write GitHub state, and status
+// never waits, retries, or polls.
 
 // statusGHTimeout bounds each GitHub read an invocation makes.
 const statusGHTimeout = 30 * time.Second
 
 // statusQuery is the first request status sends to GitHub. It reads the
-// repository's default branch and one issue or pull request with its
-// comments. For an issue, it also reads the pull requests that close it and
-// the pull requests that mention it, with their bodies, so that a pull
-// request naming the issue in its "## Governing issue" section is found. For
-// a pull request, it also reads its reviews, the check state of its head,
-// and the issues it closes, with their comments.
-const statusQuery = `query($owner: String!, $name: String!, $number: Int!) {
+// repository's default branch and one issue or pull request. Only the
+// authorized repository reads #192's registry in the same query. For an
+// issue, it also reads the pull requests that close it and the pull requests
+// that mention it, with their bodies, so a PR naming that issue in its
+// "## Governing issue" section is found. For a pull request, it reads reviews,
+// the head check state, and the issues it closes, with their comments.
+const statusQuery = `query($owner: String!, $name: String!, $number: Int!, $includeStackRegistry: Boolean!) {
   repository(owner: $owner, name: $name) {
     defaultBranchRef { name }
+    stackRegistry: issueOrPullRequest(number: 192) @include(if: $includeStackRegistry) {
+      __typename
+      ... on Issue { comments(last: 100) { totalCount pageInfo { hasPreviousPage } nodes { ...WorkflowComment } } }
+    }
     issueOrPullRequest(number: $number) {
       __typename
       ... on Issue {
@@ -45,7 +49,8 @@ const statusQuery = `query($owner: String!, $name: String!, $number: Int!) {
         timelineItems(itemTypes: [CROSS_REFERENCED_EVENT], last: 50) { totalCount nodes { ... on CrossReferencedEvent { isCrossRepository source { __typename ... on PullRequest { number url state mergedAt body } } } } }
       }
       ... on PullRequest {
-        number title url state body merged mergedAt baseRefName headRefName headRefOid
+        number title url state body merged mergedAt baseRefName baseRefOid headRefName headRefOid
+        headRepository { nameWithOwner } baseRepository { nameWithOwner }
         mergeCommit { oid }
         comments(last: 100) { totalCount pageInfo { hasPreviousPage } nodes { ...WorkflowComment } }
         reviews(last: 100) { nodes { state submittedAt url authorAssociation author { login __typename } commit { oid } comments { totalCount } } }
@@ -71,7 +76,8 @@ func governingIssuesQuery(count int) string {
 		fmt.Fprintf(&fields, `
     i%d: issueOrPullRequest(number: $n%d) {
       __typename
-      ... on Issue { number url state comments(last: 100) { totalCount pageInfo { hasPreviousPage } nodes { ...WorkflowComment } } }
+      ... on Issue { number url state comments(last: 100) { totalCount pageInfo { hasPreviousPage } nodes { ...WorkflowComment } } timelineItems(itemTypes: [CROSS_REFERENCED_EVENT], last: 50) { totalCount nodes { ... on CrossReferencedEvent { isCrossRepository source { __typename ... on PullRequest { number url state merged mergedAt body baseRefName headRefName headRepository { nameWithOwner } baseRepository { nameWithOwner } } } } } } }
+      ... on PullRequest { number url state merged mergedAt body baseRefName headRefName headRepository { nameWithOwner } baseRepository { nameWithOwner } }
     }`, i, i)
 	}
 	return `query($owner: String!, $name: String!` + vars.String() + `) {
@@ -227,23 +233,63 @@ type ghReview struct {
 }
 
 type ghClosingIssue struct {
-	Number   int        `json:"number"`
-	URL      string     `json:"url"`
-	State    string     `json:"state"`
-	Comments ghComments `json:"comments"`
+	Number        int        `json:"number"`
+	URL           string     `json:"url"`
+	State         string     `json:"state"`
+	Comments      ghComments `json:"comments"`
+	TimelineItems *struct {
+		TotalCount int                `json:"totalCount"`
+		Nodes      []ghCrossReference `json:"nodes"`
+	} `json:"timelineItems"`
+}
+
+type ghStatusPR struct {
+	Number      int
+	URL         string
+	State       string
+	Merged      bool
+	MergedAt    *time.Time
+	Body        string
+	BaseRefName string
+	HeadRefName string
+	// The repositories that own the base and head refs, as "owner/name".
+	// Empty when GitHub did not return one, for example a deleted fork.
+	BaseRepository string
+	HeadRepository string
+}
+
+// ghRepositoryName is the repository that owns one of a pull request's refs.
+// A branch name alone does not identify a branch: a fork may hold a branch
+// with the same name.
+type ghRepositoryName struct {
+	NameWithOwner string `json:"nameWithOwner"`
+}
+
+func (r *ghRepositoryName) name() string {
+	if r == nil {
+		return ""
+	}
+	return r.NameWithOwner
 }
 
 // ghCrossReference is a pull request that mentions an issue.
 type ghCrossReference struct {
-	IsCrossRepository bool `json:"isCrossRepository"`
-	Source            *struct {
-		Typename string     `json:"__typename"`
-		Number   int        `json:"number"`
-		URL      string     `json:"url"`
-		State    string     `json:"state"`
-		MergedAt *time.Time `json:"mergedAt"`
-		Body     string     `json:"body"`
-	} `json:"source"`
+	IsCrossRepository bool                    `json:"isCrossRepository"`
+	Source            *ghCrossReferenceSource `json:"source"`
+}
+
+type ghCrossReferenceSource struct {
+	Typename       string            `json:"__typename"`
+	Number         int               `json:"number"`
+	URL            string            `json:"url"`
+	State          string            `json:"state"`
+	Merged         bool              `json:"merged"`
+	BaseRefName    string            `json:"baseRefName"`
+	HeadRefName    string            `json:"headRefName"`
+	BaseRepository *ghRepositoryName `json:"baseRepository"`
+	HeadRepository *ghRepositoryName `json:"headRepository"`
+	MergedAt       *time.Time        `json:"mergedAt"`
+	Body           string            `json:"body"`
 }
 
 type ghItem struct {
@@ -269,9 +315,14 @@ type ghItem struct {
 	Merged      bool       `json:"merged"`
 	MergedAt    *time.Time `json:"mergedAt"`
 	BaseRefName string     `json:"baseRefName"`
+	BaseRefOid  string     `json:"baseRefOid"`
 	HeadRefName string     `json:"headRefName"`
 	HeadRefOid  string     `json:"headRefOid"`
-	MergeCommit *struct {
+	// The repositories that own the base and head refs; nil when GitHub
+	// returns none, for example a deleted fork.
+	BaseRepository *ghRepositoryName `json:"baseRepository"`
+	HeadRepository *ghRepositoryName `json:"headRepository"`
+	MergeCommit    *struct {
 		Oid string `json:"oid"`
 	} `json:"mergeCommit"`
 	Reviews *struct {
@@ -294,9 +345,14 @@ type ghItem struct {
 
 	// Set by status, not decoded from the item: the repository's default
 	// branch, and the governing issues the follow-up read fetched.
-	DefaultBranch  string           `json:"-"`
-	BodyIssues     []ghClosingIssue `json:"-"`
-	BodyIssueNotes []string         `json:"-"`
+	DefaultBranch         string             `json:"-"`
+	RepositoryHost        string             `json:"-"`
+	BodyIssues            []ghClosingIssue   `json:"-"`
+	BodyIssueNotes        []string           `json:"-"`
+	RepositoryIdentity    string             `json:"-"`
+	StackRegistryFetched  bool               `json:"-"`
+	StackRegistryComments []ghComment        `json:"-"`
+	StatusPRs             map[int]ghStatusPR `json:"-"`
 }
 
 func (it *ghItem) isPullRequest() bool { return it.Typename == "PullRequest" }
@@ -307,17 +363,22 @@ type ghResponse struct {
 			DefaultBranchRef *struct {
 				Name string `json:"name"`
 			} `json:"defaultBranchRef"`
+			StackRegistry *struct {
+				Typename string     `json:"__typename"`
+				Comments ghComments `json:"comments"`
+			} `json:"stackRegistry"`
 			Item *ghItem `json:"issueOrPullRequest"`
 		} `json:"repository"`
 	} `json:"data"`
 	Errors []struct {
 		Type    string `json:"type"`
 		Message string `json:"message"`
+		Path    []any  `json:"path"`
 	} `json:"errors"`
 }
 
-// fetchStatusItem makes the invocation's one GitHub read. A missing or
-// unauthenticated gh, or any other failure to read, is a ghUnavailable error.
+// fetchStatusItem makes the invocation's primary GitHub read. A registry-only
+// error is retained as unknown membership; other read failures are errors.
 func fetchStatusItem(ctx context.Context, gh ghRunner, repo ghRepository, number int) (*ghItem, error) {
 	ctx, cancel := context.WithTimeout(ctx, statusGHTimeout)
 	defer cancel()
@@ -327,6 +388,7 @@ func fetchStatusItem(ctx context.Context, gh ghRunner, repo ghRepository, number
 		"-f", "query="+statusQuery,
 		"-F", "owner="+repo.Owner,
 		"-F", "name="+repo.Name,
+		"-F", "includeStackRegistry="+strconv.FormatBool(repo.Host == authorizedStackHost && repo.Owner+"/"+repo.Name == authorizedStackRepository),
 		"-F", "number="+strconv.Itoa(number))
 
 	var resp ghResponse
@@ -340,8 +402,14 @@ func fetchStatusItem(ctx context.Context, gh ghRunner, repo ghRepository, number
 	if decodeErr != nil {
 		return nil, ghUnavailable{"gh returned a response that is not valid JSON"}
 	}
-	if len(resp.Errors) > 0 {
-		return nil, ghUnavailable{"GitHub reported an error: " + oneLine(resp.Errors[0].Message)}
+	registryReadError := false
+	for _, responseError := range resp.Errors {
+		if len(responseError.Path) >= 2 &&
+			responseError.Path[0] == "repository" && responseError.Path[1] == "stackRegistry" {
+			registryReadError = true
+			continue
+		}
+		return nil, ghUnavailable{"GitHub reported an error: " + oneLine(responseError.Message)}
 	}
 	if resp.Data == nil || resp.Data.Repository == nil {
 		return nil, ghUnavailable{"GitHub returned no repository data"}
@@ -353,13 +421,19 @@ func fetchStatusItem(ctx context.Context, gh ghRunner, repo ghRepository, number
 	if ref := resp.Data.Repository.DefaultBranchRef; ref != nil {
 		item.DefaultBranch = ref.Name
 	}
+	if repo.Host == authorizedStackHost && repo.Owner+"/"+repo.Name == authorizedStackRepository {
+		item.StackRegistryFetched = !registryReadError
+		if !registryReadError && resp.Data.Repository.StackRegistry != nil &&
+			resp.Data.Repository.StackRegistry.Typename == "Issue" {
+			item.StackRegistryComments = resp.Data.Repository.StackRegistry.Comments.Nodes
+		}
+	}
 	return item, nil
 }
 
-// fetchGoverningIssues makes the follow-up read: the issues numbers names,
-// with their comments. A number that names a pull request or nothing is
-// reported in notes, not returned.
-func fetchGoverningIssues(ctx context.Context, gh ghRunner, repo ghRepository, numbers []int) ([]ghClosingIssue, []string, error) {
+// fetchStatusReferences makes the follow-up read for governing issue comments
+// and the registered predecessor pull-request chain.
+func fetchStatusReferences(ctx context.Context, gh ghRunner, repo ghRepository, numbers []int, expectedPRs map[int]bool) ([]ghClosingIssue, map[int]ghStatusPR, []string, error) {
 	ctx, cancel := context.WithTimeout(ctx, statusGHTimeout)
 	defer cancel()
 
@@ -376,8 +450,22 @@ func fetchGoverningIssues(ctx context.Context, gh ghRunner, repo ghRepository, n
 	var resp struct {
 		Data *struct {
 			Repository map[string]*struct {
-				Typename string `json:"__typename"`
-				ghClosingIssue
+				Typename       string            `json:"__typename"`
+				Number         int               `json:"number"`
+				URL            string            `json:"url"`
+				State          string            `json:"state"`
+				Merged         bool              `json:"merged"`
+				MergedAt       *time.Time        `json:"mergedAt"`
+				Body           string            `json:"body"`
+				BaseRefName    string            `json:"baseRefName"`
+				HeadRefName    string            `json:"headRefName"`
+				BaseRepository *ghRepositoryName `json:"baseRepository"`
+				HeadRepository *ghRepositoryName `json:"headRepository"`
+				Comments       ghComments        `json:"comments"`
+				TimelineItems  *struct {
+					TotalCount int                `json:"totalCount"`
+					Nodes      []ghCrossReference `json:"nodes"`
+				} `json:"timelineItems"`
 			} `json:"repository"`
 		} `json:"data"`
 		Errors []struct {
@@ -387,20 +475,22 @@ func fetchGoverningIssues(ctx context.Context, gh ghRunner, repo ghRepository, n
 	}
 	decodeErr := json.Unmarshal(stdout, &resp)
 	if err != nil && (decodeErr != nil || resp.Data == nil) {
-		return nil, nil, classifyGHError(ctx, err, stderr)
+		return nil, nil, nil, classifyGHError(ctx, err, stderr)
 	}
 	if decodeErr != nil {
-		return nil, nil, ghUnavailable{"gh returned a response that is not valid JSON"}
+		return nil, nil, nil, ghUnavailable{"gh returned a response that is not valid JSON"}
 	}
 	for _, e := range resp.Errors {
 		if e.Type != "NOT_FOUND" {
-			return nil, nil, ghUnavailable{"GitHub reported an error: " + oneLine(e.Message)}
+			return nil, nil, nil, ghUnavailable{"GitHub reported an error: " + oneLine(e.Message)}
 		}
 	}
 	if resp.Data == nil || resp.Data.Repository == nil {
-		return nil, nil, ghUnavailable{"GitHub returned no repository data"}
+		return nil, nil, nil, ghUnavailable{"GitHub returned no repository data"}
 	}
 	var issues []ghClosingIssue
+	prs := make(map[int]ghStatusPR)
+	mentioned := make(map[int]ghStatusPR)
 	var notes []string
 	for i, n := range numbers {
 		got := resp.Data.Repository[fmt.Sprintf("i%d", i)]
@@ -408,16 +498,49 @@ func fetchGoverningIssues(ctx context.Context, gh ghRunner, repo ghRepository, n
 		case got == nil:
 			notes = append(notes, fmt.Sprintf("#%d names no issue in this repository", n))
 		case got.Typename != "Issue":
-			notes = append(notes, fmt.Sprintf("#%d is a pull request, not an issue", n))
+			prs[n] = ghStatusPR{
+				Number: got.Number, URL: got.URL, State: got.State, Merged: got.Merged,
+				MergedAt: got.MergedAt, Body: got.Body, BaseRefName: got.BaseRefName, HeadRefName: got.HeadRefName,
+				BaseRepository: got.BaseRepository.name(), HeadRepository: got.HeadRepository.name(),
+			}
+			if !expectedPRs[n] {
+				notes = append(notes, fmt.Sprintf("#%d is a pull request, not an issue", n))
+			}
 		default:
-			issues = append(issues, got.ghClosingIssue)
+			issue := ghClosingIssue{
+				Number: got.Number, URL: got.URL, State: got.State, Comments: got.Comments,
+				TimelineItems: got.TimelineItems,
+			}
+			issues = append(issues, issue)
+			if got.TimelineItems != nil {
+				for _, ref := range got.TimelineItems.Nodes {
+					if ref.Source == nil || ref.Source.Typename != "PullRequest" || ref.Source.Number < 1 || ref.IsCrossRepository {
+						continue
+					}
+					mentioned[ref.Source.Number] = ghStatusPR{
+						Number: ref.Source.Number, URL: ref.Source.URL, State: ref.Source.State,
+						Merged: ref.Source.Merged, MergedAt: ref.Source.MergedAt, Body: ref.Source.Body,
+						BaseRefName: ref.Source.BaseRefName, HeadRefName: ref.Source.HeadRefName,
+						BaseRepository: ref.Source.BaseRepository.name(), HeadRepository: ref.Source.HeadRepository.name(),
+					}
+				}
+			}
 		}
 	}
-	return issues, notes, nil
+	// A pull request read directly always wins over one only mentioned on an issue.
+	for number, pr := range mentioned {
+		if _, direct := prs[number]; !direct {
+			prs[number] = pr
+		}
+	}
+	return issues, prs, notes, nil
 }
 
 func notFoundResponse(resp ghResponse) bool {
 	for _, e := range resp.Errors {
+		if len(e.Path) >= 2 && e.Path[0] == "repository" && e.Path[1] == "stackRegistry" {
+			continue
+		}
 		if e.Type == "NOT_FOUND" && strings.Contains(e.Message, "issue or pull request") {
 			return true
 		}

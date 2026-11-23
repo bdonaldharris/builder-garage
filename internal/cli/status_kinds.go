@@ -175,10 +175,12 @@ func decodeDesignationBlock(raw string) (*designationBlock, error) {
 
 // prKind is how status classifies a pull request.
 type prKind struct {
-	kind     string // one of pullRequestKinds, or "" when none applies
-	declared bool   // the body declares it
-	valid    bool   // the base and head are ones the kind permits
-	problem  string // why a declared kind is not accepted
+	kind        string // one of pullRequestKinds, or "" when none applies
+	declared    bool   // the body declares it
+	valid       bool   // the base and head are ones the kind permits
+	stack       bool   // a registry-validated #192 stack or maintenance implementation
+	maintenance bool
+	problem     string // why a declared kind is not accepted
 }
 
 // relaxed reports whether implementation-review gates do not apply: only to

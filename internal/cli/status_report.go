@@ -80,8 +80,9 @@ type statusInputs struct {
 	// read fetched governing issues. Zero means 1.
 	Reads int
 
-	// kind is the pull request's kind, set by buildStatusReport.
-	kind *prKind
+	// kind and stack are set by buildStatusReport.
+	kind  *prKind
+	stack *stackValidation
 }
 
 // buildStatusReport evaluates the GitHub evidence for one issue or pull
@@ -104,13 +105,41 @@ func buildStatusReport(in statusInputs) *statusReport {
 	}}
 	if it.isPullRequest() {
 		k := pullRequestKind(in, governingIssues(it))
+		stack := stackValidation{}
+		if in.Config != nil {
+			integration, release, _ := configuredBranches(in)
+			stack = validateStackDeclaration(it, it.RepositoryHost, it.RepositoryIdentity, integration, release, governingIssues(it))
+		} else if dependencyOrMaintenanceDeclared(it.Body) {
+			stack = stackValidation{Present: true, Problem: "stack eligibility requires a valid project configuration"}
+		}
+		if stack.Present {
+			if k.kind == "" && declaredKind(it.Body) == kindImplementation {
+				k.kind = kindImplementation
+				k.declared = true
+			}
+			k.stack = stack.Valid
+			k.maintenance = stack.Maintenance
+			k.valid = stack.Valid
+			if stack.Valid {
+				k.problem = ""
+			} else {
+				k.problem = stack.Problem
+			}
+		}
 		in.kind = &k
+		in.stack = &stack
 		buildPRReport(r, in)
 	} else {
 		buildIssueReport(r, in)
 	}
 	addConfigSection(r, in)
 	return r
+}
+
+func dependencyOrMaintenanceDeclared(body string) bool {
+	_, dependency, _ := parseStackDependency(body)
+	_, maintenance, _ := parseStackMaintenance(body)
+	return dependency || maintenance
 }
 
 func readCount(reads int) string {
@@ -176,6 +205,8 @@ func addKindLine(s *statusSection, in statusInputs) {
 		s.add(labelChecked, "pull-request kind: the Pull request kind section %s; every implementation gate below is evaluated", k.problem)
 	case k.declared && !k.valid:
 		s.add(labelChecked, "pull-request kind: declared %s, MISMATCH: %s; every implementation gate below is evaluated", k.kind, k.problem)
+	case k.declared && k.valid && k.stack:
+		s.add(labelChecked, "pull-request kind: implementation, declared, with a registered #192 stack destination")
 	case k.declared:
 		s.add(labelChecked, "pull-request kind: %s, declared, with a base and head a %s permits", k.kind, k.kind)
 	case k.kind != "":
@@ -415,6 +446,25 @@ func buildPRReport(r *statusReport, in statusInputs) {
 	}
 	s.add(labelChecked, "base branch %s", it.BaseRefName)
 	addKindLine(s, in)
+	if in.stack != nil && in.stack.Unknown {
+		message := "stack membership is unknown: " + in.stack.Problem + "; no stack exception is granted"
+		if integration, _, ok := configuredBranches(in); ok && it.BaseRefName == integration {
+			message += "; ordinary E1 gates are evaluated"
+		} else {
+			message += "; ordinary target rules remain in force"
+		}
+		s.add(labelChecked, "%s", message)
+	}
+	if in.stack != nil && in.stack.Present {
+		switch {
+		case in.stack.Valid && in.stack.Maintenance:
+			s.add(labelChecked, "stack maintenance declaration matches registry entry: %s", in.stack.RegistryURL)
+		case in.stack.Valid:
+			s.add(labelChecked, "stack dependency declaration matches registry entry: %s", in.stack.RegistryURL)
+		default:
+			s.add(labelChecked, "stack declaration is not eligible: %s", in.stack.Problem)
+		}
+	}
 	if c := it.ClosingIssuesReferences; c != nil && c.TotalCount > len(c.Nodes) {
 		s.add(labelChecked, "the pull request closes %d issues; only the first %d were read, and the others' records are not shown or evaluated",
 			c.TotalCount, len(c.Nodes))
@@ -614,6 +664,16 @@ func evaluateHeadIdentity(g *statusSection, in statusInputs, prRecords []workflo
 	}
 	a := eq.Block.artifact()
 	g.add(labelChecked, "equivalence record for the head: changeset %s: %s", shortChangeset(a.Changeset), eq.Comment.URL)
+	if in.kind != nil && in.kind.stack {
+		if !objectNamePattern.MatchString(in.Item.BaseRefOid) {
+			g.add(labelChecked, "the current stack target branch commit is unavailable; equivalence is not shown")
+			return ""
+		}
+		if a.IntegrationRef != in.Item.BaseRefOid {
+			g.add(labelChecked, "the recorded integration_ref does not match the current target branch commit; the artifact must be recomputed")
+			return ""
+		}
+	}
 	if in.Recompute == nil {
 		return a.Changeset
 	}
@@ -810,6 +870,8 @@ func addConfigSection(r *statusReport, in statusInputs) {
 		want := strings.TrimSuffix(branch, " (default)")
 		k := in.kind
 		switch {
+		case k != nil && k.stack && k.valid:
+			s.add(labelChecked, "the pull request targets registered stack branch %s under the #192 exception", in.Item.BaseRefName)
 		case in.Item.BaseRefName == want:
 			s.add(labelChecked, "the pull request targets the configured integration branch")
 		case k != nil && k.declared && k.valid && (k.kind == kindPromotion || k.kind == kindHotfix):

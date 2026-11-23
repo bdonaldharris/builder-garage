@@ -273,14 +273,8 @@ func TestStatusIssueFindsPullRequestsNamingItInTheirGoverningSection(t *testing.
 	item.ClosedByPullRequestsReferences = nil
 	ref := func(number int, cross bool, body string) ghCrossReference {
 		r := ghCrossReference{IsCrossRepository: cross}
-		r.Source = &struct {
-			Typename string     `json:"__typename"`
-			Number   int        `json:"number"`
-			URL      string     `json:"url"`
-			State    string     `json:"state"`
-			MergedAt *time.Time `json:"mergedAt"`
-			Body     string     `json:"body"`
-		}{Typename: "PullRequest", Number: number, URL: fmt.Sprintf("https://example.invalid/pull/%d", number), State: "OPEN", Body: body}
+		r.Source = &ghCrossReferenceSource{Typename: "PullRequest", Number: number,
+			URL: fmt.Sprintf("https://example.invalid/pull/%d", number), State: "OPEN", Body: body}
 		return r
 	}
 	item.TimelineItems = &struct {
@@ -343,9 +337,9 @@ func TestBodyIssuesToFetch(t *testing.T) {
 	}
 }
 
-// runStatus makes a follow-up read only for governing issues that the
-// closing references do not supply, and both reads are read-only queries.
-func TestRunStatusMakesOneFollowUpReadForTheGoverningSection(t *testing.T) {
+// runStatus uses one bounded follow-up read for governing issues; stack
+// registry reads are limited to the authorized repository.
+func TestRunStatusMakesOneFollowUpReadForGoverningAndStackReferences(t *testing.T) {
 	pr46 := fixtureBytes(t, "pr46") // before newGitRepo changes the working directory
 	dir := newGitRepo(t, "https://github.com/o/r.git")
 	isolateUserCache(t)
@@ -394,7 +388,7 @@ func TestRunStatusMakesOneFollowUpReadForTheGoverningSection(t *testing.T) {
 		"#900 names no issue in this repository",
 		"approving issue-recorded implementation review: https://github.com/bdonaldharris/builder-garage/issues/33#issuecomment-6852033450")
 
-	// The same pull request closing #33 into the default branch: one read.
+	// An unrelated repository does not incur a stack-registry read.
 	calls = nil
 	out.Reset()
 	if err := runStatus(context.Background(), 46, statusTestEnv(t, dir, fixtureGH(t, pr46)), &out); err != nil {

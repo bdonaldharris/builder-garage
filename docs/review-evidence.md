@@ -18,7 +18,7 @@ An artifact is a change: the difference between a **base commit** `B` and a **re
 
 | Input | Working-tree artifact: an uncommitted change | Committed artifact: a pushed head `H` |
 | --- | --- | --- |
-| Integration reference `I` | The project's configured integration branch tip, as fetched, or, for a hotfix-designated issue, the configured release branch tip ([E11](extension-points.md#e11-release-branch)). Builder Garage: `origin/staging`, or `origin/main` for a hotfix-designated issue. | Same |
+| Integration reference `I` | The project's configured integration branch tip, as fetched, or, for a hotfix-designated issue, the configured release branch tip ([E11](extension-points.md#e11-release-branch)). For an issue in the registered #192 GitLab feature stack, the actual registered target branch tip. Builder Garage: `origin/staging`, `origin/main` for a hotfix-designated issue, or the registered predecessor branch for a stack feature/maintenance PR. | Same |
 | Base `B` | `git merge-base I HEAD` | `git merge-base I H` before the PR opens and while it is open. After merge, `git merge-base M^1 M^2`, where `M` is the merge commit. |
 | Result tree `T` | The working tree, staged into a **temporary** index (procedure below) | `H^{tree}` |
 
@@ -49,6 +49,8 @@ A PR head `H` is **artifact-equivalent** to an approved artifact `A` when `chang
 - When `B` is unchanged, `tree` equality is a stronger check and also holds.
 - After a rebase onto, or a merge of, integration commits that touch **none** of the artifact's paths, `tree` and `base` change, but `changeset` stays equal. The head is still equivalent.
 - If the integration branch changed a path the artifact also changes, `changeset` differs. Equivalence is not shown, and minimum trigger 1 applies. This is intended: the approved change was reviewed against different content.
+- A registered #192 stack PR uses its actual target branch tip as `integration_ref`. Retargeting, a target update, or synchronization therefore requires recomputation against that branch; if the recorded reference no longer matches, status cannot show equivalence and minimum trigger 1 applies. This does not change ordinary E1 or designated E11 behavior.
+- If the #192 registry is unavailable or invalid, an undeclared E1 PR retains ordinary eligibility while status reports stack membership as unknown; neither status nor review may claim stack requirements were verified. Registry uncertainty grants no non-E1 exception, and an explicit stack declaration requires valid registry evidence.
 
 ### Edge cases
 
@@ -223,7 +225,7 @@ A verifier's output must keep these two columns visible. A "valid" result means 
 
 ## Compatibility
 
-- **Integration PR review.** Changeset equality is the equivalence evidence `integration-pr-review` asks Agent #1 to record. A head whose changeset differs from the latest approved artifact fires minimum trigger 1. Nothing about the two minimum triggers changes.
+- **Integration PR review.** Changeset equality is the equivalence evidence `integration-pr-review` asks Agent #1 to record. A head whose changeset differs from the latest approved artifact fires minimum trigger 1. A registered #192 stack PR computes `integration_ref` from its actual registered target; a stale reference after retargeting or target movement means equivalence is not shown. Nothing about the two minimum triggers changes.
 - **Developer-local history ([#19](https://github.com/bdonaldharris/builder-garage/issues/19#issuecomment-6837362562)).** A local event's "artifact identity" field holds `method`, `base`, and `changeset`. These are object names and a digest, with no file content, so the #19 privacy rules are kept. Local events stay non-authoritative.
 - **Project configuration ([#35](https://github.com/bdonaldharris/builder-garage/issues/35)).** `integration_ref` comes from the configured integration branch (extension point E1 in the [#16 report](https://github.com/bdonaldharris/builder-garage/issues/16#issuecomment-6836405183)).
 - **Records written before adoption.** Free-text and patch-hash records, such as those on #18, remain valid historical evidence. A verifier reports them as `legacy` and does not try to recompute them.

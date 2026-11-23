@@ -109,8 +109,10 @@ A pull request's description declares its governing issues and its kind in two s
 - **`## Governing issue`.** Issue references in this repository, written as `#N`, `Closes #N`, `Fixes #N`, `Resolves #N`, or `Refs #N`.
   - A reference outside the section, one qualified with another repository (`owner/repo#N`), or a malformed one is not a governing issue.
   - GitHub links a closing keyword to its issue only when the pull request targets the default branch. So status reads the section whenever the base is another branch, or the pull request closes no issue. The issues the section names that its closing references do not supply are read in the follow-up query, with their workflow records, up to five.
+  - In `github.com/bdonaldharris/builder-garage`, status reads the #192 registry for PRs. When a valid registry identifies an enrolled issue or a PR explicitly declares stack handling, status also reads the relevant predecessor PR chain. Other repositories are not classified from stack registries or branch names.
   - For an issue, status also lists the pull requests in this repository whose Governing issue section names it.
 - **`## Pull request kind`.** Exactly one of `implementation`, `promotion`, `hotfix`, `clean synchronization`, or `conflicted synchronization`.
+- **`## Stack dependency` / `## Stack maintenance`.** Optional YAML declarations for the narrowly scoped #192 stack exception. A declaration alone never grants eligibility; status validates it against the latest registry. If the registry is unavailable or invalid, an undeclared E1 PR reports membership unknown and retains ordinary gates, while an explicit declaration grants no exception.
 
 Status reads the declared kind first, then checks it against the base and head the kind permits. E1 is the configured integration branch; the release branch is E11 ([extension points](docs/extension-points.md#e11-release-branch)).
 
@@ -122,10 +124,13 @@ Status reads the declared kind first, then checks it against the base and head t
 | clean synchronization | E1 | the release branch |
 | conflicted synchronization | E1 | `backmerge/vX.Y.Z` |
 
+The `implementation` kind has one narrow destination exception: a feature issue in the latest #192 registry targets its registered direct-prerequisite branch until that PR merges, then the branch the prerequisite's change was merged into, followed through any later merge of that branch; its `Stack dependency` must match that permitted target. Status judges an open PR by the target permitted now and a merged PR by the target permitted when it merged, and reads declarations from the current PR body only. A maintenance PR may target its registered branch from a temporary `maintenance/stack-192/...` head with `Stack maintenance`. Both remain kind `implementation`.
+
 - **A declared kind whose base and head fit** is reported as that kind. A declared promotion's head must be exactly `release/vX.Y.Z-rc.N`, and a declared conflicted synchronization's exactly `backmerge/vX.Y.Z`, with `X.Y.Z` written as a release tag is and `N` from 1.
   - Only a declared **promotion** or **clean synchronization** is exempt from implementation-review gates. Its governing issues, checks, human acceptance, and Environment / Deployment Requirements are still reported.
   - Every other kind is evaluated with every gate.
 - **A declared kind that does not fit,** or an unrecognized one, is reported as a mismatch, and every implementation gate is evaluated. A mismatch never relaxes a gate.
+- **The #192 exception is registry-scoped.** Status checks repository identity, the single governing feature issue, sequence, branch, direct prerequisite, target, prerequisite PR, and current target commit. Retargeting or a stale artifact reference makes equivalence unavailable and invokes the ordinary minimum PR-review triggers. Stack and maintenance PRs never skip implementation-review gates.
 - **No declared kind, with E1 as the base:** status infers clean synchronization when the head is the release branch, conflicted synchronization when it is a `backmerge/` branch, and implementation otherwise. An inferred kind is evaluated with every gate.
 - **No declared kind, with any other base:** status infers nothing, never a hotfix or a promotion. It reports that the base is not E1, and evaluates every gate.
 

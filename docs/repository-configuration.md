@@ -98,3 +98,19 @@ Whether to enable Dependabot security updates, now that the repository has Go mo
 ### Actions policy
 
 Whether to keep the current GitHub Actions policy or restrict it is not recorded. **Observed:** all actions and reusable workflows allowed, and SHA pinning not required.
+
+## Temporary GitLab stack ruleset
+
+The six-entry #192 stack exception requires an active temporary ruleset over the exact registered branch refs. The 2026-11-22 readiness check found no stack-specific ruleset or enrolled registry; verify GitHub's live state before relying on this procedure. The ruleset is an operational prerequisite, not something `garage status` can establish.
+
+### Configure before a branch becomes a prerequisite
+
+1. Develop each issue branch from its registered direct prerequisite. Branch creation is allowed from that already-checked predecessor without requiring workflow results at creation.
+2. The #196 prerequisite change must merge before the live stack exception can be enrolled. After that merge, the Workflow Owner publishes the counted #192 registry and the maintainer creates and verifies this ruleset from its exact entries before any enrolled PR targets a registered branch.
+3. Before another enrolled PR targets that branch, add its exact `refs/heads/<registered-branch>` to the temporary ruleset. Maintain the rule's include list as the Workflow Owner updates the registry; do not use a broad wildcard that protects unrelated branches.
+4. Configure the ruleset with no bypass actors; require pull requests, merge commits only, resolved review threads, deletion restriction, and blocked force pushes/non-fast-forward updates. Keep required approving reviews at zero, consistent with **Protect staging** and the sole-maintainer decision; governance's independent-review and maintainer-acceptance gates remain unchanged. Require the same eight GitHub Actions checks as **Protect staging** above. Status checks must gate merges but must not prevent creation of the branch from a predecessor whose checks have already passed.
+5. Verify the active ruleset's exact refs, bypass list, and required rules on GitHub before opening a PR against any enrolled target. Record that verification on #192. A ruleset change or missing protection is a material blocker.
+
+### Maintain and remove protection
+
+Keep the ruleset active for all six refs through implementation, maintenance/correction PRs, sequential upstream propagation, and integration into `staging`. Do not push directly or bypass the PR/check gates. Once all six changes and required propagation have reached `staging`, a maintainer with ruleset-administration authority verifies the completed integration, removes the temporary ruleset, and deletes the enrolled stack branches. Update this observed-state document only after confirming the resulting live GitHub state.

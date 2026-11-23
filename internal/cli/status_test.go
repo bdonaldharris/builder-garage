@@ -664,6 +664,29 @@ func TestRunStatusDoesNotRecomputeInAPartialClone(t *testing.T) {
 	}
 }
 
+func TestMergeStatusReferenceIssuesSeparatesRegistry(t *testing.T) {
+	registry := ghComment{URL: "registry"}
+	item := &ghItem{StackRegistryFetched: true, StackRegistryComments: []ghComment{registry}}
+	issues := []ghClosingIssue{
+		{Number: stackProgramIssue, Comments: ghComments{Nodes: []ghComment{{URL: "issue-192"}}}},
+		{Number: 302, Comments: ghComments{Nodes: []ghComment{{URL: "issue-302"}}}},
+	}
+
+	mergeStatusReferenceIssues(item, issues, map[int]bool{302: true})
+	if !item.StackRegistryFetched || len(item.StackRegistryComments) != 1 || item.StackRegistryComments[0].URL != "registry" {
+		t.Fatalf("primary registry evidence was not retained separately: %+v", item)
+	}
+	if len(item.BodyIssues) != 1 || item.BodyIssues[0].Number != 302 {
+		t.Fatalf("body governing issues = %+v, want only issue 302", item.BodyIssues)
+	}
+
+	item = &ghItem{StackRegistryFetched: true, StackRegistryComments: []ghComment{registry}}
+	mergeStatusReferenceIssues(item, issues, map[int]bool{stackProgramIssue: true})
+	if len(item.BodyIssues) != 1 || item.BodyIssues[0].Number != stackProgramIssue {
+		t.Fatalf("named #192 issue was not preserved: %+v", item.BodyIssues)
+	}
+}
+
 func TestPartialCloneReason(t *testing.T) {
 	exitOne := exec.Command("git", "config", "--get", "garage.status.test.absent")
 	exitOne.Env = append(os.Environ(), "GIT_CONFIG_GLOBAL="+os.DevNull, "GIT_CONFIG_SYSTEM="+os.DevNull)
