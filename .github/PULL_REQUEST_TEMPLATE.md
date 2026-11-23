@@ -19,12 +19,47 @@ implementation
 
 <!--
 Exactly one of: implementation, promotion, hotfix, clean synchronization, conflicted synchronization.
-- implementation: an issue branch into staging.
+- implementation: an issue branch into staging, or a registered #192 stack/maintenance destination.
 - promotion: release/vX.Y.Z-rc.N into main (docs/release-runbook.md).
 - hotfix: a hotfix-designated issue's branch into main.
 - clean synchronization: main into staging, without conflicts.
 - conflicted synchronization: backmerge/vX.Y.Z into staging, with its own issue and review.
 garage status checks the kind against the base and head it permits.
+-->
+
+## Stack dependency
+
+<!--
+Only for one of the six issues enrolled by the Workflow Owner on #192.
+Use the registered values; this section alone grants no destination exception.
+```yaml
+garage_stack: 1
+program_issue: 192
+sequence: <registered sequence>
+direct_prerequisite_issue: <registered issue>
+direct_prerequisite_pr: <registered pull request>
+target_branch: <prerequisite branch, or its merge target after it lands>
+```
+-->
+
+## Stack maintenance
+
+<!--
+Only for a correction or synchronization to an enrolled branch. Use a temporary
+maintenance/stack-192/... head. For a correction, include URLs for correction_record
+and agent2_disposition; omit both fields for synchronization. For synchronization
+from staging, upstream_pr is 0; for direct-predecessor propagation, identify its registered PR.
+```yaml
+garage_stack: 1
+program_issue: 192
+entry_issue: <registered issue>
+purpose: correction | synchronize
+upstream: <staging or registered direct-predecessor branch>
+upstream_pr: <0 or registered direct-predecessor PR>
+target_branch: <registered branch>
+correction_record: <issue comment URL, correction only>
+agent2_disposition: <issue comment URL, correction only>
+```
 -->
 
 ## Summary

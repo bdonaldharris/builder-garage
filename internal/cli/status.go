@@ -114,6 +114,14 @@ func runStatus(ctx context.Context, number int, env statusEnv, w io.Writer) erro
 	return err
 }
 
+func mergeStatusReferenceIssues(item *ghItem, issues []ghClosingIssue, governing map[int]bool) {
+	for _, issue := range issues {
+		if governing[issue.Number] {
+			item.BodyIssues = append(item.BodyIssues, issue)
+		}
+	}
+}
+
 // statusReportFor is the shared typed status operation. Command and web
 // adapters render its report independently; it never parses rendered output.
 func statusReportFor(ctx context.Context, number int, env statusEnv) (*statusReport, error) {
@@ -143,16 +151,32 @@ func statusReportFor(ctx context.Context, number int, env statusEnv) (*statusRep
 	}
 	reads := 1
 	if err == nil {
-		if numbers := bodyIssuesToFetch(item); len(numbers) > 0 {
+		integration, release := "", ""
+		if cfg != nil {
+			integration, release, _ = configuredBranches(statusInputs{Config: cfg})
+		}
+		stackPRs := stackPRReferencesToFetch(item, ghRepo.Host, ghRepo.Owner+"/"+ghRepo.Name, integration, release)
+		if numbers := statusReferencesToFetch(item, ghRepo.Host, ghRepo.Owner+"/"+ghRepo.Name, integration, release); len(numbers) > 0 {
 			reads = 2
-			issues, notes, fetchErr := fetchGoverningIssues(ctx, env.GH, ghRepo, numbers)
+			expectedPRs := make(map[int]bool)
+			for _, number := range stackPRs {
+				expectedPRs[number] = true
+			}
+			issues, prs, notes, fetchErr := fetchStatusReferences(ctx, env.GH, ghRepo, numbers, expectedPRs)
 			if fetchErr != nil {
 				item.BodyIssueNotes = append(item.BodyIssueNotes,
-					"the governing issues named in the Governing issue section could not be read: "+fetchErr.Error())
+					"the related issues and pull requests needed for status could not be read: "+fetchErr.Error())
 			}
-			item.BodyIssues = issues
+			item.StatusPRs = prs
+			governing := make(map[int]bool)
+			for _, number := range governingIssueNumbers(item.Body) {
+				governing[number] = true
+			}
 			item.BodyIssueNotes = append(item.BodyIssueNotes, notes...)
+			mergeStatusReferenceIssues(item, issues, governing)
 		}
+		item.RepositoryIdentity = ghRepo.Owner + "/" + ghRepo.Name
+		item.RepositoryHost = ghRepo.Host
 	}
 
 	var report *statusReport

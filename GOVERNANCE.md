@@ -88,13 +88,13 @@ Once additional authorized maintainers are available, a maintainer-authored pull
 
 Builder Garage integrates on `staging` and releases from `main` ([ADR 0004](docs/adr/0004-release-promotion.md)):
 
-- **`staging`** is the integration branch ([E1](docs/extension-points.md#e1-integration-branch)). Implementation pull requests are opened against `staging`.
+- **`staging`** is the integration branch ([E1](docs/extension-points.md#e1-integration-branch)). Implementation pull requests target `staging`, except for a feature issue enrolled in the scoped [#192 GitLab stack](#scoped-gitlab-feature-stack).
 - **`main`** is the default branch, the public released-code branch, and the release branch ([E11](docs/extension-points.md#e11-release-branch)). It changes only through the promotion of a release candidate, or the pull request of a hotfix-designated issue (below). Releases follow the [release runbook](docs/release-runbook.md).
 - **Both change only through pull requests,** merged with merge commits. No one pushes to either directly, including maintainers.
 - **A pull request merges only** after maintainer approval and after all required checks pass.
 - **An issue integrated into `staging` stays open until its release is promoted.** GitHub closes an issue on merge only into the default branch, so the promotion pull request closes the release's member issues.
 
-The canonical [integration-pr-review](skills/integration-pr-review/SKILL.md) skill opens an integration pull request against the integration branch configured at E1 in [`.garage/config.yaml`](.garage/config.yaml): `staging`, which is also the canonical default. For a hotfix-designated issue, it targets the release branch configured at E11 instead. Builder Garage applies that workflow's review, validation, and authorization requirements in full. The configured branches change the destination only. They do not change or relax any gate the skill defines.
+The canonical [integration-pr-review](skills/integration-pr-review/SKILL.md) skill opens an integration pull request against the integration branch configured at E1 in [`.garage/config.yaml`](.garage/config.yaml): `staging`, which is also the canonical default. For a hotfix-designated issue, it targets the release branch configured at E11 instead; an enrolled #192 GitLab feature targets its registered direct prerequisite. Builder Garage applies that workflow's review, validation, and authorization requirements in full. These scoped destinations change the target only. They do not change or relax any gate the skill defines.
 
 The human approval that skill requires before merge is the maintainer approval described under [Review requirements](#review-requirements).
 
@@ -147,6 +147,43 @@ Immediately after the hotfix merges, it is synchronized from `main` into `stagin
   4. Cut its first candidate as `release/vNEXT-rc.1`.
 
   A released version is never reused as another release candidate.
+
+## Scoped GitLab feature stack
+
+The six GitLab feature issues authorized by [#192](https://github.com/bdonaldharris/builder-garage/issues/192) are the only implementation issues that may target a registered branch other than E1. Eligibility comes from the latest counted `[WORKFLOW OWNER — GITLAB STACK REGISTRY]` record on #192, not a label, PR declaration, or branch name. Enrollment is established by the exact governing issue in a valid registry entry; an issue omitted from a valid registry is known not enrolled and follows ordinary target rules. The registry binds each issue and sequence to one branch and its direct prerequisite. A registry author's GitHub association is checkable, but does not prove Workflow Owner identity; that authority remains asserted.
+
+When the registry is missing, unreadable, or malformed, an undeclared PR targeting E1 retains ordinary E1 eligibility and all ordinary gates; status reports membership as unknown, not known non-enrollment, and does not claim stack requirements were verified. Registry uncertainty never grants a non-E1 destination. Explicit stack declarations require valid registry evidence. When a valid registry establishes enrollment, the declaration and stack checks are required even for an E1-targeting PR.
+
+The record's first line is the marker, followed by one fenced YAML block. It names this repository, the merged prerequisite-change PR for #196, and exactly six entries in sequence order. Entry 1's direct prerequisite is issue #196 and its merged PR into E1; every later entry's direct prerequisite is the immediately preceding entry and its registered branch. The following schema excerpt is illustrative and incomplete; it must not be posted as the complete registry:
+
+```yaml
+garage_stack: 1
+program_issue: 192
+repository: owner/repository
+prerequisite_change_pr: 123
+entries:
+  - issue: 197
+    sequence: 1
+    branch: gitlab-stack/issue-197
+    direct_prerequisite:
+      issue: 196
+      pull_request: 123
+      branch: staging
+  - issue: 198
+    sequence: 2
+    branch: gitlab-stack/issue-198
+    direct_prerequisite:
+      issue: 197
+      pull_request: 124
+      branch: gitlab-stack/issue-197
+  # Four more entries, continuing the same consecutive dependency chain.
+```
+
+A feature PR remains kind `implementation`, names exactly its registered governing issue, and targets its registered direct-prerequisite branch until that prerequisite PR merges. Afterward, its permitted target is the branch the prerequisite's change was merged into; if that branch's own registered PR has since merged, the target follows that merge onward, ending at E1. Its `Stack dependency` declaration must match the registry and this permitted target. A registered branch is that branch in the registry's repository: a same-named branch in a fork is not the registered branch, and when GitHub does not report which repository owns a pull request's head or base branch, status grants no stack eligibility. An open PR is checked against the target permitted now. A merged PR is checked against the target that was permitted when it merged, using its merge destination and the merge times GitHub records; it is not re-judged by later merges. Status reads each declaration from the PR's current body, so it cannot show what a declaration said at merge time. When a merge state or the order of two merges cannot be established, status grants no stack eligibility. Status checks the current target branch commit as the artifact’s `integration_ref`; after retargeting or a target update, equivalence must be re-established, and changed artifacts follow the ordinary minimum PR-review triggers. No declaration relaxes independent review, required CI, maintainer acceptance, or Environment / Deployment Requirements.
+
+Stack corrections and synchronization use a temporary `maintenance/stack-192/...` branch and a `Stack maintenance` declaration, while retaining kind `implementation`. A correction is reviewed under the affected issue and links its correction record and applicable Agent #2 disposition. Synchronization comes only from current E1 (`staging`) or the registered direct predecessor; dependent propagation merges that predecessor’s current branch through its current PR. Conflicts stay within the affected issue and require the ordinary review and re-review rules.
+
+The #196 prerequisite change must merge before the live stack exception is enrolled. After that merge, the Workflow Owner publishes the counted registry and a maintainer creates and verifies the temporary ruleset for the exact registered refs before any registered branch becomes a direct-prerequisite target. Protection remains through full integration. Only after every stack change has reached `staging` may a maintainer with ruleset-administration authority remove the temporary ruleset and enrolled branches. The live ruleset is not presumed to exist; its verified state is recorded separately.
 
 ## Conduct and security
 
