@@ -1,0 +1,20 @@
+# GitLab capability completion checklist (#192)
+
+This is the single cumulative adopter-workflow checklist for the six-issue feature. Entries record implementation/evidence boundaries; they do not certify a deployment, human acceptance or release. The complete-feature integration/release hold remains. Builder Garage itself stays on GitHub.
+
+| Existing GitHub adopter capability | GitLab equivalent / owner | Applicability and evidence |
+| --- | --- | --- |
+| Configured repository identity and existing no-forge projects | Explicit forge/origin contract, subgroup paths / #197 | Implemented prerequisite; PR #206 and its Issue review/equivalence records. GitHub schema-v2 behavior retained. |
+| Typed issue/change lookup, governing relationships | Issue/MR/HTTPS/Markdown references, configured host/project / #198 | PR #209 at `402cf7e6d14cee3a917c6971e5c9acc8dafb20af`; independently approved corrected artifact, all ten hosted jobs passed at #199 readiness. Deterministic fixtures; no live deployment claim. |
+| Read-only status and local web | Shared normalized observations and typed local lookup / #198 | Same PR; unsupported/incomplete facts never pass. #199 preserves the GET-only boundary. No web editing. |
+| Issue/PR authoring and editing, duplicate search | Authorized Issue/MR operations with literal bodies, bounded search, exact read-back / #199 | Implemented in this working-tree tranche; operation/authority fixtures and executable validation are recorded in #199's handoff. Independent review still required. |
+| Decisions, discovery, readiness and durable records | Governing Issue/MR top-level notes and provider-neutral canonical assets / #199 | Same markers and location/order contract; portable provider reference embedded in every installed skill. Transport does not certify consent, role or verdict. |
+| Agent implementation/correction and independent review | Developer-or-higher notes, Issue authority and supplemental MR review / #199 | Shared parser/artifact/evaluator plus current response-link checks; native approvals stay distinct. Separate Agent #2 invocation required. |
+| Human authority identity | Qualified E8 members / #199 | `github:USER`, `gitlab:HOST/USER`; unqualified GitHub compatibility. Configured identity alone does not pass native policy. |
+| Private local Issue/PR history | Separate GitLab Issue/MR kinds and provider/host/project namespace / #199 | `record --mr`, `history list --mr`; retained GitHub v1 keys/files, private bounded best-effort annotations. No workflow authority. |
+| Repository Issue/PR templates | GitLab Markdown Issue/MR templates / #199 | `.gitlab` adopter assets plus canonical fallback/provider selection; existing `.github` retained. |
+| Required checks, protected destination and merge policy | Current-head pipelines, approval/discussion/destination policy / #200 | Planned. Required unavailable facts cannot pass. #198 observes partial native facts; #199 resolves identities, without claiming complete policy eligibility. |
+| Release/promotion evidence and operations | Notes / #199; adopter release/tag/assets/CI guidance and operations / #201 | #199 supports records only. Release execution, native facts and publishing evidence remain #201. Garage's updater/distribution backend is unchanged. |
+| GitHub regression and adoption verification | GitHub plus GitLab.com/Self-Managed/Dedicated matrix / #202 | Deployment certification pending. Capture actual glab/server versions, permissions/auth, tier/capabilities and trust. Missing optional capability limits that claim; missing required evidence blocks its gate. No ONEOK access. |
+
+The release-completion assessment must attach integrated current-artifact verification and human acceptance to each applicable row before integration into staging and the one feature release. Fixture success cannot substitute for deployment compatibility. Future tranches update this file rather than creating a competing checklist.

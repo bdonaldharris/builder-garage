@@ -5,6 +5,10 @@ metadata:
   garage-role: planner
 ---
 
+# Provider binding
+
+Apply [Provider operations](references/provider-operations.md) before selecting the authoritative record or tools. The governing provider Issue and its PR/MR are the durable record. GitHub uses comments and existing GitHub tools; GitLab uses verified top-level notes, qualified identities and the explicit operations in that reference. Existing skill names, Agent markers, evidence keys and `pr-review` remain unchanged. PR responsibilities apply to the GitLab MR with typed targets; no provider choice relaxes a role, authorization, review, human-acceptance or evidence gate. GitHub-specific command examples bind only to GitHub. The #192 stack/ruleset exception remains specific to Builder Garage's GitHub repository.
+
 # Project Spec Workflow
 
 ## Executing role
@@ -48,7 +52,7 @@ These rules hold whatever the project configures, and no instruction can waive t
 
 - **F3.** This invocation has one role, planner, for its whole execution. It does not continue into implementation, review, or acceptance.
 - **F4.** This skill writes no workflow-state record of Agent #1 or Agent #2.
-- **F8.** Evidence is durable on GitHub. A spec draft kept only in the conversation is never evidence, and the spec becomes durable only when the change that adds it is merged.
+- **F8.** Evidence is durable on the selected provider. A spec draft kept only in the conversation is never evidence, and the spec becomes durable only when the change that adds it is merged.
 - **F9.** Role, not vendor, model, or tool, determines what this skill may do.
 - **F12.** Product intent is decided by the product-intent acceptor (E8), a human. A planner never decides it; the spec lists an unmade decision as pending.
 
@@ -125,7 +129,7 @@ An existing project adopts Builder Garage. The spec keeps three kinds of stateme
 
 An Observed statement moves into the main sections only through an accepted spec change. Never record current behavior as intended because it exists, because the current system may contain defects.
 
-An adoption spec needs a discovery report recorded on GitHub. If none exists, stop and recommend discovery, for example `discover #N using eng-discovery`. Starting discovery is a separate invocation.
+An adoption spec needs a discovery report recorded on the selected provider. If none exists, stop and recommend discovery, for example `discover #N using eng-discovery`. Starting discovery is a separate invocation.
 
 ---
 

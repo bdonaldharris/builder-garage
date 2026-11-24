@@ -36,7 +36,11 @@ func (b *boundedGLabOutput) Write(p []byte) (int, error) {
 	return b.Buffer.Write(p)
 }
 func runGLab(ctx context.Context, args ...string) ([]byte, []byte, error) {
+	return runGLabInput(ctx, nil, args...)
+}
+func runGLabInput(ctx context.Context, input []byte, args ...string) ([]byte, []byte, error) {
 	cmd := exec.CommandContext(ctx, "glab", args...)
+	cmd.Stdin = bytes.NewReader(input)
 	var out, stderr boundedGLabOutput
 	cmd.Stdout = &out
 	cmd.Stderr = &stderr

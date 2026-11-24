@@ -5,6 +5,10 @@ metadata:
   garage-role: implementer
 ---
 
+# Provider binding
+
+Apply [Provider operations](references/provider-operations.md) before selecting the authoritative record or tools. The governing provider Issue and its PR/MR are the durable record. GitHub uses comments and existing GitHub tools; GitLab uses verified top-level notes, qualified identities and the explicit operations in that reference. Existing skill names, Agent markers, evidence keys and `pr-review` remain unchanged. PR responsibilities apply to the GitLab MR with typed targets; no provider choice relaxes a role, authorization, review, human-acceptance or evidence gate. GitHub-specific command examples bind only to GitHub. The #192 stack/ruleset exception remains specific to Builder Garage's GitHub repository.
+
 # Application Implementation Workflow
 
 ## Executing agent identity
@@ -49,7 +53,7 @@ These rules hold whatever the project configures, and no instruction can waive t
 - **F3.** This invocation has one role, Agent #1, for its whole execution. Reaching Agent #2's responsibility is a terminal handoff: stop, and do not wait, poll, or continue in that role.
 - **F4.** Agent #1 writes only Agent #1 workflow-state markers, and never a record that represents Agent #2.
 - **F5.** Every change this skill produces goes to independent review before it is proposed for integration or advanced on the integration branch. Opening a pull request, including a draft, proposes it. Agent #1 never classifies a change as a small correction and never exempts its own work from review. Only the configured small-correction classifier (E8), a human, may classify a change as one, explicitly, when the project enables small corrections (E4).
-- **F8.** Workflow evidence is durable on the governing GitHub Issue or PR, and is written and then verified. A conversation, a local file, or local history is never the record.
+- **F8.** Workflow evidence is durable on the governing provider Issue or PR/MR, and is written and then verified. A conversation, a local file, or local history is never the record.
 - **F9.** Role, not vendor, model, or tool, determines responsibility and authority. An automated reviewer's output is review input only.
 
 ## Purpose
@@ -62,7 +66,7 @@ It keeps implementation scoped to the governing issue while preserving independe
 
 The governing Issue/PR is the authoritative source of change-specific requirements, acceptance criteria, scope, constraints, and durable workflow history/state. The current repository/artifact remains authoritative for what actually exists.
 
-This skill owns the reusable implementation procedure. The invocation prompt does not need to restate issue content, prior execution history, or workflow rules already recorded in GitHub and defined here.
+This skill owns the reusable implementation procedure. The invocation prompt does not need to restate issue content, prior execution history, or workflow rules already recorded on the selected provider and defined here.
 
 When the agent is already operating in the correct repository workspace, a one-line invocation is sufficient, for example:
 
@@ -189,7 +193,7 @@ Before a branch becomes a direct-prerequisite target, confirm the exact branch i
 
 # Durable workflow-state comments
 
-GitHub Issues and PRs are the durable record of implementation/review execution state.
+Provider Issues and PRs/MRs are the durable record of implementation/review execution state.
 
 Use recognizable workflow-state markers so agents can identify the latest relevant execution state without assuming the absolute newest comment is relevant. Human comments, automated-review comments, inline review comments, and other activity may appear after a workflow-state comment.
 
@@ -378,7 +382,7 @@ After the workflow-state comment has been written and verified, make one best-ef
 garage record --issue <number> --type <implementation | correction> --outcome <ready | blocked> --url <URL of the verified comment>
 ```
 
-Use `--pr <number>` instead of `--issue` for a correction posted on a PR. Use outcome `ready` for a READY state and `blocked` for MATERIAL BLOCKER. If the `garage` command is unavailable or the attempt fails, ignore it and do not retry. Local recording never gates, authorizes, advances, or coordinates workflow, and it never replaces the GitHub record.
+Use `--pr <number>` instead of `--issue` for a correction posted on a PR. Use outcome `ready` for a READY state and `blocked` for MATERIAL BLOCKER. If the `garage` command is unavailable or the attempt fails, ignore it and do not retry. Local recording never gates, authorizes, advances, or coordinates workflow, and it never replaces the provider record.
 
 ---
 
@@ -534,7 +538,7 @@ The requirement is a real workflow handoff, not merely a different persona. Agen
 Agent #1:
 
 1. reads the governing Issue/PR, acceptance criteria, and relevant prior workflow-state comments;
-2. identifies the latest applicable workflow-state comment for the current phase without assuming the newest GitHub comment is relevant;
+2. identifies the latest applicable workflow-state comment for the current phase without assuming the newest provider comment/note is relevant;
 3. inspects current repository state and relevant existing architecture;
 4. resolves material ambiguity before consequential implementation;
 5. creates/uses the issue-specific branch from the configured integration branch (E1), the configured release branch for a hotfix-designated issue (E11), or the registered direct prerequisite for an enrolled #192 issue ([Hotfixes](#hotfixes-e11); [Scoped GitLab feature stack](#scoped-gitlab-feature-stack-192));
@@ -602,7 +606,7 @@ Agent #1 must **not** commit, push, open a PR, or self-satisfy Agent #2 review. 
 
 This hold point is reached only after the universal pre-return completion gate produces `READY FOR AGENT #2 REVIEW`.
 
-Agent #1 posts the structured `[AGENT #1 — IMPLEMENTATION]` comment, then returns control for separate Agent #2 review with the artifact still uncommitted and unpushed, or, under commit-stage review, pushed to the issue branch and not proposed. That GitHub comment is the durable implementation handoff.
+Agent #1 posts the structured `[AGENT #1 — IMPLEMENTATION]` comment, then returns control for separate Agent #2 review with the artifact still uncommitted and unpushed, or, under commit-stage review, pushed to the issue branch and not proposed. That provider comment/note is the durable implementation handoff.
 
 ---
 # Phase 2 — Agent #2 review boundary
@@ -782,7 +786,7 @@ Do not use an automated reviewer to repair artifact-equivalence uncertainty.
 
 # Consolidated suggestion backlog
 
-Non-blocking review observations go to the project's suggestions backlog (E7) rather than to a new GitHub issue per observation:
+Non-blocking review observations go to the project's suggestions backlog (E7) rather than to a new provider issue per observation:
 
 - when `suggestions_backlog` names an issue, append them to that issue;
 - when it is omitted, use the repository's one persistent issue named `Application Improvement Suggestions`;
@@ -803,28 +807,28 @@ Create a standalone issue only when the Workflow Owner (E8), a human, deliberate
 
 # Issue authoring
 
-This skill may author a GitHub issue only as this section describes. An authored issue records work. It never authorizes implementing that work, and it never assigns, invokes, or schedules anyone.
+This skill may author a provider issue only as this section describes. An authored issue records work. It never authorizes implementing that work, and it never assigns, invokes, or schedules anyone.
 
 ## When an issue may be created
 
 - **Explicit authorization.** Create an issue only when the Builder explicitly authorizes creating it in the current task. A recommendation to create one is not authorization. Neither is approval of a plan, report, review, or decision. An authorization covers only the issues it names.
-- **Durable evidence.** Author only from durable GitHub records, each linked by URL. Never author from the conversation. When this skill writes its own record, author only after that record is written and verified.
+- **Durable evidence.** Author only from durable provider records, each linked by URL. Never author from the conversation. When this skill writes its own record, author only after that record is written and verified.
 - **Assigned types only.** Author only the issue types listed under "What this skill may author".
 
 ## Procedure
 
 1. **Check for duplicates.** Search open and closed issues read-only, by key terms and by matching labels. For example: `gh search issues --repo OWNER/REPO "<key terms>"`, which searches both open and closed issues when `--state` is omitted. Never comment on, close, label, or link a candidate.
 2. **Resolve the template.**
-   1. **The repository's issue templates.** Read `.github/ISSUE_TEMPLATE/` directly, for example with `gh api repos/OWNER/REPO/contents/.github/ISSUE_TEMPLATE`. GitHub's GraphQL `issueTemplates` does not list YAML issue forms.
+   1. **The repository's issue templates.** For GitLab, inspect `.gitlab/issue_templates/*.md` and select the matching Markdown template using [Provider operations](references/provider-operations.md). For GitHub, read `.github/ISSUE_TEMPLATE/` directly, for example with `gh api repos/OWNER/REPO/contents/.github/ISSUE_TEMPLATE`. GitHub's GraphQL `issueTemplates` does not list YAML issue forms.
       - Choose the template whose purpose matches the issue. Ask the Builder when more than one fits, or none does.
-      - Honor `config.yml`. When `blank_issues_enabled` is `false`, a template is required.
+      - For GitHub, honor `config.yml`. When `blank_issues_enabled` is `false`, a template is required.
    2. **Otherwise, this skill's fallback template,** `templates/issue.md`.
 3. **Draft.**
    - Fill every field that the template marks required. In a form, those are the fields with `validations: required: true`.
-   - Compose a form's body the way GitHub renders a form: one `### <label>` section per field, in the form's order.
+   - For a GitLab Markdown template, fill its required headings. For a GitHub form, compose its body as rendered: one `### <label>` section per field, in the form's order.
    - End the body with the authoring record.
 4. **Confirm.** Show the Builder the complete draft: the title, body, labels, the template used, and the duplicate candidates. Create the issue only after an explicit yes. Any change to the draft needs a new yes.
-5. **Create.**
+5. **Create.** For GitLab, use the explicitly authorized create operation in [Provider operations](references/provider-operations.md) and its verified read-back; the `gh` command below is the GitHub binding.
    - Set only the approved title, body, and labels. For example: `gh issue create --title "<title>" --body-file <file> --label <label>`.
    - Suggest a label only from the template or from the Builder. A label that does not exist in the repository is reported and left out, never created.
    - Never set project fields, assignees, or milestones, unless the Builder's authorization names that action.
@@ -838,7 +842,7 @@ Every authored issue's body ends with one fenced YAML block. The block's `checka
 ```yaml
 garage_authoring: 1
 checkable:
-  source_evidence:             # required: durable GitHub issue, pull request, or comment URLs
+  source_evidence:             # required: durable provider Issue, PR/MR, comment or note URLs
     - "<URL>"
   decision: "<URL of the durable decision, when decision_status is decided>"
 asserted:
@@ -1007,7 +1011,7 @@ An implementation follows this skill only when:
 - instructions that conflict with the Agent #1 role, the valid configuration, or a floor rule this skill states are rejected;
 - only a Workflow Owner-designated hotfix uses E11, and only a feature issue in the latest valid #192 registry uses its registered direct-prerequisite branch; every other issue uses E1, and neither exception changes a gate;
 - Agent #1 never classifies a change as a small correction or exempts its own work from review;
-- GitHub workflow-state comments provide durable history but never replace inspection of the current artifact;
+- Provider workflow-state comments/notes provide durable history but never replace inspection of the current artifact;
 - Agent #1 inspects existing architecture before creating new architecture;
 - material ambiguity is clarified rather than guessed through;
 - implementation remains inside issue scope;

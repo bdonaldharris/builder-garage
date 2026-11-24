@@ -58,6 +58,7 @@ func defaultHistoryEnv() (historyEnv, error) {
 type historyListOptions struct {
 	Issue    int
 	PR       int
+	MR       int
 	AllLocal bool
 	Format   string
 }
@@ -70,7 +71,7 @@ func newHistoryCommand() *cobra.Command {
 cache directory, one file per repository identity.
 
 Local history is an annotation only: it may be incomplete, and it is never
-workflow evidence. GitHub Issue and pull request records are authoritative.
+workflow evidence. Provider Issue and PR/MR records are authoritative.
 These commands are offline and read-only. They never contact GitHub or the
 network, never open a stored link, and never change the history.`,
 		Args: cobra.NoArgs,
@@ -85,12 +86,12 @@ func newHistoryListCommand() *cobra.Command {
 		Use:   "list",
 		Short: "List this repository's local workflow events",
 		Long: `List the local workflow events recorded for this repository, oldest first:
-the time, the issue or pull request, the event type, the outcome, and the
-link to the GitHub record.
+the time, the issue, PR or MR, the event type, the outcome, and the
+link to the provider record.
 
 With --all-local, list every local history file instead, whichever
 repository it belongs to: its path and key, its event count and date range,
-the GitHub repositories its events link to, and its events, grouped under
+the provider repositories its events link to, and its events, grouped under
 it. Histories are never merged. A file is marked "events link to this
 repository" when every link in it points to this checkout's origin
 repository; that is a label read from the stored links, not proof.
@@ -113,6 +114,7 @@ and, with --all-local, one {"file": {...}} summary before each file's events.`,
 	flags := cmd.Flags()
 	flags.IntVar(&opts.Issue, "issue", 0, "show only events for this issue")
 	flags.IntVar(&opts.PR, "pr", 0, "show only events for this pull request")
+	flags.IntVar(&opts.MR, "mr", 0, "show only events for this GitLab merge request")
 	flags.BoolVar(&opts.AllLocal, "all-local", false, "list every local history file, each with its own events")
 	flags.StringVar(&opts.Format, "format", historyFormatText, "output format: text or jsonl")
 	return cmd
@@ -157,7 +159,13 @@ func (f historyFilter) describe() string {
 	return targetLabel(f.Kind, f.Number)
 }
 
-func parseHistoryFilter(issue, pr int) (historyFilter, error) {
+func parseHistoryFilter(issue, pr int, mr ...int) (historyFilter, error) {
+	if len(mr) > 0 && mr[0] != 0 {
+		if issue != 0 || pr != 0 {
+			return historyFilter{}, errors.New("give exactly one of --issue, --pr or --mr")
+		}
+		return historyFilter{"mr", mr[0]}, filterError(validateTarget("mr", mr[0]))
+	}
 	switch {
 	case issue != 0 && pr != 0:
 		return historyFilter{}, errors.New("give either --issue or --pr, not both")
@@ -184,6 +192,9 @@ func checkHistoryFormat(format string) error {
 }
 
 func targetLabel(kind string, number int) string {
+	if kind == "mr" {
+		return fmt.Sprintf("MR !%d", number)
+	}
 	if kind == "pr" {
 		return fmt.Sprintf("PR #%d", number)
 	}
@@ -206,7 +217,7 @@ func runHistoryList(ctx context.Context, env historyEnv, opts historyListOptions
 	if err := checkHistoryFormat(opts.Format); err != nil {
 		return err
 	}
-	filter, err := parseHistoryFilter(opts.Issue, opts.PR)
+	filter, err := parseHistoryFilter(opts.Issue, opts.PR, opts.MR)
 	if err != nil {
 		return err
 	}
@@ -214,7 +225,7 @@ func runHistoryList(ctx context.Context, env historyEnv, opts historyListOptions
 		return listAllLocalHistory(ctx, env, filter, opts.Format, out)
 	}
 
-	repo, err := identifyRepository(ctx, env.WorkDir, env.Git)
+	repo, err := historyRepository(ctx, env.WorkDir, env.Git)
 	if err != nil {
 		return err
 	}
@@ -285,7 +296,7 @@ func listAllLocalHistory(ctx context.Context, env historyEnv, filter historyFilt
 	// Outside a repository there is no current file and no mark; every file
 	// is still listed.
 	var repo repoIdentity
-	if r, err := identifyRepository(ctx, env.WorkDir, env.Git); err == nil {
+	if r, err := historyRepository(ctx, env.WorkDir, env.Git); err == nil {
 		repo = r
 	}
 	cacheDir, err := historyCacheDir(env)
@@ -400,6 +411,12 @@ func linkedRepository(raw string) (string, bool) {
 	if err != nil || u.Hostname() == "" {
 		return "", false
 	}
+	if split := strings.Index(u.Path, "/-/"); split > 0 {
+		project := strings.TrimPrefix(u.Path[:split], "/")
+		if validForgeProject(project, "gitlab") {
+			return strings.ToLower(canonicalHTTPSHost(u.Host) + "/" + project), true
+		}
+	}
 	segments := strings.Split(strings.Trim(u.Path, "/"), "/")
 	if len(segments) < 2 || segments[0] == "" || segments[1] == "" {
 		return "", false
@@ -490,7 +507,7 @@ func runHistoryPath(ctx context.Context, env historyEnv, format string, out io.W
 	if err := checkHistoryFormat(format); err != nil {
 		return err
 	}
-	repo, err := identifyRepository(ctx, env.WorkDir, env.Git)
+	repo, err := historyRepository(ctx, env.WorkDir, env.Git)
 	if err != nil {
 		return err
 	}

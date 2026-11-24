@@ -920,7 +920,7 @@ func addLocalSection(r *statusReport, kind string, number int, events []historyE
 		s.add(labelLocal, "%s %s %s%s", e.Time, e.Type, e.Outcome, link)
 	}
 	if shown == 0 {
-		s.add(labelLocal, "no local events for this %s", map[string]string{"issue": "issue", "pr": "pull request"}[kind])
+		s.add(labelLocal, "no local events for this %s", map[string]string{"issue": "issue", "pr": "pull request", "mr": "merge request"}[kind])
 	}
 	if discarded > 0 {
 		s.add(labelLocal, "%d unreadable local entries were skipped", discarded)

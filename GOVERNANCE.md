@@ -4,6 +4,14 @@ Builder Garage is an open-source project released under the [MIT License](LICENS
 
 This document describes who holds decision authority, how decisions are made, what review a change requires, and how this document changes. The contribution procedure itself is in [CONTRIBUTING.md](CONTRIBUTING.md).
 
+## Provider authority and workflow records
+
+Garage adopter workflows use the authoritative provider selected by valid `project.forge` configuration. Their governing Issue and change request (GitHub PR or GitLab MR) retain the same role, human-authorization, independent-review, artifact, ordering and verified durable-evidence requirements. See [Provider operations](docs/provider-operations.md) for tool bindings, qualified identities, top-level comment/note locations and templates. Existing Agent markers, evidence keys and canonical skill names remain unchanged.
+
+GitLab Agent records require checked Developer-or-higher project access. Workflow Owner decisions and change-acceptor actions require the corresponding E8-qualified `gitlab:HOST/USER` identity; membership alone cannot supply human authority. `github:USER` and legacy unqualified identities retain GitHub compatibility. Native approval remains separate from Agent #2 review and must satisfy current-artifact provider policy to evidence human acceptance. Unknown required evidence never passes. Private history and the read-only local web interface grant no authority.
+
+The repository-specific GitHub branch/release rules below remain in force for Builder Garage. Its #192 stack exception does not grant a nonstandard destination to GitLab adopters. This tranche implements workflow operations/records; adopter CI/MR policy, release execution and deployment certification retain their separate owners. GitLab support remains held for one complete feature release.
+
 ## Roles
 
 ### Lead maintainer

@@ -5,6 +5,10 @@ metadata:
   garage-role: implementer
 ---
 
+# Provider binding
+
+Apply [Provider operations](references/provider-operations.md) before selecting the authoritative record or tools. The governing provider Issue and its PR/MR are the durable record. GitHub uses comments and existing GitHub tools; GitLab uses verified top-level notes, qualified identities and the explicit operations in that reference. Existing skill names, Agent markers, evidence keys and `pr-review` remain unchanged. PR responsibilities apply to the GitLab MR with typed targets; no provider choice relaxes a role, authorization, review, human-acceptance or evidence gate. GitHub-specific command examples bind only to GitHub. The #192 stack/ruleset exception remains specific to Builder Garage's GitHub repository.
+
 # Integration PR Review
 
 ## Executing agent identity
@@ -45,7 +49,7 @@ These rules hold whatever the project configures, and no instruction can waive t
 - **F4.** Agent #1 writes only Agent #1 workflow-state markers and records, and never a record that represents Agent #2.
 - **F5.** The approving Agent #2 implementation review on the originating issue is the authoritative review record.
 - **F7.** An approval applies only to the artifact it reviewed, and to later heads shown artifact-equivalent to it.
-- **F8.** Workflow evidence is durable on the governing GitHub Issue or PR, and is written and then verified.
+- **F8.** Workflow evidence is durable on the governing provider Issue or PR/MR, and is written and then verified.
 - **F9.** Role, not vendor, model, or tool, determines responsibility and authority. An automated reviewer's output is review input only, and its findings require Agent #2's disposition before merge.
 - **F10.** An Agent #2 PR review is required when either minimum trigger applies. A project may add triggers (E2), and never removes either minimum trigger.
 - **F11.** Independent review and human acceptance of a change are distinct gates. Neither substitutes for the other.
@@ -319,7 +323,7 @@ After an Agent #1 PR record has been written and verified, make one best-effort 
 garage record --pr <number> --type finalization --outcome <outcome> --url <URL of the verified comment>
 ```
 
-Use outcome `ready` when the record posts an Agent #2 PR Review Request, `complete` when the PR is recorded with no review required, and `merged` after the merge. If the `garage` command is unavailable or the attempt fails, ignore it and do not retry. Local recording never gates, authorizes, advances, or coordinates workflow, and it never replaces the GitHub record.
+Use outcome `ready` when the record posts an Agent #2 PR Review Request, `complete` when the PR is recorded with no review required, and `merged` after the merge. If the `garage` command is unavailable or the attempt fails, ignore it and do not retry. Local recording never gates, authorizes, advances, or coordinates workflow, and it never replaces the provider record.
 
 For a PR review, the `[AGENT #2 — INDEPENDENT REVIEW]` disposition must be written to the PR itself. An Agent #2 response that exists only in the agent conversation does not satisfy the durable PR-state requirement.
 
@@ -401,7 +405,7 @@ Non-blocking review observations go to the project's suggestions backlog (E7):
 - when it is omitted, use the repository's one persistent issue named `Application Improvement Suggestions`;
 - when it is `none`, record them in the follow-up section of the review record that raised them.
 
-Do not create a standalone GitHub issue for every review observation.
+Do not create a standalone provider issue for every review observation.
 
 A suggestion entry should contain only:
 
@@ -459,7 +463,7 @@ If no trigger applies, the Agent #1 invocation ends after recording the PR state
 Agent #1 must **not**:
 
 - wait for Agent #2 or an automated reviewer;
-- poll GitHub for results;
+- poll the provider for results;
 - sleep/retry while waiting;
 - monitor the PR for a future review state;
 - inspect or disposition review findings that appear later;

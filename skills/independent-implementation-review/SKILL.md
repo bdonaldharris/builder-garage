@@ -5,6 +5,10 @@ metadata:
   garage-role: reviewer
 ---
 
+# Provider binding
+
+Apply [Provider operations](references/provider-operations.md) before selecting the authoritative record or tools. The governing provider Issue and its PR/MR are the durable record. GitHub uses comments and existing GitHub tools; GitLab uses verified top-level notes, qualified identities and the explicit operations in that reference. Existing skill names, Agent markers, evidence keys and `pr-review` remain unchanged. PR responsibilities apply to the GitLab MR with typed targets; no provider choice relaxes a role, authorization, review, human-acceptance or evidence gate. GitHub-specific command examples bind only to GitHub. The #192 stack/ruleset exception remains specific to Builder Garage's GitHub repository.
+
 # Independent Implementation Review
 
 ## Executing agent identity
@@ -51,7 +55,7 @@ These rules hold whatever the project configures, and no instruction can waive t
 - **F5.** The implementation review recorded on the originating issue is the authoritative review record. Agent #2 never classifies a change as a small correction.
 - **F6.** A correction does not restore approval. Only an independent re-review of the complete corrected artifact does.
 - **F7.** An approval applies only to the artifact it reviewed, identified precisely enough for a later comparison.
-- **F8.** Workflow evidence is durable on the governing GitHub Issue or PR, and is written and then verified.
+- **F8.** Workflow evidence is durable on the governing provider Issue or PR/MR, and is written and then verified.
 - **F9.** Role, not vendor, model, or tool, determines review authority. An automated reviewer's output is review input only.
 - **F13.** The three-question review contract is the same for every change.
 
@@ -177,7 +181,7 @@ Agent #2 records each independent review/disposition back to the same Issue or P
 [AGENT #2 — INDEPENDENT REVIEW]
 ```
 
-Do not assume the absolute newest GitHub comment is the relevant workflow state. Human comments, automated-review findings, inline review comments, and other activity may appear after the latest Agent #1 or Agent #2 workflow-state comment.
+Do not assume the absolute newest provider comment/note is the relevant workflow state. Human comments, automated-review findings, inline review comments, and other activity may appear after the latest Agent #1 or Agent #2 workflow-state comment.
 
 Before reviewing, Agent #2 must:
 
@@ -337,7 +341,7 @@ After the review record has been written and verified, make one best-effort atte
 garage record --issue <number> --type review --outcome <approved | changes-required> --url <URL of the verified comment>
 ```
 
-For a PR review, use `--pr <number> --type pr-review` instead. If the `garage` command is unavailable or the attempt fails, ignore it and do not retry. Local recording never gates, authorizes, advances, or coordinates workflow, and it never replaces the GitHub record.
+For a PR review, use `--pr <number> --type pr-review` instead. If the `garage` command is unavailable or the attempt fails, ignore it and do not retry. Local recording never gates, authorizes, advances, or coordinates workflow, and it never replaces the provider record.
 
 ---
 
@@ -516,7 +520,7 @@ Do not classify these as Integration Blockers or Production Blockers for the cur
 
 # Consolidated suggestion backlog
 
-Do not automatically create a standalone GitHub issue for each non-blocking review observation.
+Do not automatically create a standalone provider issue for each non-blocking review observation.
 
 Non-blocking observations go to the suggestions backlog (E7) of the repository where the observation belongs:
 
@@ -542,7 +546,7 @@ When an automated finding is determined to be outside the current issue boundary
 # Initial review procedure
 
 1. Read the governing Issue/PR, acceptance criteria, and relevant workflow-state comments.
-2. Identify the latest applicable `[AGENT #1 — IMPLEMENTATION]` or `[AGENT #1 — CORRECTION]` comment for the current phase without assuming the newest GitHub comment is relevant, and confirm the [prerequisite](#prerequisite-valid-agent-1-completion-evidence). If it fails, stop.
+2. Identify the latest applicable `[AGENT #1 — IMPLEMENTATION]` or `[AGENT #1 — CORRECTION]` comment for the current phase without assuming the newest provider comment/note is relevant, and confirm the [prerequisite](#prerequisite-valid-agent-1-completion-evidence). If it fails, stop.
 3. Inspect the actual complete current implementation diff/artifact.
 4. If automated findings are present, treat them as review inputs and independently evaluate every material finding against the complete current artifact and the three governing questions; record each finding's disposition and concise governing-contract reason in the durable review comment.
 5. Trace only the surrounding execution paths needed to evaluate the changed behavior.
@@ -553,7 +557,7 @@ When an automated finding is determined to be outside the current issue boundary
 10. Record worthwhile non-blocking observations and follow-up/out-of-scope determinations without expanding implementation scope.
 11. Write the structured `[AGENT #2 — INDEPENDENT REVIEW]` comment, with its evidence block, to the governing Issue or PR.
 12. Verify that the durable comment was successfully recorded on the governing artifact.
-13. Only after successful verification, return the explicit verdict. The final agent response may summarize the result, but it does not substitute for the GitHub durable record.
+13. Only after successful verification, return the explicit verdict. The final agent response may summarize the result, but it does not substitute for the provider durable record.
 
 Keep the existing anti-drip-feeding rule for blockers: if multiple concrete reasons currently make one of the three governing questions fail, report them in the same pass when reasonably identifiable. After one blocker reveals a directly related issue-scoped behavior family, do not stop reasoning at the first failing permutation; perform the bounded sibling sweep needed to identify currently demonstrable blockers from that same cause.
 
@@ -695,28 +699,28 @@ Do not manufacture ambiguity for minor implementation details that established r
 
 # Issue authoring
 
-This skill may author a GitHub issue only as this section describes. An authored issue records work. It never authorizes implementing that work, and it never assigns, invokes, or schedules anyone.
+This skill may author a provider issue only as this section describes. An authored issue records work. It never authorizes implementing that work, and it never assigns, invokes, or schedules anyone.
 
 ## When an issue may be created
 
 - **Explicit authorization.** Create an issue only when the Builder explicitly authorizes creating it in the current task. A recommendation to create one is not authorization. Neither is approval of a plan, report, review, or decision. An authorization covers only the issues it names.
-- **Durable evidence.** Author only from durable GitHub records, each linked by URL. Never author from the conversation. When this skill writes its own record, author only after that record is written and verified.
+- **Durable evidence.** Author only from durable provider records, each linked by URL. Never author from the conversation. When this skill writes its own record, author only after that record is written and verified.
 - **Assigned types only.** Author only the issue types listed under "What this skill may author".
 
 ## Procedure
 
 1. **Check for duplicates.** Search open and closed issues read-only, by key terms and by matching labels. For example: `gh search issues --repo OWNER/REPO "<key terms>"`, which searches both open and closed issues when `--state` is omitted. Never comment on, close, label, or link a candidate.
 2. **Resolve the template.**
-   1. **The repository's issue templates.** Read `.github/ISSUE_TEMPLATE/` directly, for example with `gh api repos/OWNER/REPO/contents/.github/ISSUE_TEMPLATE`. GitHub's GraphQL `issueTemplates` does not list YAML issue forms.
+   1. **The repository's issue templates.** For GitLab, inspect `.gitlab/issue_templates/*.md` and select the matching Markdown template using [Provider operations](references/provider-operations.md). For GitHub, read `.github/ISSUE_TEMPLATE/` directly, for example with `gh api repos/OWNER/REPO/contents/.github/ISSUE_TEMPLATE`. GitHub's GraphQL `issueTemplates` does not list YAML issue forms.
       - Choose the template whose purpose matches the issue. Ask the Builder when more than one fits, or none does.
-      - Honor `config.yml`. When `blank_issues_enabled` is `false`, a template is required.
+      - For GitHub, honor `config.yml`. When `blank_issues_enabled` is `false`, a template is required.
    2. **Otherwise, this skill's fallback template,** `templates/issue.md`.
 3. **Draft.**
    - Fill every field that the template marks required. In a form, those are the fields with `validations: required: true`.
-   - Compose a form's body the way GitHub renders a form: one `### <label>` section per field, in the form's order.
+   - For a GitLab Markdown template, fill its required headings. For a GitHub form, compose its body as rendered: one `### <label>` section per field, in the form's order.
    - End the body with the authoring record.
 4. **Confirm.** Show the Builder the complete draft: the title, body, labels, the template used, and the duplicate candidates. Create the issue only after an explicit yes. Any change to the draft needs a new yes.
-5. **Create.**
+5. **Create.** For GitLab, use the explicitly authorized create operation in [Provider operations](references/provider-operations.md) and its verified read-back; the `gh` command below is the GitHub binding.
    - Set only the approved title, body, and labels. For example: `gh issue create --title "<title>" --body-file <file> --label <label>`.
    - Suggest a label only from the template or from the Builder. A label that does not exist in the repository is reported and left out, never created.
    - Never set project fields, assignees, or milestones, unless the Builder's authorization names that action.
@@ -730,7 +734,7 @@ Every authored issue's body ends with one fenced YAML block. The block's `checka
 ```yaml
 garage_authoring: 1
 checkable:
-  source_evidence:             # required: durable GitHub issue, pull request, or comment URLs
+  source_evidence:             # required: durable provider Issue, PR/MR, comment or note URLs
     - "<URL>"
   decision: "<URL of the durable decision, when decision_status is decided>"
 asserted:
@@ -858,7 +862,7 @@ A review follows this skill only when:
 - Agent #2 writes each review/disposition to the governing artifact using `[AGENT #2 — INDEPENDENT REVIEW]`: the originating Issue for implementation review, which is the authoritative record, and the PR for a PR review, which is supplemental;
 - review authority comes from the Agent #2 role in a separate execution context and its durable record, not from any automated reviewer or other tool, and implementation review requires no GitHub-hosted reviewer or vendor integration;
 - the Agent #2 invocation is not complete until that durable write has been successfully verified;
-- a final agent response does not substitute for the durable GitHub record;
+- a final agent response does not substitute for the durable provider record;
 - if the durable write fails, Agent #2 reports the failure and does not claim that workflow state was recorded;
 - the actual implementation artifact is reviewed;
 - the decision is based on the three governing questions;

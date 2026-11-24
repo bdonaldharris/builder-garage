@@ -2,6 +2,10 @@
 
 Builder Garage is maintainer-led and community-contributed, and contributions are welcome from anyone. This document explains how a change moves from an idea to `staging`, and from there to a release on `main`.
 
+## Provider binding for adopters
+
+Builder Garage itself continues to use GitHub. Adopter repositories may select GitLab using validated forge configuration; [provider operations](docs/provider-operations.md) maps the same contribution workflow to GitLab Issues/MRs and verified top-level notes. Authoritative implementation review remains on the Issue; supplemental review and equivalence belong on the MR. Human authorization, role separation and all promotion gates remain unchanged. GitLab Markdown templates live under `.gitlab/issue_templates` and `.gitlab/merge_request_templates`; GitHub retains its existing forms/templates and tools. `garage forge` performs explicit authorized GitLab operations, never autonomous workflow execution; local web remains read-only.
+
 ## Before you start
 
 - **Current state.** The repository contains the initial Go CLI foundation and its tests and build validation, alongside engineering skills, standards, [engineering principles](docs/principles.md), [project history](docs/history.md), and governance. See the [project status](README.md#project-status), [CLI development commands](README.md#develop-and-validate), and [architectural direction](docs/architecture.md).

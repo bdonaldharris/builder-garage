@@ -6,6 +6,10 @@
 
 Builder Garage is an open-source, project-embedded, extensible agentic engineering framework: a system of engineering practices, standards, architecture, roles, contracts, and workflows for responsible software construction with AI agents.
 
+## GitLab workflow stack
+
+The in-development #192 feature includes typed GitLab observation and explicit `garage forge` workflow operations, qualified authority members, adopter Markdown templates and `garage record --mr` / `garage history list --mr`. [Provider operations](docs/provider-operations.md) describes authorization, durable read-back and current limits. Status and local web remain read-only. This is an internal stack capability; complete GitLab support is held for the single feature release and deployment evidence. Builder Garage's own GitHub infrastructure and existing GitHub behavior remain unchanged.
+
 ## Project status
 
 Builder Garage is at its foundation stage.

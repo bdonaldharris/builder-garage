@@ -68,7 +68,7 @@ var historyOutcomes = []string{
 }
 
 // historyTargetKinds are the GitHub records an event can refer to.
-var historyTargetKinds = []string{"issue", "pr"}
+var historyTargetKinds = []string{"issue", "pr", "mr"}
 
 var (
 	repoKeyPattern  = regexp.MustCompile(`^[0-9a-f]{32}$`)
