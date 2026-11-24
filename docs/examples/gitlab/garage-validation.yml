@@ -1,0 +1,25 @@
+# Adopter include only. This file is not Builder Garage's production CI.
+# Copy this file and validate.sh into your adopter's .gitlab/garage/ directory.
+# Set GARAGE_CI_IMAGE to a reviewed, digest-pinned image containing Garage and sh.
+# Keep the adopter's application validation jobs and workflow:rules intact.
+garage:validate:
+  stage: test
+  image: $GARAGE_CI_IMAGE
+  before_script: []
+  after_script: []
+  rules:
+    - if: '$CI_PIPELINE_SOURCE == "merge_request_event"'
+    - if: '$CI_COMMIT_TAG'
+      when: never
+    - if: '$CI_COMMIT_BRANCH && $CI_OPEN_MERGE_REQUESTS'
+      when: never
+    - if: '$CI_COMMIT_BRANCH'
+    - when: never
+  script:
+    - sh .gitlab/garage/validate.sh
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - garage-ci-evidence/

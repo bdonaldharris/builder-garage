@@ -1,0 +1,4 @@
+[
+ {"id":301,"name":"validation","status":"success","allow_failure":false,"pipeline":{"id":30,"project_id":7,"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}},
+ {"id":302,"name":"advisory","status":"failed","allow_failure":true,"pipeline":{"id":30,"project_id":7,"sha":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"}}
+]

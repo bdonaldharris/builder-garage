@@ -5,6 +5,7 @@ import (
 	"errors"
 	"fmt"
 	"net/url"
+	"reflect"
 	"sort"
 	"strconv"
 	"strings"
@@ -14,6 +15,8 @@ import (
 // Transport payloads stay in the GitLab adapter. Shared reports receive
 // normalized facts with explicit completeness/capability information.
 type glProject struct {
+	AllowMergeOnSkippedPipeline               *bool  `json:"allow_merge_on_skipped_pipeline"`
+	MergeMethod                               string `json:"merge_method"`
 	ID                                        int    `json:"id"`
 	Path                                      string `json:"path_with_namespace"`
 	DefaultBranch                             string `json:"default_branch"`
@@ -26,6 +29,8 @@ type glUser struct {
 	Bot      bool   `json:"bot"`
 }
 type glPipeline struct {
+	Source    string `json:"source"`
+	WebURL    string `json:"web_url"`
 	ProjectID int    `json:"project_id"`
 	ID        int    `json:"id"`
 	SHA       string `json:"sha"`
@@ -33,6 +38,7 @@ type glPipeline struct {
 	Ref       string `json:"ref"`
 }
 type glResource struct {
+	Draft           *bool      `json:"draft"`
 	Labels          []string   `json:"labels"`
 	Author          glUser     `json:"author"`
 	ID              int        `json:"id"`
@@ -76,10 +82,13 @@ type glMembership struct {
 	AccessLevel *int `json:"access_level"`
 }
 type glApprovals struct {
-	ApprovalsRequired *int `json:"approvals_required"`
-	ApprovalsLeft     *int `json:"approvals_left"`
+	Approved          *bool `json:"approved"`
+	HasApprovalRules  *bool `json:"has_approval_rules"`
+	ApprovalsRequired *int  `json:"approvals_required"`
+	ApprovalsLeft     *int  `json:"approvals_left"`
 	ApprovedBy        []struct {
-		User glUser `json:"user"`
+		User       glUser     `json:"user"`
+		ApprovedAt *time.Time `json:"approved_at"`
 	} `json:"approved_by"`
 }
 
@@ -97,10 +106,12 @@ func (o *workflowObservation) governingUnavailable(name string, err error) {
 }
 
 type gitlabStatusAdapter struct {
+	Now    func() time.Time
 	Runner glabRunner
 	Forge  forgeConfig
 }
 type gitlabObservationReader struct {
+	now         func() time.Time
 	client      *gitlabClient
 	observation *workflowObservation
 	members     map[string]*int
@@ -142,7 +153,7 @@ func (a gitlabStatusAdapter) Read(ctx context.Context, t workflowTarget, cfg *pr
 	c := newGitlabClient(a.Runner, f)
 	c.projects[t.Project] = true
 	o := &workflowObservation{Complete: true, GoverningComplete: true}
-	reader := gitlabObservationReader{client: c, observation: o, members: map[string]*int{}, projects: map[int]glProject{}}
+	reader := gitlabObservationReader{now: a.Now, client: c, observation: o, members: map[string]*int{}, projects: map[int]glProject{}}
 	var project glProject
 	if _, err := c.get(ctx, "GET", "projects/"+url.PathEscape(t.Project), &project); err != nil {
 		return nil, c.reads, err
@@ -228,13 +239,15 @@ func (a gitlabStatusAdapter) Read(ctx context.Context, t workflowTarget, cfg *pr
 				}
 			}
 		}
+		reader.policy(ctx, item, t, resource, project, cfg)
 		// A concurrent update invalidates observations tied to the earlier MR
 		// snapshot. Do not attach old approvals/pipelines to a new current head.
 		latest, e := reader.resource(ctx, t, project.ID)
-		if e != nil || latest.SHA != resource.SHA || latest.SourceBranch != resource.SourceBranch || latest.TargetBranch != resource.TargetBranch || latest.SourceProjectID != resource.SourceProjectID || latest.TargetProjectID != resource.TargetProjectID || latest.State != resource.State || latest.Description != resource.Description {
+		if e != nil || latest.SHA != resource.SHA || latest.SourceBranch != resource.SourceBranch || latest.TargetBranch != resource.TargetBranch || latest.SourceProjectID != resource.SourceProjectID || latest.TargetProjectID != resource.TargetProjectID || latest.State != resource.State || latest.Description != resource.Description || !reflect.DeepEqual(latest.HeadPipeline, resource.HeadPipeline) || !reflect.DeepEqual(latest.DiffRefs, resource.DiffRefs) || !reflect.DeepEqual(latest.Draft, resource.Draft) || !reflect.DeepEqual(latest.DetailedMergeStatus, resource.DetailedMergeStatus) || !reflect.DeepEqual(latest.Author, resource.Author) {
 			o.unavailable("MR snapshot", errors.New("unavailable: MR changed during observation or its final snapshot could not be read"))
 			item.Checks = nil
 			item.BaseRefOid = ""
+			invalidateGitlabPolicy(o, "MR changed during observation; current artifact is unavailable")
 		}
 	} else {
 		linked, partial, e := gitlabList[glResource](ctx, c, c.resource(t.Project, "issues", strconv.Itoa(t.Number), "closed_by"))
@@ -338,6 +351,8 @@ func (r *gitlabObservationReader) comments(ctx context.Context, t workflowTarget
 	}
 	discussions, dPartial, dErr := gitlabList[glDiscussion](ctx, r.client, base+"/discussions")
 	if dPartial || dErr != nil {
+		// Discussion notes also carry workflow records, independently of whether
+		// native policy requires resolving discussion threads.
 		r.observation.unavailable("discussions", observationProblem(dErr, "truncated: discussions incomplete"))
 	}
 	resolved := true
@@ -363,7 +378,7 @@ func (r *gitlabObservationReader) comments(ctx context.Context, t workflowTarget
 		}
 		return notes[i].CreatedAt.Before(notes[j].CreatedAt)
 	})
-	comments := workflowComments{Truncated: partial || dPartial || err != nil || dErr != nil}
+	comments := workflowComments{Truncated: partial || err != nil || dPartial || dErr != nil}
 	versions := map[int]glNote{}
 	conflicting := map[int]bool{}
 	for _, note := range notes {
@@ -555,11 +570,11 @@ func (r *gitlabObservationReader) approvals(ctx context.Context, t workflowTarge
 	var approvals glApprovals
 	_, err := r.client.get(ctx, "GET", r.client.resource(t.Project, "merge_requests", strconv.Itoa(t.Number), "approvals"), &approvals)
 	if err != nil {
-		r.observation.unavailable("native approvals", err)
+		r.observation.Facts = append(r.observation.Facts, workflowFact{Name: "native approvals", Problem: err.Error()})
 		return
 	}
 	if approvals.ApprovalsRequired == nil || approvals.ApprovalsLeft == nil {
-		r.observation.unavailable("native approvals", errors.New("unavailable: deployment did not return approval requirements"))
+		r.observation.Facts = append(r.observation.Facts, workflowFact{Name: "native approvals", Problem: "unavailable: deployment did not return aggregate approval requirements; policy capability is evaluated separately"})
 		return
 	}
 	r.observation.fact("native approvals", fmt.Sprintf("required %d, left %d, approving users %d (not an Agent #2 review or qualified human acceptance)", *approvals.ApprovalsRequired, *approvals.ApprovalsLeft, len(approvals.ApprovedBy)))

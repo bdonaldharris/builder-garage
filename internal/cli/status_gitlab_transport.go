@@ -138,9 +138,15 @@ func (c *gitlabClient) allowed(method, endpoint string) bool {
 			return rest[0] == "issues"
 		case "closes_issues":
 			return rest[0] == "merge_requests"
-		case "approvals":
+		case "approvals", "approval_state":
 			return rest[0] == "merge_requests" && len(q) == 0
+		case "versions", "pipelines":
+			return rest[0] == "merge_requests"
 		}
+	case "protected_branches", "protected_tags":
+		return len(rest) == 1
+	case "approvals":
+		return len(rest) == 1 && len(q) == 0
 	case "members":
 		return len(rest) == 3 && rest[1] == "all" && positiveID(rest[2]) && len(q) == 0
 	case "repository":
@@ -150,7 +156,7 @@ func (c *gitlabClient) allowed(method, endpoint string) bool {
 		branch, e := url.PathUnescape(rest[2])
 		return e == nil && branch != "" && !strings.Contains(branch, "..") && !strings.ContainsAny(branch, "\r\n\\")
 	case "pipelines":
-		return len(rest) == 2 && positiveID(rest[1]) && len(q) == 0
+		return (len(rest) == 2 && positiveID(rest[1]) && len(q) == 0) || (len(rest) == 3 && positiveID(rest[1]) && rest[2] == "jobs")
 	}
 	return false
 }
