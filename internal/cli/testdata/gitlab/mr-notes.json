@@ -1,0 +1,28 @@
+[
+  {
+    "id": 21,
+    "body": "[AGENT #1 \u2014 IMPLEMENTATION]\n\n```yaml\ngarage_evidence: 1\nrecord: equivalence\nissue: 6\nequivalent_to: https://gitlab.example/group/sub/project/-/issues/6#note_12\ncheckable:\n  artifact:\n    method: garage-artifact-v1\n    object_format: sha1\n    stage: commit\n    integration_ref: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n    base: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n    tree: cccccccccccccccccccccccccccccccccccccccc\n    changeset: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n    paths: 1\n    commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nasserted:\n  status: ready-for-review\n  validation_run: true\n```\n",
+    "author": {
+      "id": 1,
+      "username": "builder",
+      "bot": false
+    },
+    "created_at": "2026-11-24T12:21:00Z",
+    "updated_at": "2026-11-24T12:21:00Z",
+    "system": false,
+    "resolvable": false
+  },
+  {
+    "id": 22,
+    "body": "[AGENT #2 \u2014 INDEPENDENT REVIEW]\n\n```yaml\ngarage_evidence: 1\nrecord: pr-review\nissue: 6\nresponds_to: https://gitlab.example/group/sub/project/-/merge_requests/5#note_21\nsupplements: https://gitlab.example/group/sub/project/-/issues/6#note_12\ncheckable:\n  artifact:\n    method: garage-artifact-v1\n    object_format: sha1\n    stage: commit\n    integration_ref: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n    base: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n    tree: cccccccccccccccccccccccccccccccccccccccc\n    changeset: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n    paths: 1\n    commit: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa\nasserted:\n  execution_context: separate-from-implementation\n  inspected: complete-artifact\n  answers: {acceptance_criteria_met: true, new_regression: false, works: true}\n  verdict: approved\n```\n",
+    "author": {
+      "id": 1,
+      "username": "builder",
+      "bot": false
+    },
+    "created_at": "2026-11-24T12:22:00Z",
+    "updated_at": "2026-11-24T12:22:00Z",
+    "system": false,
+    "resolvable": false
+  }
+]

@@ -26,6 +26,7 @@ type statusEnv struct {
 	CacheDir func() (string, error)
 	Git      gitRunner
 	GH       ghRunner
+	GLab     glabRunner
 	Now      func() time.Time
 }
 
@@ -39,64 +40,58 @@ func defaultStatusEnv() (statusEnv, error) {
 		CacheDir: os.UserCacheDir,
 		Git:      runGitNoLazyFetch,
 		GH:       runGH,
+		GLab:     runGLab,
 		Now:      time.Now,
 	}, nil
 }
 
 func newStatusCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "status [NUMBER | issue NUMBER | pr NUMBER | HTTPS-URL]",
-		Short: "Show the workflow status of one issue or pull request, read from GitHub",
-		Long: `Show the workflow status of one issue or pull request in this repository's
-GitHub repository, including closed and merged ones.
+		Use:   "status [NUMBER | issue NUMBER | pr NUMBER | mr IID | HTTPS-URL]",
+		Short: "Show authoritative issue or change workflow facts from the configured forge",
+		Long: `Show recorded workflow facts for an issue or change in this project's forge.
 
-Accepts legacy NUMBER and #NUMBER, explicit issue NUMBER or pr NUMBER, and
-canonical HTTPS /OWNER/REPO/issues/NUMBER or /OWNER/REPO/pull/NUMBER URLs.
-Explicit kinds must match the actual resource. URLs must match the selected
-forge host and project; another project requires cross-project targets enabled.
-Schema-v3 project.forge explicitly selects provider/project; origin must match.
-GitLab configuration is accepted, but its observation adapter is not yet
-implemented. No GitHub fallback is used for GitLab.
+GitHub retains NUMBER and #NUMBER, issue NUMBER, pr NUMBER, and canonical
+HTTPS /OWNER/REPO/issues/NUMBER or /OWNER/REPO/pull/NUMBER URLs. GitLab requires
+issue IID, mr IID, or a canonical HTTPS /GROUP/PROJECT/-/issues/IID or
+/GROUP/PROJECT/-/merge_requests/IID URL. Bare GitLab numbers and #IID are
+ambiguous and refused. Markdown uses #IID for issues and !IID for MRs;
+qualified subgroup/project references require cross-project targets enabled.
 
-GitHub records are the only authority for workflow state. Status reads them
-through the gh command, in one query, plus at most one follow-up query when a
-pull request's "## Governing issue" section names issues its closing
-references do not supply. It writes nothing to GitHub. It never stores a
-token, never polls, waits, or retries, and never assigns, invokes, or advances
-an agent. The next eligible action it shows is information only.
+Schema-v3 project.forge selects provider, host and project; origin must match.
+Legacy schema-v2 GitHub projects need no migration. URLs stay on the configured
+host; another project requires allow_cross_project_targets. GitLab never falls
+back to GitHub, and foreign targets never use origin-project history.
 
-A pull request declares its governing issues in a "## Governing issue"
-section, and its kind in a "## Pull request kind" section: implementation,
-promotion, hotfix, clean synchronization, or conflicted synchronization.
-Status checks a declared kind against the base and head it permits. Only a
-declared, matching promotion or clean synchronization is exempt from the
-implementation-review gates; a mismatch never relaxes a gate.
+GitHub uses authenticated gh with one read-only GraphQL query plus at most one
+follow-up query. GitLab uses the selected host's authenticated glab REST-v4
+identity and explicit GET/resource allowlists: at most 64 calls, three pages of
+100 items per collection, 20 seconds per call and 60 seconds per observation.
+Incomplete, inaccessible, confidential, unsupported and unavailable facts are
+reported explicitly. Unavailable required evidence never passes a gate.
 
-Each line names its source and basis:
-  GitHub, checked      a fact read from GitHub, or a comparison of recorded values
-  GitHub, asserted     a claim a record makes that no tool can verify
-  local git, checked   a commit identity recomputed from local objects; nothing is
-                       fetched, and in a partial clone nothing is recomputed
-  configuration        a value from a valid .garage/config.yaml
-  local, not evidence  private local history, which may be incomplete
+Every fact names its provider and checked/asserted basis. GitHub record
+eligibility remains OWNER/MEMBER/COLLABORATOR; GitLab workflow records require
+checked Developer-or-higher project membership. Native MR approvals are not
+Agent #2 reviews or proof of a qualified human change acceptor. Qualified
+GitLab authority/write support and complete compatibility certification belong
+to later feature-stack issues. This observation slice is not a public rollout
+of complete GitLab support.
 
-A workflow record counts only when its author's GitHub association is owner,
-member, or collaborator. Human acceptance is evidenced only by an approving
-GitHub review.
-
-If gh is missing or not authenticated, status says that GitHub was not
-consulted, reports no workflow state or eligibility, and exits with an error.`,
+Status writes nothing to either forge, stores no credentials or TLS exceptions,
+and never retries, polls, assigns or advances an agent. Local history is never
+authoritative evidence. Missing authentication or inaccessible resources never
+select another provider. The existing pull-request kind, issue review, artifact
+equivalence and separate human acceptance gates remain in force.`,
 		Example: `  garage status 48
   garage status #33
   garage status issue 33
   garage status pr 48
-  garage status https://github.com/owner/repo/pull/48`,
+  garage status https://github.com/owner/repo/pull/48
+  garage status mr 48`,
 		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			target, err := parseWorkflowTarget(args)
-			if err != nil {
-				return err
-			}
+			target := workflowTarget{Args: args}
 			env, err := defaultStatusEnv()
 			if err != nil {
 				return err
@@ -182,12 +177,24 @@ func statusReportForTarget(ctx context.Context, target workflowTarget, env statu
 			cfg = &loaded
 		}
 	}
+	if len(target.Args) > 0 {
+		var parseErr error
+		if cfg != nil && proj(cfg).Forge != nil && proj(cfg).Forge.Provider == "gitlab" {
+			target, parseErr = parseGitlabTarget(target.Args, *proj(cfg).Forge)
+		} else {
+			target, parseErr = parseWorkflowTarget(target.Args)
+		}
+		if parseErr != nil {
+			return nil, parseErr
+		}
+		number = target.Number
+	}
 	if cfg != nil {
 		if err := checkForgeOrigin(ctx, repo.TopLevel, env.Git, *cfg); err != nil {
 			return nil, err
 		}
 		if f := proj(cfg).Forge; f != nil && f.Provider == "gitlab" {
-			return nil, errors.New("GitLab status is not available in this version; no provider was consulted")
+			return gitlabStatusReportFor(ctx, target, cfg, env, repo)
 		}
 	}
 	ghRepo, err := githubRepository(ctx, repo.TopLevel, env.Git)

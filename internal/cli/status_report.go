@@ -28,21 +28,34 @@ type statusLine struct {
 }
 
 type statusSection struct {
+	provider string
+
 	heading string
 	lines   []statusLine
 }
 
 func (s *statusSection) add(label, format string, args ...any) {
+	if s.provider == "gitlab" {
+		if label == labelChecked {
+			label = "GitLab, checked"
+		}
+		if label == labelAsserted {
+			label = "GitLab, asserted"
+		}
+	}
 	s.lines = append(s.lines, statusLine{label: label, text: fmt.Sprintf(format, args...)})
 }
 
 type statusReport struct {
+	target   workflowTarget
+	provider string
+
 	header   []string
 	sections []*statusSection
 }
 
 func (r *statusReport) section(heading string) *statusSection {
-	s := &statusSection{heading: heading}
+	s := &statusSection{heading: heading, provider: r.provider}
 	r.sections = append(r.sections, s)
 	return s
 }
@@ -226,7 +239,9 @@ func location(it *workflowItem) string {
 // addRecordsSection lists every workflow record on one issue or pull request.
 func addRecordsSection(r *statusReport, heading string, comments workflowComments, records []workflowRecord) {
 	s := r.section(heading)
-	if comments.Truncated {
+	if comments.Truncated && r.provider == "gitlab" {
+		s.add(labelChecked, "truncated: only %d notes were observed; omitted records are not evaluated", len(comments.Nodes))
+	} else if comments.Truncated {
 		s.add(labelChecked, "only the latest %d of %d comments were read; earlier records are not shown or evaluated",
 			len(comments.Nodes), comments.TotalCount)
 	}
@@ -238,7 +253,9 @@ func addRecordsSection(r *statusReport, heading string, comments workflowComment
 		rec := &records[i]
 		when := rec.Comment.CreatedAt.UTC().Format("2006-01-02 15:04Z")
 		prefix := when + " "
-		if !rec.Counted {
+		if !rec.Counted && rec.Comment.Provider == "gitlab" {
+			prefix += "IGNORED (" + rec.Comment.Eligibility + "): "
+		} else if !rec.Counted {
 			prefix += fmt.Sprintf("IGNORED (author association %s, not owner, member, or collaborator): ",
 				orNone(rec.Comment.AuthorAssociation))
 		}
@@ -664,7 +681,7 @@ func evaluateHeadIdentity(g *statusSection, in statusInputs, prRecords []workflo
 	}
 	a := eq.Block.artifact()
 	g.add(labelChecked, "equivalence record for the head: changeset %s: %s", shortChangeset(a.Changeset), eq.Comment.URL)
-	if in.kind != nil && in.kind.stack {
+	if in.Item.Provider == "gitlab" || (in.kind != nil && in.kind.stack) {
 		if !objectNamePattern.MatchString(in.Item.BaseRefOid) {
 			g.add(labelChecked, "the current stack target branch commit is unavailable; equivalence is not shown")
 			return ""

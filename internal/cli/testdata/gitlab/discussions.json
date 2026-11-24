@@ -1,0 +1,20 @@
+[
+  {
+    "id": "thread1",
+    "individual_note": false,
+    "notes": [
+      {
+        "id": 25,
+        "body": "A resolved discussion",
+        "author": {
+          "id": 1,
+          "username": "builder"
+        },
+        "created_at": "2026-11-24T12:25:00Z",
+        "system": false,
+        "resolvable": true,
+        "resolved": true
+      }
+    ]
+  }
+]
