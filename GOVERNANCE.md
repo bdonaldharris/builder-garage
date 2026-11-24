@@ -154,29 +154,40 @@ The six GitLab feature issues authorized by [#192](https://github.com/bdonaldhar
 
 When the registry is missing, unreadable, or malformed, an undeclared PR targeting E1 retains ordinary E1 eligibility and all ordinary gates; status reports membership as unknown, not known non-enrollment, and does not claim stack requirements were verified. Registry uncertainty never grants a non-E1 destination. Explicit stack declarations require valid registry evidence. When a valid registry establishes enrollment, the declaration and stack checks are required even for an E1-targeting PR.
 
-The record's first line is the marker, followed by one fenced YAML block. It names this repository, the merged prerequisite-change PR for #196, and exactly six entries in sequence order. Entry 1's direct prerequisite is issue #196 and its merged PR into E1; every later entry's direct prerequisite is the immediately preceding entry and its registered branch. The following schema excerpt is illustrative and incomplete; it must not be posted as the complete registry:
+The record's first line is the marker, followed by one fenced YAML block. It names this repository, the merged prerequisite-change PR for #196, and exactly six entries in sequence order. Entry 1's direct prerequisite is issue #196 and its merged PR into E1; every later entry's direct prerequisite is the immediately preceding entry and its registered branch. For entries 2–6, `direct_prerequisite.pull_request` is optional until the predecessor's reviewed implementation PR exists; omit it when unknown (`null` also means unbound). If supplied, it must be a positive PR number. Entry 1 always requires the merged #196 PR number, equal to `prerequisite_change_pr`. All six issue, sequence, branch, prerequisite issue, and prerequisite branch identities remain required.
+
+A valid registry records the complete branch plan; it does not assert that those branches or PRs exist or that protection is active. An entry with an unbound prerequisite cannot use the stack exception, including for maintenance. Before that entry proceeds, the Workflow Owner publishes a new complete registry binding its real predecessor PR. Status validates that PR and every earlier predecessor through the ordinary chain checks; an unbound later entry does not block an earlier bound entry. A PR declaration cannot supply a missing registry binding.
+
+The following schema excerpt is illustrative and incomplete; it must not be posted as the complete registry:
 
 ```yaml
 garage_stack: 1
 program_issue: 192
 repository: owner/repository
-prerequisite_change_pr: 123
+prerequisite_change_pr: 203
 entries:
   - issue: 197
     sequence: 1
     branch: gitlab-stack/issue-197
     direct_prerequisite:
       issue: 196
-      pull_request: 123
+      pull_request: 203
       branch: staging
   - issue: 198
     sequence: 2
     branch: gitlab-stack/issue-198
     direct_prerequisite:
       issue: 197
-      pull_request: 124
+      pull_request: 206
       branch: gitlab-stack/issue-197
-  # Four more entries, continuing the same consecutive dependency chain.
+  - issue: 199
+    sequence: 3
+    branch: gitlab-stack/issue-199
+    direct_prerequisite:
+      issue: 198
+      branch: gitlab-stack/issue-198
+      # pull_request omitted until the real #198 PR exists.
+  # Three more entries, continuing the same consecutive dependency chain.
 ```
 
 A feature PR remains kind `implementation`, names exactly its registered governing issue, and targets its registered direct-prerequisite branch until that prerequisite PR merges. Afterward, its permitted target is the branch the prerequisite's change was merged into; if that branch's own registered PR has since merged, the target follows that merge onward, ending at E1. Its `Stack dependency` declaration must match the registry and this permitted target. A registered branch is that branch in the registry's repository: a same-named branch in a fork is not the registered branch, and when GitHub does not report which repository owns a pull request's head or base branch, status grants no stack eligibility. An open PR is checked against the target permitted now. A merged PR is checked against the target that was permitted when it merged, using its merge destination and the merge times GitHub records; it is not re-judged by later merges. Status reads each declaration from the PR's current body, so it cannot show what a declaration said at merge time. When a merge state or the order of two merges cannot be established, status grants no stack eligibility. Status checks the current target branch commit as the artifact’s `integration_ref`; after retargeting or a target update, equivalence must be re-established, and changed artifacts follow the ordinary minimum PR-review triggers. No declaration relaxes independent review, required CI, maintainer acceptance, or Environment / Deployment Requirements.
