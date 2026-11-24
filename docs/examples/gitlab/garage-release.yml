@@ -1,0 +1,28 @@
+# Adopter include only. This file is not Builder Garage's production CI or release system.
+# Copy this file and publish.sh into your adopter's .gitlab/garage/ directory.
+# It publishes the files your own build left in GARAGE_RELEASE_DIR to this
+# project's generic package registry, versioned by the protected tag. Package
+# files are durable release storage; job artifacts are not.
+# It creates no tag, release or release link. A human creates those with glab or
+# the GitLab interface, or an agent runs a delegated `garage forge release`
+# operation. Set GARAGE_RELEASE_IMAGE to a reviewed, digest-pinned image with sh
+# and curl, and use a stage that exists in your pipeline.
+garage:release-publish:
+  stage: deploy
+  image: $GARAGE_RELEASE_IMAGE
+  variables:
+    GARAGE_RELEASE_DIR: dist
+    GARAGE_RELEASE_PACKAGE: release
+  before_script: []
+  after_script: []
+  rules:
+    - if: '$CI_COMMIT_TAG && $CI_COMMIT_REF_PROTECTED == "true"'
+    - when: never
+  script:
+    - sh .gitlab/garage/publish.sh
+  allow_failure: false
+  artifacts:
+    when: always
+    expire_in: 1 week
+    paths:
+      - garage-release-evidence/

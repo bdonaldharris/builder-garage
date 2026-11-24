@@ -82,3 +82,109 @@ func TestGitlabAdopterCITemplateAndScript(t *testing.T) {
 		})
 	}
 }
+
+// The adopter release include publishes durable package files only. Execute
+// its script against a fake curl to check refusals, immutability and the
+// manifest. This is a local fixture, not GitLab runner or registry evidence.
+func TestGitlabAdopterReleaseTemplateAndScript(t *testing.T) {
+	root, err := filepath.Abs("../..")
+	if err != nil {
+		t.Fatal(err)
+	}
+	source := filepath.Join(root, "docs", "examples", "gitlab")
+	data, err := os.ReadFile(filepath.Join(source, "garage-release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	var template map[string]any
+	if err := yaml.Unmarshal(data, &template); err != nil {
+		t.Fatal(err)
+	}
+	if len(template) != 1 || template["workflow"] != nil {
+		t.Fatal("release include overrides the adopter workflow")
+	}
+	job := template["garage:release-publish"].(map[string]any)
+	rules := job["rules"].([]any)
+	if job["allow_failure"] != false || job["image"] != "$GARAGE_RELEASE_IMAGE" || job["release"] != nil || len(rules) != 2 || rules[0].(map[string]any)["if"] != `$CI_COMMIT_TAG && $CI_COMMIT_REF_PROTECTED == "true"` || rules[1].(map[string]any)["when"] != "never" {
+		t.Fatalf("release include contract lost: %v", job)
+	}
+	if script := job["script"].([]any); len(script) != 1 || script[0] != "sh .gitlab/garage/publish.sh" {
+		t.Fatal("release include runs more than the publish script")
+	}
+	if runtime.GOOS == "windows" {
+		t.Skip("adopter script requires a POSIX runner; the include contract remains tested on Windows")
+	}
+	shell, err := exec.LookPath("sh")
+	if err != nil {
+		t.Skip("POSIX shell unavailable")
+	}
+	bin := t.TempDir()
+	fakeCurl := `#!/bin/sh
+printf '%s\n' "$*" >> "$FAKE_CURL_LOG"
+for arg in "$@"; do
+  if [ "$arg" = --upload-file ]; then exit "${FAKE_UPLOAD_EXIT:-0}"; fi
+done
+printf '%s' "${FAKE_PROBE:-404}"
+`
+	if err := os.WriteFile(filepath.Join(bin, "curl"), []byte(fakeCurl), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	for _, test := range []struct {
+		name    string
+		env     []string
+		files   map[string]string
+		ok      bool
+		uploads int
+		needle  string
+	}{
+		{"publishes every file", nil, map[string]string{"app.tar.gz": "app", "app.tar.gz.sig": "sig"}, true, 2, "file=app.tar.gz sha256="},
+		{"unprotected tag", []string{"CI_COMMIT_REF_PROTECTED=false"}, map[string]string{"app": "x"}, false, 0, "unprotected"},
+		{"branch pipeline", []string{"CI_COMMIT_TAG="}, map[string]string{"app": "x"}, false, 0, "tag pipeline"},
+		{"plain HTTP API", []string{"CI_API_V4_URL=http://gitlab.example/api/v4"}, map[string]string{"app": "x"}, false, 0, "not HTTPS"},
+		{"already published", []string{"FAKE_PROBE=200"}, map[string]string{"app": "x"}, false, 0, "never replaced"},
+		{"existence unknown", []string{"FAKE_PROBE=403"}, map[string]string{"app": "x"}, false, 0, "cannot establish"},
+		{"upload uncertain", []string{"FAKE_UPLOAD_EXIT=22"}, map[string]string{"app": "x"}, false, 1, "inspect the package registry"},
+		{"unsafe file name", nil, map[string]string{"app 1.tar": "x"}, false, 0, "not a valid generic package file name"},
+		{"no files", nil, map[string]string{}, false, 0, "no release files"},
+		{"invalid package", []string{"GARAGE_RELEASE_PACKAGE=../x"}, map[string]string{"app": "x"}, false, 0, "package name"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			dir := t.TempDir()
+			if err := os.MkdirAll(filepath.Join(dir, "dist"), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			for name, body := range test.files {
+				writeFile(t, filepath.Join(dir, "dist", name), body)
+			}
+			log := filepath.Join(t.TempDir(), "curl.log")
+			ctx, cancel := context.WithTimeout(t.Context(), time.Minute)
+			defer cancel()
+			cmd := exec.CommandContext(ctx, shell, filepath.Join(source, "publish.sh"))
+			cmd.Dir = dir
+			cmd.Env = append(os.Environ(), "PATH="+bin+string(os.PathListSeparator)+os.Getenv("PATH"), "FAKE_CURL_LOG="+log,
+				"CI_COMMIT_TAG=v1.2.0", "CI_COMMIT_REF_PROTECTED=true", "CI_API_V4_URL=https://gitlab.example/api/v4", "CI_PROJECT_ID=7",
+				"CI_JOB_TOKEN=job-token", "CI_COMMIT_SHA="+strings.Repeat("a", 40), "CI_PIPELINE_URL=https://gitlab.example/group/project/-/pipelines/30")
+			cmd.Env = append(cmd.Env, test.env...)
+			out, err := cmd.CombinedOutput()
+			if (err == nil) != test.ok || !strings.Contains(string(out), test.needle) {
+				t.Fatalf("publish: %v %s", err, out)
+			}
+			calls, _ := os.ReadFile(log)
+			if got := strings.Count(string(calls), "--upload-file"); got != test.uploads {
+				t.Fatalf("uploads %d, want %d: %s", got, test.uploads, calls)
+			}
+			if test.ok {
+				if !strings.Contains(string(calls), "https://gitlab.example/api/v4/projects/7/packages/generic/release/v1.2.0/app.tar.gz") {
+					t.Fatalf("not published to the versioned generic package: %s", calls)
+				}
+				manifest, err := os.ReadFile(filepath.Join(dir, "garage-release-evidence", "manifest.txt"))
+				if err != nil || !strings.Contains(string(manifest), "authority=none") || !strings.Contains(string(manifest), "source=ci-job-environment-asserted") {
+					t.Fatalf("manifest provenance lost: %v %s", err, manifest)
+				}
+			}
+			if strings.Contains(string(out), "job-token") {
+				t.Fatal("the job token was echoed")
+			}
+		})
+	}
+}

@@ -1,6 +1,6 @@
 # GitLab workflow observation
 
-This is the #198 observation tranche of the [#192 capability stack](https://github.com/bdonaldharris/builder-garage/issues/192). It does not establish a separate public rollout or complete GitLab parity. The #199 [workflow operations](provider-operations.md) tranche adds explicit writes and qualified authority configuration. The #200 [CI/policy tranche](gitlab-ci-policy.md) adds source-linked checked native gate outcomes and an adopter CI include. Release operations and deployment-matrix certification remain subsequent tranches.
+This is the #198 observation tranche of the [#192 capability stack](https://github.com/bdonaldharris/builder-garage/issues/192). It does not establish a separate public rollout or complete GitLab parity. The #199 [workflow operations](provider-operations.md) tranche adds explicit writes and qualified authority configuration. The #200 [CI/policy tranche](gitlab-ci-policy.md) adds source-linked checked native gate outcomes and an adopter CI include. The #201 [release tranche](gitlab-release.md) adds GET-only release inspection and delegated tag/release operations. Deployment-matrix certification remains a subsequent tranche.
 
 Configure schema-v3 [`project.forge`](configuration.md#forge-identity-schema-3), install `glab`, and authenticate to the configured host using that CLI. Garage stores no credentials or TLS exceptions. HTTPS with normal certificate trust is required; origin must match the configured project. An inaccessible project never selects GitHub instead.
 
