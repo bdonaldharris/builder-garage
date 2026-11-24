@@ -257,10 +257,10 @@ func TestProviderDispatchFailsClosedAndPreservesGitHub(t *testing.T) {
 
 func TestStatusRequiresSafelyReadableExistingConfiguration(t *testing.T) {
 	fixture := fixtureBytes(t, "pr46")
-	for _, scenario := range []string{"absent directory", "absent file", "legacy valid", "legacy invalid values", "symlink", "broken symlink", "directory", "non-directory parent", "unreadable file"} {
+	for _, scenario := range []string{"absent directory", "absent file", "legacy valid", "legacy invalid values", "symlink", "broken symlink", "directory", "non-directory parent", "symlink parent", "broken symlink parent", "unreadable file"} {
 		t.Run(scenario, func(t *testing.T) {
 			dir := t.TempDir()
-			refused := scenario == "symlink" || scenario == "broken symlink" || scenario == "directory" || scenario == "non-directory parent" || scenario == "unreadable file"
+			refused := scenario == "symlink" || scenario == "broken symlink" || scenario == "directory" || scenario == "non-directory parent" || scenario == "symlink parent" || scenario == "broken symlink parent" || scenario == "unreadable file"
 			origin := "git@github.com:o/r.git"
 			if refused {
 				origin = "git@gitlab.com:g/p.git"
@@ -291,6 +291,12 @@ func TestStatusRequiresSafelyReadableExistingConfiguration(t *testing.T) {
 				}
 			case "non-directory parent":
 				writeFile(t, filepath.Dir(path), "not a directory")
+			case "symlink parent", "broken symlink parent":
+				target := filepath.Join(dir, "external-config-directory")
+				if scenario == "symlink parent" {
+					writeFile(t, filepath.Join(target, configFileName), forgeYAML("gitlab", "g/p"))
+				}
+				symlinkOrSkip(t, target, filepath.Dir(path))
 			case "unreadable file":
 				writeFile(t, path, forgeYAML("gitlab", "g/p"))
 				if err := os.Chmod(path, 0); err != nil {

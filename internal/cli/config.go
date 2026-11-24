@@ -7,6 +7,7 @@ import (
 	"io"
 	"io/fs"
 	"os"
+	"path/filepath"
 	"regexp"
 	"strconv"
 	"strings"
@@ -170,9 +171,25 @@ func (p configProblems) Error() string {
 	return "invalid configuration:\n  - " + strings.Join(p, "\n  - ")
 }
 
-// readConfigFile reads the configuration file without following a symbolic
-// link and without opening anything other than a regular file.
+// readConfigFile checks the containing directory before the file. On Windows,
+// looking up a child of a regular file can match fs.ErrNotExist; that must not
+// classify an unsafe .garage path as an absent configuration. Neither the
+// directory nor the file may be a symbolic link.
 func readConfigFile(configPath string) ([]byte, error) {
+	dir := filepath.Dir(configPath)
+	dirInfo, err := os.Lstat(dir)
+	if errors.Is(err, fs.ErrNotExist) {
+		return nil, fmt.Errorf("%w at %s: run \"garage init\" to create one", errNoConfig, configPath)
+	}
+	if err != nil {
+		return nil, fmt.Errorf("cannot inspect %s: %w", dir, err)
+	}
+	if dirInfo.Mode()&fs.ModeSymlink != 0 {
+		return nil, fmt.Errorf("refusing to read %s: its directory is a symbolic link", configPath)
+	}
+	if !dirInfo.IsDir() {
+		return nil, fmt.Errorf("refusing to read %s: %s is not a directory", configPath, dir)
+	}
 	info, err := os.Lstat(configPath)
 	if errors.Is(err, fs.ErrNotExist) {
 		return nil, fmt.Errorf("%w at %s: run \"garage init\" to create one", errNoConfig, configPath)
