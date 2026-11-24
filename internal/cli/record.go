@@ -15,6 +15,7 @@ import (
 type recordOptions struct {
 	Issue    int
 	PR       int
+	MR       int
 	Type     string
 	Outcome  string
 	URL      string
@@ -56,13 +57,13 @@ The event is stored in the user cache directory, keyed to the current git
 repository, and is never written inside the repository or sent anywhere.
 At most 500 events are kept per repository; older events are discarded.
 
-Local history is an annotation only. It is not workflow evidence: GitHub
-Issue and pull request records are authoritative, and local history never
+Local history is an annotation only. It is not workflow evidence: provider
+Issue and PR/MR records are authoritative, and local history never
 authorizes, blocks, or advances work.
 
 Only these fields are stored: a timestamp, the repository key, the issue or
-pull request number, the event type, the outcome, an optional link to the
-durable GitHub record, an optional artifact identity, and an optional
+PR/MR number, the event type, the outcome, an optional link to the
+durable provider record, an optional artifact identity, and an optional
 explicitly recorded role.
 
 Event types: ` + strings.Join(historyEventTypes, ", ") + `
@@ -91,9 +92,10 @@ printed and the command still exits successfully.`,
 	flags := cmd.Flags()
 	flags.IntVar(&opts.Issue, "issue", 0, "issue number the event concerns")
 	flags.IntVar(&opts.PR, "pr", 0, "pull request number the event concerns")
+	flags.IntVar(&opts.MR, "mr", 0, "GitLab merge request IID the event concerns")
 	flags.StringVar(&opts.Type, "type", "", "event type (required)")
 	flags.StringVar(&opts.Outcome, "outcome", "", "event outcome (required)")
-	flags.StringVar(&opts.URL, "url", "", "https link to the durable GitHub record")
+	flags.StringVar(&opts.URL, "url", "", "https link to the durable provider record")
 	flags.StringVar(&opts.Artifact, "artifact", "", "artifact identity (format pending #34)")
 	flags.StringVar(&opts.Role, "role", "", "explicit recorded role, for example Agent #1")
 
@@ -102,6 +104,9 @@ printed and the command still exits successfully.`,
 
 func reportRecorded(cmd *cobra.Command, opts recordOptions, result historyAppendResult) error {
 	target := fmt.Sprintf("issue #%d", opts.Issue)
+	if opts.MR != 0 {
+		target = fmt.Sprintf("merge request !%d", opts.MR)
+	}
 	if opts.PR != 0 {
 		target = fmt.Sprintf("pull request #%d", opts.PR)
 	}
@@ -130,11 +135,14 @@ func recordEvent(ctx context.Context, opts recordOptions, env recordEnv) (histor
 		return historyAppendResult{}, err
 	}
 
-	repo, err := identifyRepository(ctx, env.WorkDir, env.Git)
+	repo, err := historyRepository(ctx, env.WorkDir, env.Git)
 	if err != nil {
 		return historyAppendResult{}, err
 	}
 
+	if err := checkRecordProvider(repo, kind); err != nil {
+		return historyAppendResult{}, err
+	}
 	cacheDir, err := env.CacheDir()
 	if err != nil {
 		return historyAppendResult{}, fmt.Errorf("cannot locate the user cache directory: %w", err)
@@ -170,6 +178,12 @@ func recordEvent(ctx context.Context, opts recordOptions, env recordEnv) (histor
 // recordTarget returns the record kind and number named by exactly one of
 // --issue and --pr.
 func recordTarget(opts recordOptions) (string, int, error) {
+	if opts.MR != 0 {
+		if opts.Issue != 0 || opts.PR != 0 {
+			return "", 0, fmt.Errorf("%w: give exactly one of --issue, --pr or --mr", errHistoryInput)
+		}
+		return "mr", opts.MR, validateTarget("mr", opts.MR)
+	}
 	switch {
 	case opts.Issue != 0 && opts.PR != 0:
 		return "", 0, fmt.Errorf("%w: give either --issue or --pr, not both", errHistoryInput)

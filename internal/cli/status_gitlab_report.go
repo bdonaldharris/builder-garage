@@ -36,7 +36,17 @@ func gitlabStatusReportFor(ctx context.Context, t workflowTarget, cfg *projectCo
 			return recomputeCommitChangeset(ctx, env.Git, repo.TopLevel, ref, commit)
 		}
 	}
-	return buildGitlabStatusReport(in), nil
+	report := buildGitlabStatusReport(in)
+	if t.Project == f.Project {
+		if historyRepo, err := historyRepository(ctx, repo.TopLevel, env.Git); err == nil {
+			kind := "issue"
+			if t.Kind == workflowChangeKind {
+				kind = "mr"
+			}
+			addLocalHistory(report, env, historyRepo, kind, t.Number, false)
+		}
+	}
+	return report, nil
 }
 func buildGitlabStatusReport(in statusInputs) *statusReport {
 	it := in.Item
@@ -130,7 +140,7 @@ func buildGitlabStatusReport(in statusInputs) *statusReport {
 			}
 		}
 		gates.add(labelChecked, "automated findings: unavailable as a complete native review feed; discussion notes are observed, never assumed absent findings")
-		gates.add(labelChecked, "human acceptance: unavailable until a configured, qualified GitLab change acceptor and current-artifact native approval policy can be established; native approval counts alone do not satisfy this gate")
+		gates.add(labelChecked, "human acceptance: unavailable until qualified GitLab change-acceptor identity AND current-artifact native approval policy are established; native approval counts alone do not satisfy this gate")
 		if !o.Complete {
 			gates.add(labelChecked, "observation is incomplete; unavailable required evidence cannot pass a gate")
 		}

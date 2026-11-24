@@ -23,7 +23,8 @@ type repoIdentity struct {
 	// Key is a stable, opaque key for the repository: the first 32 hex digits
 	// of the SHA-256 of its identity string. The identity string itself, which
 	// may contain a remote URL, is never stored.
-	Key string
+	Key    string
+	GitLab bool
 	// TopLevel is the absolute path of the working tree's top-level directory.
 	TopLevel string
 	// Remote is the normalized origin URL, "host/path", or "" when the
@@ -138,4 +139,41 @@ func isSCPLikeRemote(raw string) bool {
 	}
 	// A single letter followed by a colon is a Windows drive, not a host.
 	return colon != 1
+}
+
+// GitLab history has an explicit forge namespace. Legacy GitHub keys and
+// serialized v1 events stay unchanged; identical IIDs cannot reuse PR history.
+func historyRepository(ctx context.Context, dir string, git gitRunner) (repoIdentity, error) {
+	repo, err := identifyRepository(ctx, dir, git)
+	if err != nil {
+		return repo, err
+	}
+	data, err := readConfigFile(configPathInRepository(repo.TopLevel))
+	if err != nil {
+		return repo, nil
+	}
+	cfg, err := decodeConfig(data)
+	if err != nil || proj(&cfg).Forge == nil || proj(&cfg).Forge.Provider != "gitlab" {
+		return repo, nil
+	}
+	if problems := validateConfig(cfg); problems != nil {
+		return repo, problems
+	}
+	if err := checkForgeOrigin(ctx, repo.TopLevel, git, cfg); err != nil {
+		return repo, err
+	}
+	f := effectiveForge(*cfg.Project.Forge)
+	sum := sha256.Sum256([]byte("forge:gitlab:" + strings.ToLower(canonicalHTTPSHost(forgeHost(f))) + "/" + f.Project))
+	repo.Key = hex.EncodeToString(sum[:16])
+	repo.GitLab = true
+	return repo, nil
+}
+func checkRecordProvider(repo repoIdentity, kind string) error {
+	if kind == "mr" && !repo.GitLab {
+		return fmt.Errorf("--mr requires valid explicit GitLab configuration and matching origin")
+	}
+	if kind == "pr" && repo.GitLab {
+		return fmt.Errorf("--pr is GitHub-only; use --mr for GitLab")
+	}
+	return nil
 }

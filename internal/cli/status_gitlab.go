@@ -33,6 +33,8 @@ type glPipeline struct {
 	Ref       string `json:"ref"`
 }
 type glResource struct {
+	Labels          []string   `json:"labels"`
+	Author          glUser     `json:"author"`
 	ID              int        `json:"id"`
 	IID             int        `json:"iid"`
 	ProjectID       int        `json:"project_id"`

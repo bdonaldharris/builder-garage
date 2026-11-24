@@ -472,6 +472,11 @@ func checkNamedConditions(p *configProblems, field string, list []namedCondition
 func checkAuthority(p *configProblems, field string, a authority) {
 	checkLine(p, field+".role", a.Role)
 	checkUniqueLines(p, field+".members", a.Members)
+	for i, member := range a.Members {
+		if _, err := parseAuthorityMember(member); err != nil {
+			*p = append(*p, fmt.Sprintf("%s.members[%d]: %v", field, i, err))
+		}
+	}
 }
 
 func checkUniqueLines(p *configProblems, field string, values []string) {

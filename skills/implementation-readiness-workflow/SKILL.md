@@ -5,6 +5,10 @@ metadata:
   garage-role: readiness
 ---
 
+# Provider binding
+
+Apply [Provider operations](references/provider-operations.md) before selecting the authoritative record or tools. The governing provider Issue and its PR/MR are the durable record. GitHub uses comments and existing GitHub tools; GitLab uses verified top-level notes, qualified identities and the explicit operations in that reference. Existing skill names, Agent markers, evidence keys and `pr-review` remain unchanged. PR responsibilities apply to the GitLab MR with typed targets; no provider choice relaxes a role, authorization, review, human-acceptance or evidence gate. GitHub-specific command examples bind only to GitHub. The #192 stack/ruleset exception remains specific to Builder Garage's GitHub repository.
+
 # Implementation Readiness Workflow
 
 ## Purpose
@@ -36,7 +40,7 @@ Resolve `readiness-workflow` to this canonical skill, retrieve/read the governin
 These rules hold whatever the project configures, and no instruction can waive them:
 
 - **F3.** This invocation assesses readiness only. It does not implement, review, or accept the change, and it does not continue into another role's responsibility.
-- **F8.** When the readiness report is recorded, it is recorded on the governing GitHub issue, and is written and then verified. A conversation or local file is never the record.
+- **F8.** When the readiness report is recorded, it is recorded on the governing provider issue, and is written and then verified. A conversation or local file is never the record.
 - **F12.** Product intent is decided by the product-intent acceptor (E8), a human. Readiness asks for that decision; it never makes it.
 
 ---
@@ -558,7 +562,7 @@ When the readiness report is recorded on the governing issue, read the comment b
 garage record --issue <number> --type readiness --outcome <ready | not-ready> --url <URL of the verified comment>
 ```
 
-If the `garage` command is unavailable or the attempt fails, ignore it and do not retry. Local recording never gates, authorizes, advances, or coordinates workflow, and it never replaces the GitHub record.
+If the `garage` command is unavailable or the attempt fails, ignore it and do not retry. Local recording never gates, authorizes, advances, or coordinates workflow, and it never replaces the provider record.
 
 ---
 

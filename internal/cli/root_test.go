@@ -90,7 +90,7 @@ func TestRegisteredCommands(t *testing.T) {
 	}
 	slices.Sort(got)
 
-	want := []string{"config", "history", "init", "record", "skills", "status", "update", "version", "web"}
+	want := []string{"config", "forge", "history", "init", "record", "skills", "status", "update", "version", "web"}
 	if !slices.Equal(got, want) {
 		t.Fatalf("registered commands = %v, want %v", got, want)
 	}

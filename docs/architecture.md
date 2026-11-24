@@ -83,3 +83,7 @@ Architectural decisions are made through the project's normal [contribution proc
 4. this document is updated when an approved change alters the direction recorded here.
 
 This follows the discipline recorded in the project's [history](history.md): understand what the evidence supports before turning it into architecture. Approved direction recorded here takes precedence over any historical hypothesis or candidate principle.
+
+## Explicit GitLab provider operations
+
+`garage forge` adds bounded, explicit Issue/MR search/read/create/update and workflow-note operations through glab. Command wiring is separate from the injected operation boundary. It validates configured forge/origin, typed target and authenticated acting identity; canonical workflows retain authorization/review responsibilities. Mutations use literal JSON stdin, disallow quick-action lines, and require exact durable GET read-back. Uncertain writes are not retried. The observation client's GET allowlist and read-only local web remain separate. Qualified E8 matching does not become independent review or native approval policy. GitLab private history uses a distinct provider/host/project namespace and MR kind, preserving legacy GitHub v1 files/keys. [Provider operations](provider-operations.md) defines installed skill bindings and limits.

@@ -234,3 +234,7 @@ A verifier's output must keep these two columns visible. A "valid" result means 
 ## Not decided here
 
 - Support for sparse checkouts, and post-merge audit of squash or rebase merges without a recorded `base`.
+
+## GitLab durable evidence binding
+
+Use the same `garage_evidence: 1`, artifact identity, Agent markers and `review` / `pr-review` compatibility values on GitLab. The authoritative implementation disposition is a verified top-level governing-Issue note. MR equivalence and supplemental review are top-level MR notes; link exact `#note_ID` URLs in `responds_to`, `supplements` and `equivalent_to`. Preserve current completion/disposition ordering and approval carry-forward only for the applicable unchanged artifact. IIDs are typed and project-bound: an MR and Issue with the same IID are different artifacts. Native GitLab approvals never become Agent #2 records. Eligible Agent authors need checked effective Developer-or-higher membership, while human decisions require E8-qualified identity. See [provider operations](provider-operations.md) for write/read-back and authority binding. A verified write only proves transport/content identity; role, independence, human consent, complete-artifact inspection and asserted verdict remain claims.

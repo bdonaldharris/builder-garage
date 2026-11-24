@@ -44,7 +44,7 @@ garage init --forge-provider github --forge-project owner/repo
 
 The five flag names also identify configuration settings in `garage config show/get/set`. Existing blocks can be edited through the normal confirmed config commands or by hand. Unsetting `forge-provider` removes the entire optional block. Unrelated edits and upgrades preserve forge fields and YAML comments.
 
-Without a forge block, existing schema-v2 GitHub configuration and remote-derived identity behavior remain unchanged; schema 3 also permits omission. `init` creates schema 3 files. The GitLab observation adapter reads authenticated issue/MR workflow facts through `glab`; it never falls back to GitHub. It performs no GitLab writes. Native approval facts are observed separately from Agent #2 review and qualified human acceptance, whose configuration support is a later tranche. It does not establish publicly available GitLab support or deployment compatibility. Those require the remaining #192 stack and complete verification. See [GitLab workflow observation](gitlab-observation.md) for target grammar, runtime setup, resource limits and validation boundaries.
+Without a forge block, existing schema-v2 GitHub configuration and remote-derived identity behavior remain unchanged; schema 3 also permits omission. `init` creates schema 3 files. The GitLab observation adapter reads authenticated issue/MR workflow facts through `glab`; it never falls back to GitHub. It performs no GitLab writes. Native approval facts are observed separately from Agent #2 review and qualified human acceptance, whose qualified configuration is documented below; complete native-policy support is a later tranche. It does not establish publicly available GitLab support or deployment compatibility. Those require the remaining #192 stack and complete verification. See [GitLab workflow observation](gitlab-observation.md) for target grammar, runtime setup, resource limits and validation boundaries.
 
 ## The `project` section
 
@@ -175,3 +175,7 @@ Each canonical skill cites the extension points it uses and states their canonic
 ## Builder Garage's own configuration
 
 Builder Garage's [`.garage/config.yaml`](../.garage/config.yaml) was generated, not hand-authored, by the noninteractive command recorded in its [skill-adoption profile](skill-adoption.md#configuration). It is single-project evidence of the configuration in use, not proof that it suits other projects.
+
+## Qualified authority members
+
+E8 members accept `github:USER` and `gitlab:HOST/USER`. Existing unqualified members remain GitHub-compatible. Use an exact account on the configured GitLab host; a role description without a qualified member cannot establish GitLab human authority. For example, `--workflow-owner 'lead maintainer:github:builder,gitlab:gitlab.example.com/builder'` preserves the same role/member structure through init and config editing. These are public identity references, never credentials. Host comparison normalizes HTTPS port 443 and host letter case; GitLab usernames are matched exactly. Unknown providers and malformed qualified members fail config validation. See [provider operations](provider-operations.md).

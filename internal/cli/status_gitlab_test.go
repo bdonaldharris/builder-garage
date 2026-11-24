@@ -343,7 +343,8 @@ func gitlabStatusEnvFixture(t *testing.T, run *gitlabFixtureRunner) (string, sta
 		return nil, nil, nil
 	})
 	env.GLab = run.run
-	env.CacheDir = func() (string, error) { t.Fatal("GitLab reused GitHub history"); return "", nil }
+	cache := t.TempDir()
+	env.CacheDir = func() (string, error) { return cache, nil }
 	return dir, env
 }
 func TestGitlabStatusDispatchAndReadOnlyWeb(t *testing.T) {
