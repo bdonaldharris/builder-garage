@@ -108,18 +108,30 @@ func (c *gitlabClient) allowed(method, endpoint string) bool {
 	if e != nil {
 		return false
 	}
+	rest := raw[2:]
+	filters := gitlabQueryFilters(rest)
+	paging := 0
 	for k, v := range q {
-		if (k != "page" && k != "per_page") || len(v) != 1 || !positiveID(v[0]) {
+		if len(v) != 1 {
 			return false
 		}
-		if k == "per_page" && v[0] != strconv.Itoa(gitlabPageSize) {
+		switch {
+		case k == "page" || k == "per_page":
+			if !positiveID(v[0]) || k == "per_page" && v[0] != strconv.Itoa(gitlabPageSize) {
+				return false
+			}
+			paging++
+		case filters[k] == nil || !filters[k](v[0]):
 			return false
 		}
+	}
+	// A filtered collection is allowed only with its complete exact filter set.
+	if len(filters) > 0 && len(q)-paging != len(filters) {
+		return false
 	}
 	if len(raw) == 2 {
 		return len(q) == 0
 	}
-	rest := raw[2:]
 	switch rest[0] {
 	case "issues", "merge_requests":
 		if len(rest) < 2 || !positiveID(rest[1]) {
@@ -150,15 +162,68 @@ func (c *gitlabClient) allowed(method, endpoint string) bool {
 	case "members":
 		return len(rest) == 3 && rest[1] == "all" && positiveID(rest[2]) && len(q) == 0
 	case "repository":
-		if len(rest) != 3 || rest[1] != "branches" || len(q) != 0 {
+		if len(rest) != 3 || len(q) != 0 {
 			return false
 		}
-		branch, e := url.PathUnescape(rest[2])
-		return e == nil && branch != "" && !strings.Contains(branch, "..") && !strings.ContainsAny(branch, "\r\n\\")
+		ref, e := url.PathUnescape(rest[2])
+		switch rest[1] {
+		case "branches":
+			return e == nil && ref != "" && !strings.Contains(ref, "..") && !strings.ContainsAny(ref, "\r\n\\")
+		case "tags":
+			return e == nil && validReleaseTag(ref)
+		}
+	case "releases":
+		tag, e := url.PathUnescape(rest[len(rest)-1])
+		if len(rest) == 4 {
+			tag, e = url.PathUnescape(rest[1])
+		}
+		if e != nil || !validReleaseTag(tag) {
+			return false
+		}
+		return len(rest) == 2 && len(q) == 0 || len(rest) == 4 && rest[2] == "assets" && rest[3] == "links"
+	case "packages":
+		return len(rest) == 1 || len(rest) == 3 && positiveID(rest[1]) && rest[2] == "package_files"
 	case "pipelines":
-		return (len(rest) == 2 && positiveID(rest[1]) && len(q) == 0) || (len(rest) == 3 && positiveID(rest[1]) && rest[2] == "jobs")
+		return len(rest) == 1 || (len(rest) == 2 && positiveID(rest[1]) && len(q) == 0) || (len(rest) == 3 && positiveID(rest[1]) && rest[2] == "jobs")
 	}
 	return false
+}
+
+// gitlabQueryFilters names the exact filter set a filtered collection needs.
+// A collection that is not listed accepts only pagination.
+func gitlabQueryFilters(rest []string) map[string]func(string) bool {
+	if len(rest) != 1 {
+		return nil
+	}
+	switch rest[0] {
+	case "pipelines":
+		return map[string]func(string) bool{"ref": validReleaseTag, "sha": objectNamePattern.MatchString}
+	case "packages":
+		return map[string]func(string) bool{
+			"package_type":    func(v string) bool { return v == "generic" },
+			"package_name":    validPackageSegment,
+			"package_version": validPackageSegment,
+		}
+	}
+	return nil
+}
+
+// validReleaseTag accepts a Git tag name that stays one escaped API segment.
+func validReleaseTag(tag string) bool {
+	return checkBranchName(tag) == nil && len(tag) <= 255 && !strings.ContainsAny(tag, "\\#:?%*[ \t\r\n\x00")
+}
+
+// validPackageSegment accepts a generic package name, version or file name.
+func validPackageSegment(s string) bool {
+	if s == "" || len(s) > 255 || s == "." || s == ".." || strings.HasPrefix(s, "-") {
+		return false
+	}
+	for _, r := range s {
+		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || strings.ContainsRune("._+-~", r)) {
+			return false
+		}
+	}
+	return true
 }
 func (c *gitlabClient) get(ctx context.Context, method, endpoint string, out any) (http.Header, error) {
 	if err := ctx.Err(); err != nil {
@@ -209,10 +274,20 @@ func (c *gitlabClient) get(ctx context.Context, method, endpoint string, out any
 // list constructs each continuation instead of handing arbitrary server links
 // back to glab. A supplied Link is validated before any next request is made.
 func gitlabList[T any](ctx context.Context, c *gitlabClient, endpoint string) ([]T, bool, error) {
+	return gitlabListFiltered[T](ctx, c, endpoint, nil)
+}
+
+// gitlabListFiltered pages a collection whose exact filters the allowlist
+// names. Every continuation must repeat those filters unchanged.
+func gitlabListFiltered[T any](ctx context.Context, c *gitlabClient, endpoint string, filters url.Values) ([]T, bool, error) {
 	var result []T
+	prefix := ""
+	if len(filters) > 0 {
+		prefix = filters.Encode() + "&"
+	}
 	for page := 1; page <= gitlabPageLimit; page++ {
 		var items []T
-		query := fmt.Sprintf("%s?per_page=%d&page=%d", endpoint, gitlabPageSize, page)
+		query := fmt.Sprintf("%s?%sper_page=%d&page=%d", endpoint, prefix, gitlabPageSize, page)
 		headers, err := c.get(ctx, "GET", query, &items)
 		if err != nil {
 			return result, true, err
@@ -234,8 +309,13 @@ func gitlabList[T any](ctx context.Context, c *gitlabClient, endpoint string) ([
 				return result, true, errors.New("truncated: refused an untrusted GitLab pagination continuation")
 			}
 			values, e := url.ParseQuery(u.RawQuery)
-			if e != nil || len(values) != 2 || values.Get("per_page") != strconv.Itoa(gitlabPageSize) || !c.allowed("GET", endpoint+"?"+u.RawQuery) {
+			if e != nil || len(values) != 2+len(filters) || values.Get("per_page") != strconv.Itoa(gitlabPageSize) || !c.allowed("GET", endpoint+"?"+u.RawQuery) {
 				return result, true, errors.New("truncated: refused unsupported GitLab pagination parameters")
+			}
+			for k := range filters {
+				if values.Get(k) != filters.Get(k) {
+					return result, true, errors.New("truncated: GitLab pagination changed the collection filters")
+				}
 			}
 			linkNext = values.Get("page")
 		}

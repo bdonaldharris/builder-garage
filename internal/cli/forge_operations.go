@@ -213,13 +213,9 @@ func executeGitlabOperation(ctx context.Context, cfg projectConfig, o forgeOpera
 		}
 		return forgeOperationResult{URL: r.WebURL, Complete: true, Items: []glResource{r}}, nil
 	}
-	var actor glUser
-	if _, err := c.request(ctx, "GET", "user", nil, &actor); err != nil {
+	actor, err := c.checkActor(ctx, o.Actor)
+	if err != nil {
 		return result, err
-	}
-	expected, _ := parseAuthorityMember(o.Actor)
-	if actor.ID < 1 || actor.Username == "" || !strings.EqualFold(expected.Host, canonicalHTTPSHost(forgeHost(f))) || expected.User != actor.Username {
-		return result, errors.New("authenticated GitLab identity does not match expected actor")
 	}
 	if o.Action == "note" {
 		return c.note(ctx, cfg, o, t, project.ID, actor)

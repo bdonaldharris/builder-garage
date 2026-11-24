@@ -20,12 +20,14 @@ Status and the local web interface remain read-only.
 
 Mutation flags assert that the invoking workflow already obtained authorization;
 they never grant it. Writes use literal JSON, refuse quick-action lines and
-verify durable read-back. No merge, approval, release or deletion operation is
-provided. A failed mutation is never retried automatically.`, Args: cobra.NoArgs}
+verify durable read-back. Tag and release mutations also require a checked
+Workflow Owner release delegation note. No merge, approval, package publishing,
+protected-ref change or deletion operation is provided. A failed mutation is
+never retried automatically.`, Args: cobra.NoArgs}
 	for _, action := range []string{"search", "read", "notes", "create", "update", "note"} {
 		cmd.AddCommand(newForgeOperationCommand(action))
 	}
-	cmd.AddCommand(newForgePolicyCommand())
+	cmd.AddCommand(newForgePolicyCommand(), newForgeReleaseCommand())
 	return cmd
 }
 func newForgeOperationCommand(action string) *cobra.Command {
@@ -171,4 +173,83 @@ func newForgePolicyCommand() *cobra.Command {
 			Note         string               `json:"note"`
 		}{item.URL, item.HeadRefOid, item.BaseRefName, item.BaseRefOid, reads, item.Observation.PolicyGates, "Native evidence only; Agent #2, equivalence, workflow triggers and human authority remain separate. No merge eligibility or authorization is granted."})
 	}}
+}
+
+// newForgeReleaseCommand groups GitLab release inspection and the delegated
+// tag/release mutations (#201).
+func newForgeReleaseCommand() *cobra.Command {
+	cmd := &cobra.Command{Use: "release", Short: "Inspect or perform a delegated GitLab tag or release operation", Long: `Inspect checked GitLab release facts, or perform one tag or release operation
+that a Workflow Owner delegated in a [WORKFLOW OWNER — RELEASE DELEGATION] note
+on the release issue. Garage verifies that note before any write. A human who
+performs a release operation directly uses glab or the GitLab interface.`, Args: cobra.NoArgs}
+	var ref string
+	inspect := &cobra.Command{Use: "inspect TAG", Short: "Report checked tag, release, pipeline and asset facts without changing them", Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		dir, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		cfg, err := loadForgeOperationConfig(cmd.Context(), dir, runGit)
+		if err != nil {
+			return err
+		}
+		result, err := inspectGitlabRelease(cmd.Context(), *cfg.Project.Forge, args[0], ref, runGLab)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(cmd.OutOrStdout()).Encode(result)
+	}}
+	inspect.Flags().StringVar(&ref, "ref", "", "expected full commit object name of the tag")
+	cmd.AddCommand(inspect)
+	for _, op := range []struct{ use, operation, short string }{
+		{"tag", releaseOpTag, "Create a delegated tag at an exact commit"},
+		{"create", releaseOpCreate, "Create a delegated release for an existing tag"},
+		{"update", releaseOpUpdate, "Replace a delegated release's title and notes"},
+		{"link", releaseOpLink, "Add a delegated asset link to a release"},
+	} {
+		cmd.AddCommand(newForgeReleaseMutation(op.use, op.operation, op.short))
+	}
+	return cmd
+}
+
+func newForgeReleaseMutation(use, operation, short string) *cobra.Command {
+	o := releaseOperation{Operation: operation}
+	var notesFile string
+	cmd := &cobra.Command{Use: use + " TAG", Short: short, Args: cobra.ExactArgs(1), RunE: func(cmd *cobra.Command, args []string) error {
+		dir, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		cfg, err := loadForgeOperationConfig(cmd.Context(), dir, runGit)
+		if err != nil {
+			return err
+		}
+		o.Tag = args[0]
+		if operation == releaseOpCreate || operation == releaseOpUpdate {
+			if o.Notes, err = readOperationBody(notesFile); err != nil {
+				return err
+			}
+		}
+		result, err := executeGitlabRelease(cmd.Context(), cfg, o, runGLabInput)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(cmd.OutOrStdout()).Encode(result)
+	}}
+	flags := cmd.Flags()
+	flags.StringVar(&o.Ref, "ref", "", "full commit object name the delegation names")
+	flags.StringVar(&o.Actor, "actor", "", "expected authenticated gitlab:HOST/USER")
+	flags.StringVar(&o.Delegation, "delegation", "", "URL of the Workflow Owner's release delegation note")
+	flags.BoolVar(&o.Authorized, "authorized", false, "assert the invoking workflow obtained authorization for this exact operation")
+	switch operation {
+	case releaseOpTag:
+		flags.StringVar(&o.Message, "message", "", "optional one-line annotation message")
+	case releaseOpCreate, releaseOpUpdate:
+		flags.StringVar(&o.Title, "title", "", "approved complete release title")
+		flags.StringVar(&notesFile, "body-file", "", "UTF-8 Markdown file containing the approved complete release notes")
+	case releaseOpLink:
+		flags.StringVar(&o.LinkName, "name", "", "asset link name")
+		flags.StringVar(&o.LinkURL, "url", "", "HTTPS URL of the durably stored asset")
+		flags.StringVar(&o.LinkType, "link-type", "package", "other, package, image or runbook")
+	}
+	return cmd
 }
