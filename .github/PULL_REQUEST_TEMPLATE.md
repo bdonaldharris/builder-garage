@@ -30,7 +30,7 @@ garage status checks the kind against the base and head it permits.
 ## Stack dependency
 
 <!--
-Only for one of the six issues enrolled by the Workflow Owner on #192.
+Only for one of the six issues enrolled by the Workflow Owner on #192. Its direct-prerequisite PR must already be bound in the counted registry; a planned entry with an omitted/null prerequisite PR cannot use this declaration to establish eligibility.
 Use the registered values; this section alone grants no destination exception.
 ```yaml
 garage_stack: 1

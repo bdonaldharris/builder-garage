@@ -13,10 +13,11 @@ func stackTestRegistry(repository string) *stackRegistry {
 	entries := make([]stackRegistryEntry, stackEntryCount)
 	for i := range entries {
 		issue := 301 + i
-		prerequisite := stackPrerequisite{Issue: stackPrerequisiteChangeIssue, PullRequest: 700, Branch: "staging"}
+		prerequisitePR := 700 + i
+		prerequisite := stackPrerequisite{Issue: stackPrerequisiteChangeIssue, PullRequest: &prerequisitePR, Branch: "staging"}
 		if i > 0 {
 			prerequisite = stackPrerequisite{
-				Issue: 300 + i, PullRequest: 700 + i, Branch: fmt.Sprintf("gitlab-stack/issue-%d", 300+i),
+				Issue: 300 + i, PullRequest: &prerequisitePR, Branch: fmt.Sprintf("gitlab-stack/issue-%d", 300+i),
 			}
 		}
 		entries[i] = stackRegistryEntry{
@@ -35,9 +36,11 @@ func stackRegistryComment(registry *stackRegistry) ghComment {
 	fmt.Fprintf(&body, "%s\n\n```yaml\ngarage_stack: %d\nprogram_issue: %d\nrepository: %q\nprerequisite_change_pr: %d\nentries:\n",
 		stackRegistryMarker, registry.GarageStack, registry.ProgramIssue, registry.Repository, registry.PrerequisiteChangePR)
 	for _, entry := range registry.Entries {
-		fmt.Fprintf(&body, "  - issue: %d\n    sequence: %d\n    branch: %q\n    direct_prerequisite:\n      issue: %d\n      pull_request: %d\n      branch: %q\n",
-			entry.Issue, entry.Sequence, entry.Branch, entry.DirectPrerequisite.Issue,
-			entry.DirectPrerequisite.PullRequest, entry.DirectPrerequisite.Branch)
+		fmt.Fprintf(&body, "  - issue: %d\n    sequence: %d\n    branch: %q\n    direct_prerequisite:\n      issue: %d\n      branch: %q\n",
+			entry.Issue, entry.Sequence, entry.Branch, entry.DirectPrerequisite.Issue, entry.DirectPrerequisite.Branch)
+		if entry.DirectPrerequisite.PullRequest != nil {
+			fmt.Fprintf(&body, "      pull_request: %d\n", entry.DirectPrerequisite.pullRequestNumber())
+		}
 	}
 	body.WriteString("```\n")
 	return ghComment{URL: "https://github.com/o/r/issues/192#issuecomment/1",
@@ -46,7 +49,7 @@ func stackRegistryComment(registry *stackRegistry) ghComment {
 
 func stackDependencyBody(issue int, entry stackRegistryEntry) string {
 	return fmt.Sprintf("## Governing issue\n\nRefs #%d\n\n## Pull request kind\n\nimplementation\n\n## Stack dependency\n\n```yaml\ngarage_stack: 1\nprogram_issue: 192\nsequence: %d\ndirect_prerequisite_issue: %d\ndirect_prerequisite_pr: %d\ntarget_branch: %s\n```\n",
-		issue, entry.Sequence, entry.DirectPrerequisite.Issue, entry.DirectPrerequisite.PullRequest, entry.DirectPrerequisite.Branch)
+		issue, entry.Sequence, entry.DirectPrerequisite.Issue, entry.DirectPrerequisite.pullRequestNumber(), entry.DirectPrerequisite.Branch)
 }
 
 func stackFeaturePRBody(entry stackRegistryEntry, target string) string {
@@ -872,7 +875,7 @@ func TestValidateStackMaintenance(t *testing.T) {
 	}
 
 	propagation := stackMaintenanceBody(entry.Issue, "synchronize", entry.DirectPrerequisite.Branch,
-		entry.DirectPrerequisite.PullRequest, entry.Branch, "")
+		entry.DirectPrerequisite.pullRequestNumber(), entry.Branch, "")
 	item.Body = propagation
 	if got := validateStackDeclaration(item, "github.com", "bdonaldharris/builder-garage", "staging", "main", nil); !got.Valid {
 		t.Fatalf("valid dependent propagation = %+v", got)
@@ -1153,3 +1156,126 @@ func containsInt(values []int, want int) bool {
 }
 
 func intPointer(value int) *int { return &value }
+
+// A complete branch plan must bootstrap without inventing future PRs. Each
+// dependent gains topology eligibility only after its real predecessor is bound.
+func TestStackRegistryIncrementalBootstrap(t *testing.T) {
+	registry := stackTestRegistry(stackTestRepository)
+	for i := 1; i < len(registry.Entries); i++ {
+		registry.Entries[i].DirectPrerequisite.PullRequest = nil
+	}
+	prs := stackTestItem("", registry.Entries[0]).StatusPRs
+	delete(prs, 701)
+	validate := func(item *ghItem) stackValidation {
+		return validateStackDeclaration(item, "github.com", stackTestRepository, "staging", "main", nil)
+	}
+	for i := range registry.Entries {
+		entry := registry.Entries[i]
+		if err := validateStackRegistry(registry, "github.com", stackTestRepository, "staging", "main"); err != nil {
+			t.Fatalf("partial plan at sequence %d: %v", i+1, err)
+		}
+		if i > 0 {
+			// A declaration cannot supply a missing registry binding, even when
+			// GitHub already returned the claimed PR and matching branch.
+			claimed := entry
+			predecessorNumber := 700 + i
+			claimed.DirectPrerequisite.PullRequest = &predecessorNumber
+			candidate := stackTestSubject(stackTestOpenPR(701+i, entry.DirectPrerequisite.Branch,
+				entry.Branch, stackDependencyBody(entry.Issue, claimed)), prs, registry)
+			if got := validate(candidate); got.Valid || !strings.Contains(got.Problem, "no direct-prerequisite PR") {
+				t.Fatalf("unbound sequence %d = %+v", i+1, got)
+			}
+			for _, number := range stackPRReferencesToFetch(candidate, "github.com", stackTestRepository, "staging", "main") {
+				if number < 1 || number >= predecessorNumber {
+					t.Fatalf("unbound entry requested unregistered prerequisite %d", number)
+				}
+			}
+			undeclared := *candidate
+			undeclared.Body = stackFeatureWithoutDeclarationBody(entry.Issue)
+			undeclared.BaseRefName = "staging"
+			if got := validate(&undeclared); got.Valid || got.Unknown || !got.Present {
+				t.Fatalf("planned entry escaped enrollment through ordinary E1 path: %+v", got)
+			}
+			for _, purpose := range []string{"correction", "synchronize"} {
+				maintenance := stackTestSubject(stackTestOpenPR(800+i, entry.Branch, "maintenance/stack-192/bootstrap",
+					stackMaintenanceBody(entry.Issue, purpose, "staging", 0, entry.Branch, "")), prs, registry)
+				if got := validate(maintenance); got.Valid || !strings.Contains(got.Problem, "no direct-prerequisite PR") {
+					t.Fatalf("unbound %s sequence %d = %+v", purpose, i+1, got)
+				}
+			}
+			registry.Entries[i].DirectPrerequisite.PullRequest = &predecessorNumber
+			entry = registry.Entries[i]
+		}
+		pr := stackTestOpenPR(701+i, entry.DirectPrerequisite.Branch, entry.Branch, stackDependencyBody(entry.Issue, entry))
+		item := stackTestSubject(pr, prs, registry)
+		if got := validate(item); !got.Valid {
+			t.Fatalf("bound sequence %d = %+v", i+1, got)
+		}
+		maintenance := stackTestSubject(stackTestOpenPR(800+i, entry.Branch, "maintenance/stack-192/bootstrap",
+			stackMaintenanceBody(entry.Issue, "synchronize", "staging", 0, entry.Branch, "")), prs, registry)
+		if got := validate(maintenance); !got.Valid {
+			t.Fatalf("bound maintenance sequence %d = %+v", i+1, got)
+		}
+		for _, number := range stackPRReferencesToFetch(item, "github.com", stackTestRepository, "staging", "main") {
+			if number < 1 || number > 700+i {
+				t.Fatalf("sequence %d fetched nonexistent/future prerequisite %d", i+1, number)
+			}
+		}
+		if i > 0 {
+			predecessor := prs[700+i]
+			bad := predecessor
+			bad.HeadRefName = "unregistered/branch"
+			prs[700+i] = bad
+			if got := validate(stackTestSubject(pr, prs, registry)); got.Valid {
+				t.Fatalf("sequence %d accepted mismatched real predecessor", i+1)
+			}
+			delete(prs, 700+i)
+			if got := validate(stackTestSubject(pr, prs, registry)); got.Valid {
+				t.Fatalf("sequence %d accepted unread predecessor", i+1)
+			}
+			prs[700+i] = predecessor
+		}
+		prs[pr.Number] = pr
+	}
+}
+
+func TestStackRegistryOptionalPRContract(t *testing.T) {
+	for _, test := range []struct {
+		name  string
+		index int
+		value *int
+	}{
+		{name: "first prerequisite is mandatory", index: 0},
+		{name: "zero is not a PR", index: 2, value: intPointer(0)},
+		{name: "negative is not a PR", index: 2, value: intPointer(-1)},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			registry := stackTestRegistry(stackTestRepository)
+			registry.Entries[test.index].DirectPrerequisite.PullRequest = test.value
+			record := latestStackRegistry([]ghComment{stackRegistryComment(registry)})
+			if record.Registry == nil {
+				t.Fatalf("parse: %s", record.Problem)
+			}
+			if err := validateStackRegistry(record.Registry, "github.com", stackTestRepository, "staging", "main"); err == nil {
+				t.Fatal("invalid prerequisite accepted")
+			}
+		})
+	}
+	registry := stackTestRegistry(stackTestRepository)
+	registry.Entries[2].DirectPrerequisite.PullRequest = nil
+	comment := stackRegistryComment(registry)
+	for _, suffix := range []string{"", "      pull_request: null\n"} {
+		candidate := comment
+		candidate.Body = strings.Replace(candidate.Body, "      branch: \"gitlab-stack/issue-302\"\n", "      branch: \"gitlab-stack/issue-302\"\n"+suffix, 1)
+		record := latestStackRegistry([]ghComment{candidate})
+		if record.Registry == nil {
+			t.Fatalf("optional reference parse: %s", record.Problem)
+		}
+		if err := validateStackRegistry(record.Registry, "github.com", stackTestRepository, "staging", "main"); err != nil {
+			t.Fatalf("optional reference: %v", err)
+		}
+		if record.Registry.Entries[2].DirectPrerequisite.PullRequest != nil {
+			t.Fatal("missing reference became a PR")
+		}
+	}
+}

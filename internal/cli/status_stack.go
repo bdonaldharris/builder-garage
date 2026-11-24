@@ -26,8 +26,17 @@ var stackMaintenanceBranchPattern = regexp.MustCompile(`^maintenance/stack-192/[
 
 type stackPrerequisite struct {
 	Issue       int    `yaml:"issue"`
-	PullRequest int    `yaml:"pull_request"`
+	PullRequest *int   `yaml:"pull_request,omitempty"`
 	Branch      string `yaml:"branch"`
+}
+
+// An omitted prerequisite PR reserves the dependency without asserting that
+// the predecessor's implementation PR already exists.
+func (p stackPrerequisite) pullRequestNumber() int {
+	if p.PullRequest == nil {
+		return 0
+	}
+	return *p.PullRequest
 }
 
 type stackRegistryEntry struct {
@@ -197,13 +206,13 @@ func validateStackRegistry(registry *stackRegistry, host, repository, integratio
 		if branches[entry.Branch] {
 			return fmt.Errorf("branch %q appears more than once in the registry", entry.Branch)
 		}
-		if entry.DirectPrerequisite.Issue < 1 || entry.DirectPrerequisite.PullRequest < 1 ||
+		if entry.DirectPrerequisite.Issue < 1 || (entry.DirectPrerequisite.PullRequest != nil && entry.DirectPrerequisite.pullRequestNumber() < 1) ||
 			!validStackBranch(entry.DirectPrerequisite.Branch) {
 			return fmt.Errorf("registry entry #%d has an incomplete direct prerequisite", entry.Issue)
 		}
 		if i == 0 {
 			if entry.DirectPrerequisite.Issue != stackPrerequisiteChangeIssue ||
-				entry.DirectPrerequisite.PullRequest != registry.PrerequisiteChangePR ||
+				entry.DirectPrerequisite.pullRequestNumber() != registry.PrerequisiteChangePR ||
 				entry.DirectPrerequisite.Branch != integration {
 				return errors.New("the first entry must depend on issue #196's merged prerequisite-change PR into E1")
 			}
@@ -256,7 +265,9 @@ func stackPRReferencesToFetch(it *ghItem, host, repository, integration, release
 	}
 	numbers := []int{registry.PrerequisiteChangePR}
 	for i := 0; i < entry.Sequence; i++ {
-		numbers = append(numbers, registry.Entries[i].DirectPrerequisite.PullRequest)
+		if number := registry.Entries[i].DirectPrerequisite.pullRequestNumber(); number > 0 {
+			numbers = append(numbers, number)
+		}
 	}
 	return numbers
 }
@@ -339,6 +350,9 @@ func validateStackDeclaration(it *ghItem, host, repository, integration, release
 			return fail(fmt.Sprintf("governing issue #%d is not enrolled in the #192 registry", issues[0]))
 		}
 		entry = registeredEntry
+		if problem := stackPrerequisitePRProblem(entry); problem != "" {
+			return fail(problem)
+		}
 		// The subject is judged by the same feature rule as its predecessors.
 		chain.features[entry.Sequence] = stackFactsFromItem(it)
 		if problem := chain.problemThrough(entry.Sequence); problem != "" {
@@ -352,6 +366,9 @@ func validateStackDeclaration(it *ghItem, host, repository, integration, release
 		entry, ok = entries[maintenance.EntryIssue]
 		if !ok {
 			return fail(fmt.Sprintf("maintenance entry issue #%d is not enrolled in the #192 registry", maintenance.EntryIssue))
+		}
+		if problem := stackPrerequisitePRProblem(entry); problem != "" {
+			return fail(problem)
 		}
 		issues := governingIssueNumbers(it.Body)
 		if len(issues) != 1 || issues[0] != entry.Issue {
@@ -383,7 +400,7 @@ func validateStackDeclaration(it *ghItem, host, repository, integration, release
 					return fail("a staging synchronization must not name an upstream PR")
 				}
 			case entry.DirectPrerequisite.Branch:
-				if maintenance.UpstreamPR != entry.DirectPrerequisite.PullRequest {
+				if maintenance.UpstreamPR != entry.DirectPrerequisite.pullRequestNumber() {
 					return fail("dependent propagation must name the registered direct-prerequisite PR")
 				}
 				propagation = true
@@ -545,7 +562,9 @@ func newStackChain(prs map[int]ghStatusPR, registry *stackRegistry, integration 
 		features:     make(map[int]stackFeatureFacts, len(registry.Entries)),
 	}
 	for i := 1; i < len(registry.Entries); i++ {
-		chain.features[i] = stackFactsFromStatusPR(prs, registry.Entries[i].DirectPrerequisite.PullRequest)
+		if number := registry.Entries[i].DirectPrerequisite.pullRequestNumber(); number > 0 {
+			chain.features[i] = stackFactsFromStatusPR(prs, number)
+		}
 	}
 	return chain
 }
@@ -619,6 +638,13 @@ func (c stackChain) permittedTarget(sequence int, at *time.Time) (string, string
 	return c.integration, ""
 }
 
+func stackPrerequisitePRProblem(entry stackRegistryEntry) string {
+	if entry.DirectPrerequisite.pullRequestNumber() < 1 {
+		return fmt.Sprintf("registry entry #%d has no direct-prerequisite PR; the Workflow Owner must register the existing predecessor PR before this entry can use the stack exception", entry.Issue)
+	}
+	return ""
+}
+
 // featureProblem is the one feature-validation rule. It applies to the
 // feature PR of sequence wherever that PR is consumed: as the status subject,
 // as a predecessor, or as a maintenance upstream.
@@ -630,6 +656,9 @@ func (c stackChain) permittedTarget(sequence int, at *time.Time) (string, string
 // what the body said at merge time.
 func (c stackChain) featureProblem(sequence int) string {
 	entry := c.registry.Entries[sequence-1]
+	if problem := stackPrerequisitePRProblem(entry); problem != "" {
+		return problem
+	}
 	facts := c.features[sequence]
 	label := c.label(sequence)
 	merged, problem := facts.mergeState()
@@ -663,7 +692,7 @@ func (c stackChain) featureProblem(sequence int) string {
 	}
 	if dependency.Sequence != entry.Sequence ||
 		dependency.DirectPrerequisiteIssue != entry.DirectPrerequisite.Issue ||
-		dependency.DirectPrerequisitePR != entry.DirectPrerequisite.PullRequest {
+		dependency.DirectPrerequisitePR != entry.DirectPrerequisite.pullRequestNumber() {
 		return fmt.Sprintf("%s: Stack dependency does not match the governing registry entry", label)
 	}
 	var at *time.Time
