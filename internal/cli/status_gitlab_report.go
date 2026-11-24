@@ -18,7 +18,7 @@ func gitlabStatusReportFor(ctx context.Context, t workflowTarget, cfg *projectCo
 	if t.Project == "" {
 		t.Project = f.Project
 	}
-	var provider statusProvider = gitlabStatusAdapter{Runner: env.GLab, Forge: f}
+	var provider statusProvider = gitlabStatusAdapter{Runner: env.GLab, Forge: f, Now: env.Now}
 	item, reads, err := provider.Read(ctx, t, cfg)
 	if err != nil {
 		r := &statusReport{provider: "gitlab", target: t, header: []string{"GitLab status unavailable", "", "GITLAB WAS NOT CONSULTED SUCCESSFULLY: " + err.Error() + ".", "No workflow state or eligible action is established; no GitHub fallback or local history is used."}}
@@ -140,7 +140,17 @@ func buildGitlabStatusReport(in statusInputs) *statusReport {
 			}
 		}
 		gates.add(labelChecked, "automated findings: unavailable as a complete native review feed; discussion notes are observed, never assumed absent findings")
-		gates.add(labelChecked, "human acceptance: unavailable until qualified GitLab change-acceptor identity AND current-artifact native approval policy are established; native approval counts alone do not satisfy this gate")
+		for _, gate := range o.PolicyGates {
+			scope := "advisory/not applicable"
+			if gate.Required {
+				scope = "required"
+			}
+			gates.add(labelChecked, "%s: %s (%s) — %s; source: %s", gate.Name, gate.State, scope, oneLine(gate.Detail), strings.Join(gate.Sources, ", "))
+		}
+		if len(o.PolicyGates) == 0 {
+			gates.add(labelChecked, "native policy and qualified human acceptance: unavailable; no gate passes")
+		}
+
 		if !o.Complete {
 			gates.add(labelChecked, "observation is incomplete; unavailable required evidence cannot pass a gate")
 		}

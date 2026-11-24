@@ -25,6 +25,7 @@ provided. A failed mutation is never retried automatically.`, Args: cobra.NoArgs
 	for _, action := range []string{"search", "read", "notes", "create", "update", "note"} {
 		cmd.AddCommand(newForgeOperationCommand(action))
 	}
+	cmd.AddCommand(newForgePolicyCommand())
 	return cmd
 }
 func newForgeOperationCommand(action string) *cobra.Command {
@@ -135,4 +136,39 @@ func loadForgeOperationConfig(ctx context.Context, dir string, git gitRunner) (p
 		return cfg, errors.New("forge operations require explicit GitLab configuration; use existing GitHub tools for GitHub")
 	}
 	return cfg, checkForgeOrigin(ctx, repo.TopLevel, git, cfg)
+}
+
+// Policy inspection shares the bounded GET-only provider adapter with status.
+// It reports independent native outcomes, never authority to merge or mutate.
+func newForgePolicyCommand() *cobra.Command {
+	return &cobra.Command{Use: "policy mr IID", Short: "Inspect checked GitLab MR policy evidence without changing it", Args: cobra.RangeArgs(1, 2), RunE: func(cmd *cobra.Command, args []string) error {
+		dir, err := os.Getwd()
+		if err != nil {
+			return err
+		}
+		cfg, err := loadForgeOperationConfig(cmd.Context(), dir, runGit)
+		if err != nil {
+			return err
+		}
+		target, err := parseGitlabTarget(args, *cfg.Project.Forge)
+		if err != nil {
+			return err
+		}
+		if target.Kind != workflowChangeKind {
+			return errors.New("policy inspection requires a merge request")
+		}
+		item, reads, err := (gitlabStatusAdapter{Runner: runGLab, Forge: *cfg.Project.Forge}).Read(cmd.Context(), target, &cfg)
+		if err != nil {
+			return err
+		}
+		return json.NewEncoder(cmd.OutOrStdout()).Encode(struct {
+			URL          string               `json:"url"`
+			Head         string               `json:"head"`
+			Target       string               `json:"target"`
+			TargetCommit string               `json:"target_commit"`
+			Reads        int                  `json:"reads"`
+			Gates        []workflowPolicyGate `json:"gates"`
+			Note         string               `json:"note"`
+		}{item.URL, item.HeadRefOid, item.BaseRefName, item.BaseRefOid, reads, item.Observation.PolicyGates, "Native evidence only; Agent #2, equivalence, workflow triggers and human authority remain separate. No merge eligibility or authorization is granted."})
+	}}
 }

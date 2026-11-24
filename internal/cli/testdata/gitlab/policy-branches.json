@@ -1,0 +1,3 @@
+[
+ {"name":"stack/*","allow_force_push":false,"push_access_levels":[{"access_level":0}],"merge_access_levels":[{"access_level":40}]}
+]

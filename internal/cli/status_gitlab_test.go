@@ -81,6 +81,9 @@ func (f *gitlabFixtureRunner) run(ctx context.Context, args ...string) ([]byte, 
 	case prefix + "/merge_requests/5/approvals":
 		name = "approvals"
 	default:
+		if strings.HasSuffix(path, "/approval_state") || strings.HasSuffix(path, "/versions") || strings.HasSuffix(path, "/pipelines") || strings.HasSuffix(path, "/protected_branches") || strings.HasSuffix(path, "/protected_tags") || path == prefix+"/approvals" || strings.HasSuffix(path, "/jobs") {
+			return gitlabHTTP(404, "", `{}`), nil, nil
+		}
 		if strings.HasSuffix(path, "/notes") || strings.HasSuffix(path, "/discussions") || strings.HasSuffix(path, "/closed_by") || strings.HasSuffix(path, "/closes_issues") {
 			return gitlabHTTP(200, "", "[]"), nil, nil
 		}

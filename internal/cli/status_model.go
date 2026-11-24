@@ -121,7 +121,19 @@ type workflowFact struct {
 	Name, Value, Problem string
 	Available            bool
 }
+
+// Each policy capability has its own outcome. Optional absence never turns
+// unrelated checked evidence into failure; unavailable required facts never pass.
+type workflowPolicyGate struct {
+	Sources  []string `json:"sources,omitempty"`
+	Name     string   `json:"name"`
+	State    string   `json:"state"` // passed | failed | unavailable | not-required
+	Required bool     `json:"required"`
+	Detail   string   `json:"detail"`
+	Source   string   `json:"source"`
+}
 type workflowObservation struct {
+	PolicyGates                 []workflowPolicyGate
 	Facts                       []workflowFact
 	References                  []workflowTarget
 	Governing                   []workflowIssue
