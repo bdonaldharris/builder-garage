@@ -30,7 +30,7 @@ func stackTestRegistry(repository string) *stackRegistry {
 	}
 }
 
-func stackRegistryComment(registry *stackRegistry) ghComment {
+func stackRegistryComment(registry *stackRegistry) workflowComment {
 	var body strings.Builder
 	fmt.Fprintf(&body, "%s\n\n```yaml\ngarage_stack: %d\nprogram_issue: %d\nrepository: %q\nprerequisite_change_pr: %d\nentries:\n",
 		stackRegistryMarker, registry.GarageStack, registry.ProgramIssue, registry.Repository, registry.PrerequisiteChangePR)
@@ -40,7 +40,7 @@ func stackRegistryComment(registry *stackRegistry) ghComment {
 			entry.DirectPrerequisite.PullRequest, entry.DirectPrerequisite.Branch)
 	}
 	body.WriteString("```\n")
-	return ghComment{URL: "https://github.com/o/r/issues/192#issuecomment/1",
+	return workflowComment{URL: "https://github.com/o/r/issues/192#issuecomment/1",
 		Body: body.String(), AuthorAssociation: "OWNER"}
 }
 
@@ -58,12 +58,12 @@ func stackFeatureWithoutDeclarationBody(issue int) string {
 	return fmt.Sprintf("## Governing issue\n\nRefs #%d\n\n## Pull request kind\n\nimplementation\n", issue)
 }
 
-func stackTestMergedPR(number int, base, head, body, mergedAt string) ghStatusPR {
+func stackTestMergedPR(number int, base, head, body, mergedAt string) workflowChange {
 	at, err := time.Parse(time.RFC3339, mergedAt)
 	if err != nil {
 		panic(err)
 	}
-	return ghStatusPR{
+	return workflowChange{
 		Number: number, State: "MERGED", Merged: true, MergedAt: &at,
 		BaseRefName: base, HeadRefName: head, Body: body,
 		BaseRepository: stackTestRepository, HeadRepository: stackTestRepository,
@@ -72,52 +72,52 @@ func stackTestMergedPR(number int, base, head, body, mergedAt string) ghStatusPR
 
 const stackTestRepository = "bdonaldharris/builder-garage"
 
-func stackTestRepositoryName() *ghRepositoryName {
-	return &ghRepositoryName{NameWithOwner: stackTestRepository}
+func stackTestRepositoryName() *workflowRepository {
+	return &workflowRepository{NameWithOwner: stackTestRepository}
 }
 
-func stackTestOpenPR(number int, base, head, body string) ghStatusPR {
-	return ghStatusPR{Number: number, State: "OPEN", BaseRefName: base, HeadRefName: head, Body: body,
+func stackTestOpenPR(number int, base, head, body string) workflowChange {
+	return workflowChange{Number: number, State: "OPEN", BaseRefName: base, HeadRefName: head, Body: body,
 		BaseRepository: stackTestRepository, HeadRepository: stackTestRepository}
 }
 
-func stackTestRepositoryOrNil(name string) *ghRepositoryName {
+func stackTestRepositoryOrNil(name string) *workflowRepository {
 	if name == "" {
 		return nil
 	}
-	return &ghRepositoryName{NameWithOwner: name}
+	return &workflowRepository{NameWithOwner: name}
 }
 
 // stackTestSubject builds the status subject from the same facts a
 // predecessor read would return for that pull request.
-func stackTestSubject(pr ghStatusPR, others map[int]ghStatusPR, registry *stackRegistry) *ghItem {
-	prs := make(map[int]ghStatusPR, len(others))
+func stackTestSubject(pr workflowChange, others map[int]workflowChange, registry *stackRegistry) *workflowItem {
+	prs := make(map[int]workflowChange, len(others))
 	for number, other := range others {
 		if number != pr.Number {
 			prs[number] = other
 		}
 	}
-	return &ghItem{
-		Typename: "PullRequest", Number: pr.Number, State: pr.State, Merged: pr.Merged, MergedAt: pr.MergedAt,
+	return &workflowItem{
+		Kind: workflowChangeKind, Number: pr.Number, State: pr.State, Merged: pr.Merged, MergedAt: pr.MergedAt,
 		Body: pr.Body, BaseRefName: pr.BaseRefName, BaseRefOid: strings.Repeat("a", 40), HeadRefName: pr.HeadRefName,
 		BaseRepository: stackTestRepositoryOrNil(pr.BaseRepository),
 		HeadRepository: stackTestRepositoryOrNil(pr.HeadRepository),
 		RepositoryHost: "github.com", RepositoryIdentity: "bdonaldharris/builder-garage",
 		StackRegistryFetched:  true,
-		StackRegistryComments: []ghComment{stackRegistryComment(registry)},
+		StackRegistryComments: []workflowComment{stackRegistryComment(registry)},
 		StatusPRs:             prs,
 	}
 }
 
-func stackTestItem(body string, entry stackRegistryEntry) *ghItem {
-	return &ghItem{
-		Typename: "PullRequest", State: "OPEN", Body: body, BaseRefName: entry.DirectPrerequisite.Branch,
+func stackTestItem(body string, entry stackRegistryEntry) *workflowItem {
+	return &workflowItem{
+		Kind: workflowChangeKind, State: "OPEN", Body: body, BaseRefName: entry.DirectPrerequisite.Branch,
 		BaseRefOid: strings.Repeat("a", 40), HeadRefName: entry.Branch,
 		BaseRepository: stackTestRepositoryName(), HeadRepository: stackTestRepositoryName(),
 		RepositoryHost: "github.com", RepositoryIdentity: "bdonaldharris/builder-garage",
 		StackRegistryFetched:  true,
-		StackRegistryComments: []ghComment{stackRegistryComment(stackTestRegistry("bdonaldharris/builder-garage"))},
-		StatusPRs: map[int]ghStatusPR{
+		StackRegistryComments: []workflowComment{stackRegistryComment(stackTestRegistry("bdonaldharris/builder-garage"))},
+		StatusPRs: map[int]workflowChange{
 			700: stackTestMergedPR(700, "staging", "feature/196",
 				"## Governing issue\n\nRefs #196\n\n## Pull request kind\n\nimplementation\n",
 				"2026-01-01T09:00:00Z"),
@@ -165,18 +165,18 @@ func TestValidateStackRegistry(t *testing.T) {
 
 func TestLatestStackRegistryIsFailClosed(t *testing.T) {
 	valid := stackRegistryComment(stackTestRegistry("o/r"))
-	if got := latestStackRegistry([]ghComment{valid}); got.Registry == nil || got.URL != valid.URL {
+	if got := latestStackRegistry([]workflowComment{valid}); got.Registry == nil || got.URL != valid.URL {
 		t.Fatalf("latestStackRegistry = %+v, want valid record", got)
 	}
-	invalid := ghComment{URL: "https://github.com/o/r/issues/192#issuecomment/2",
+	invalid := workflowComment{URL: "https://github.com/o/r/issues/192#issuecomment/2",
 		Body: stackRegistryMarker + "\n\nno YAML block\n", AuthorAssociation: "OWNER"}
-	got := latestStackRegistry([]ghComment{valid, invalid})
+	got := latestStackRegistry([]workflowComment{valid, invalid})
 	if got.Registry != nil || got.URL != invalid.URL || !strings.Contains(got.Problem, "no fenced YAML") {
 		t.Fatalf("latest malformed record did not govern: %+v", got)
 	}
 	untrusted := invalid
 	untrusted.AuthorAssociation = "NONE"
-	if got := latestStackRegistry([]ghComment{untrusted}); got.Registry != nil || !strings.Contains(got.Problem, "no counted") {
+	if got := latestStackRegistry([]workflowComment{untrusted}); got.Registry != nil || !strings.Contains(got.Problem, "no counted") {
 		t.Fatalf("unassociated record counted: %+v", got)
 	}
 }
@@ -272,45 +272,45 @@ func TestValidateStackDependency(t *testing.T) {
 		t.Fatalf("retargeting after the direct prerequisite merged was rejected: %+v", got)
 	}
 
-	cases := map[string]func(*ghItem){
-		"registered issue cannot omit declaration for E1 target": func(item *ghItem) {
+	cases := map[string]func(*workflowItem){
+		"registered issue cannot omit declaration for E1 target": func(item *workflowItem) {
 			item.Body = stackFeatureWithoutDeclarationBody(entry.Issue)
 			item.BaseRefName = "staging"
 			item.HeadRefName = entry.Branch
 		},
-		"registered issue cannot omit declaration after retarget": func(item *ghItem) {
+		"registered issue cannot omit declaration after retarget": func(item *workflowItem) {
 			item.Body = stackFeatureWithoutDeclarationBody(entry.Issue)
 			item.BaseRefName = "staging"
 		},
-		"unregistered governing issue": func(item *ghItem) {
+		"unregistered governing issue": func(item *workflowItem) {
 			item.Body = stackDependencyBody(999, entry)
 		},
-		"missing prerequisite-change PR": func(item *ghItem) {
+		"missing prerequisite-change PR": func(item *workflowItem) {
 			delete(item.StatusPRs, 700)
 		},
-		"unmerged prerequisite-change PR": func(item *ghItem) {
+		"unmerged prerequisite-change PR": func(item *workflowItem) {
 			pr := item.StatusPRs[700]
 			pr.Merged = false
 			pr.State = "OPEN"
 			item.StatusPRs[700] = pr
 		},
-		"wrong registered head": func(item *ghItem) { item.HeadRefName = "gitlab-stack/wrong" },
-		"wrong target":          func(item *ghItem) { item.BaseRefName = "staging" },
-		"wrong declaration target": func(item *ghItem) {
+		"wrong registered head": func(item *workflowItem) { item.HeadRefName = "gitlab-stack/wrong" },
+		"wrong target":          func(item *workflowItem) { item.BaseRefName = "staging" },
+		"wrong declaration target": func(item *workflowItem) {
 			item.Body = strings.Replace(item.Body, "target_branch: gitlab-stack/issue-301", "target_branch: staging", 1)
 		},
-		"wrong prerequisite PR": func(item *ghItem) {
+		"wrong prerequisite PR": func(item *workflowItem) {
 			item.StatusPRs[701] = stackTestOpenPR(701, "staging", "wrong", "")
 		},
-		"wrong predecessor base": func(item *ghItem) {
+		"wrong predecessor base": func(item *workflowItem) {
 			item.StatusPRs[701] = stackTestOpenPR(701, "main", "gitlab-stack/issue-301",
 				stackFeaturePRBody(stackTestRegistry("bdonaldharris/builder-garage").Entries[0], "staging"))
 		},
-		"wrong repository": func(item *ghItem) {
-			item.StackRegistryComments = []ghComment{stackRegistryComment(stackTestRegistry("other/repo"))}
+		"wrong repository": func(item *workflowItem) {
+			item.StackRegistryComments = []workflowComment{stackRegistryComment(stackTestRegistry("other/repo"))}
 		},
-		"missing registry": func(item *ghItem) { item.StackRegistryFetched = false },
-		"not declared implementation": func(item *ghItem) {
+		"missing registry": func(item *workflowItem) { item.StackRegistryFetched = false },
+		"not declared implementation": func(item *workflowItem) {
 			item.Body = strings.Replace(item.Body, "implementation", "hotfix", 1)
 		},
 	}
@@ -332,7 +332,7 @@ func TestValidateStackDependency(t *testing.T) {
 		t.Fatalf("undeclared E1 PR with unreadable registry was not reported as unknown: %+v", got)
 	}
 	malformed := stackTestItem(stackFeatureWithoutDeclarationBody(entry.Issue), entry)
-	malformed.StackRegistryComments = []ghComment{{
+	malformed.StackRegistryComments = []workflowComment{{
 		Body: stackRegistryMarker + "\n\nmalformed registry\n", AuthorAssociation: "OWNER",
 	}}
 	got = validateStackDeclaration(malformed, "github.com", "bdonaldharris/builder-garage", "staging", "main", nil)
@@ -344,7 +344,7 @@ func TestValidateStackDependency(t *testing.T) {
 	unrelatedRepo.RepositoryHost = "github.com"
 	unrelatedRepo.RepositoryIdentity = "other/repo"
 	unrelatedRepo.HeadRefName = entry.Branch
-	unrelatedRepo.StackRegistryComments = []ghComment{stackRegistryComment(stackTestRegistry("other/repo"))}
+	unrelatedRepo.StackRegistryComments = []workflowComment{stackRegistryComment(stackTestRegistry("other/repo"))}
 	got = validateStackDeclaration(unrelatedRepo, "github.com", "other/repo", "staging", "main", nil)
 	if got.Present || got.Problem != "" {
 		t.Fatalf("another repository's registry changed ordinary PR eligibility: %+v", got)
@@ -359,7 +359,7 @@ func TestStackMembershipBoundaries(t *testing.T) {
 		registry.Entries[1].Branch = "feature/custom-stack-302"
 		registry.Entries[2].DirectPrerequisite.Branch = registry.Entries[1].Branch
 		item := stackTestItem(stackFeatureWithoutDeclarationBody(entry.Issue), entry)
-		item.StackRegistryComments = []ghComment{stackRegistryComment(registry)}
+		item.StackRegistryComments = []workflowComment{stackRegistryComment(registry)}
 		item.HeadRefName = registry.Entries[1].Branch
 		item.BaseRefName = "staging"
 		got := validateStackDeclaration(item, "github.com", "bdonaldharris/builder-garage", "staging", "main", nil)
@@ -374,7 +374,7 @@ func TestStackMembershipBoundaries(t *testing.T) {
 		registry.Entries[2].DirectPrerequisite.Branch = registry.Entries[1].Branch
 		entry := registry.Entries[1]
 		item := stackTestItem(stackDependencyBody(entry.Issue, entry), entry)
-		item.StackRegistryComments = []ghComment{stackRegistryComment(registry)}
+		item.StackRegistryComments = []workflowComment{stackRegistryComment(registry)}
 		item.HeadRefName = entry.Branch
 		item.BaseRefName = entry.DirectPrerequisite.Branch
 		item.StatusPRs[701] = stackTestOpenPR(701, "staging", registry.Entries[0].Branch,
@@ -406,7 +406,7 @@ func TestStackMembershipBoundaries(t *testing.T) {
 				case "unreadable":
 					item.StackRegistryFetched = false
 				case "malformed":
-					item.StackRegistryComments = []ghComment{{
+					item.StackRegistryComments = []workflowComment{{
 						Body: stackRegistryMarker + "\n\nmalformed registry\n", AuthorAssociation: "OWNER",
 					}}
 				}
@@ -452,9 +452,9 @@ func TestStackMembershipBoundaries(t *testing.T) {
 func TestStackPredecessorChainValidatesRelevantMergeEvidence(t *testing.T) {
 	registry := stackTestRegistry("bdonaldharris/builder-garage")
 	entry := registry.Entries[2]
-	newItem := func() *ghItem {
+	newItem := func() *workflowItem {
 		item := stackTestItem(stackDependencyBody(entry.Issue, entry), entry)
-		item.StackRegistryComments = []ghComment{stackRegistryComment(registry)}
+		item.StackRegistryComments = []workflowComment{stackRegistryComment(registry)}
 		item.StatusPRs[701] = stackTestOpenPR(701, "staging", registry.Entries[0].Branch,
 			stackFeaturePRBody(registry.Entries[0], "staging"))
 		item.StatusPRs[702] = stackTestOpenPR(702, registry.Entries[0].Branch, registry.Entries[1].Branch,
@@ -512,7 +512,7 @@ func TestStackPredecessorChainValidatesRelevantMergeEvidence(t *testing.T) {
 // the PR itself, status on a dependent feature PR, and maintenance.
 type stackHistory struct {
 	name     string
-	pr1, pr2 ghStatusPR
+	pr1, pr2 workflowChange
 	// pr1Valid and pr2Valid are each PR's own feature-rule result.
 	pr1Valid, pr2Valid bool
 	// pr3Target is the target permitted now for the third feature PR.
@@ -530,9 +530,9 @@ func TestStackFeatureHistoriesAcrossConsumptionPaths(t *testing.T) {
 	body1 := stackFeaturePRBody(e1, "staging")
 	body2 := func(target string) string { return stackFeaturePRBody(e2, target) }
 	open1 := stackTestOpenPR(701, "staging", b1, body1)
-	merged1 := func(at string) ghStatusPR { return stackTestMergedPR(701, "staging", b1, body1, at) }
-	open2 := func(base, declared string) ghStatusPR { return stackTestOpenPR(702, base, b2, body2(declared)) }
-	merged2 := func(base, declared, at string) ghStatusPR {
+	merged1 := func(at string) workflowChange { return stackTestMergedPR(701, "staging", b1, body1, at) }
+	open2 := func(base, declared string) workflowChange { return stackTestOpenPR(702, base, b2, body2(declared)) }
+	merged2 := func(base, declared, at string) workflowChange {
 		return stackTestMergedPR(702, base, b2, body2(declared), at)
 	}
 
@@ -556,18 +556,18 @@ func TestStackFeatureHistoriesAcrossConsumptionPaths(t *testing.T) {
 			open2("staging", "staging"), false, true, ""},
 	}
 	prerequisite := stackTestItem("", e1).StatusPRs[700]
-	validate := func(item *ghItem) stackValidation {
+	validate := func(item *workflowItem) stackValidation {
 		return validateStackDeclaration(item, host, repository, "staging", "main", nil)
 	}
 	for _, history := range histories {
 		t.Run(history.name, func(t *testing.T) {
-			prs := map[int]ghStatusPR{700: prerequisite, 701: history.pr1, 702: history.pr2}
+			prs := map[int]workflowChange{700: prerequisite, 701: history.pr1, 702: history.pr2}
 			chainValid := history.pr1Valid && history.pr2Valid
 
 			// One rule: the same facts get the same feature result whether they
 			// arrive as a predecessor read or as the status subject.
 			asPredecessor := newStackChain(prs, registry, "staging")
-			for sequence, pr := range map[int]ghStatusPR{1: history.pr1, 2: history.pr2} {
+			for sequence, pr := range map[int]workflowChange{1: history.pr1, 2: history.pr2} {
 				asSubject := newStackChain(prs, registry, "staging")
 				asSubject.features[sequence] = stackFactsFromItem(stackTestSubject(pr, prs, registry))
 				if got, want := asSubject.featureProblem(sequence), asPredecessor.featureProblem(sequence); got != want {
@@ -620,21 +620,21 @@ func TestStackBranchIdentityRequiresRegistryRepository(t *testing.T) {
 	registry := stackTestRegistry(stackTestRepository)
 	e1, e2, e3 := registry.Entries[0], registry.Entries[1], registry.Entries[2]
 	b1, b2 := e1.Branch, e2.Branch
-	validate := func(item *ghItem) stackValidation {
+	validate := func(item *workflowItem) stackValidation {
 		return validateStackDeclaration(item, "github.com", stackTestRepository, "staging", "main", nil)
 	}
-	newPRs := func() map[int]ghStatusPR {
-		return map[int]ghStatusPR{
+	newPRs := func() map[int]workflowChange {
+		return map[int]workflowChange{
 			700: stackTestItem("", e1).StatusPRs[700],
 			701: stackTestOpenPR(701, "staging", b1, stackFeaturePRBody(e1, "staging")),
 			702: stackTestOpenPR(702, b1, b2, stackFeaturePRBody(e2, b1)),
 		}
 	}
-	third := func(prs map[int]ghStatusPR, target string) *ghItem {
+	third := func(prs map[int]workflowChange, target string) *workflowItem {
 		return stackTestSubject(stackTestOpenPR(703, target, e3.Branch, stackFeaturePRBody(e3, target)), prs, registry)
 	}
-	maintenance := func(prs map[int]ghStatusPR) map[string]*ghItem {
-		items := make(map[string]*ghItem)
+	maintenance := func(prs map[int]workflowChange) map[string]*workflowItem {
+		items := make(map[string]*workflowItem)
 		for name, body := range map[string]string{
 			"E1 synchronization": stackMaintenanceBody(e3.Issue, "synchronize", "staging", 0, e3.Branch, ""),
 			"propagation":        stackMaintenanceBody(e3.Issue, "synchronize", b2, 702, e3.Branch, ""),
@@ -739,16 +739,16 @@ func TestStackBranchIdentityRequiresRegistryRepository(t *testing.T) {
 // lives. A fork head, or a deleted fork, changes nothing in its report.
 func TestOrdinaryForkPullRequestsAreUnchangedByStackIdentity(t *testing.T) {
 	entry := stackTestRegistry(stackTestRepository).Entries[1]
-	newItem := func(head *ghRepositoryName) *ghItem {
+	newItem := func(head *workflowRepository) *workflowItem {
 		item := stackTestItem(stackFeatureWithoutDeclarationBody(999), entry)
 		item.BaseRefName = "staging"
 		item.HeadRefName = "feature/ordinary"
 		item.HeadRepository = head
-		item.BodyIssues = []ghClosingIssue{{Number: 999}}
+		item.BodyIssues = []workflowIssue{{Number: 999}}
 		return item
 	}
 	want := renderItem(t, newItem(stackTestRepositoryName()), stagingConfig(), 2)
-	for name, head := range map[string]*ghRepositoryName{
+	for name, head := range map[string]*workflowRepository{
 		"fork":         {NameWithOwner: "someone/builder-garage"},
 		"deleted fork": nil,
 	} {
@@ -764,7 +764,7 @@ func TestOrdinaryForkPullRequestsAreUnchangedByStackIdentity(t *testing.T) {
 		})
 	}
 	t.Run("unknown registry", func(t *testing.T) {
-		item := newItem(&ghRepositoryName{NameWithOwner: "someone/builder-garage"})
+		item := newItem(&workflowRepository{NameWithOwner: "someone/builder-garage"})
 		item.StackRegistryFetched = false
 		sameRepository := newItem(stackTestRepositoryName())
 		sameRepository.StackRegistryFetched = false
@@ -773,7 +773,7 @@ func TestOrdinaryForkPullRequestsAreUnchangedByStackIdentity(t *testing.T) {
 		}
 	})
 	t.Run("unrelated repository", func(t *testing.T) {
-		item := newItem(&ghRepositoryName{NameWithOwner: "someone/other"})
+		item := newItem(&workflowRepository{NameWithOwner: "someone/other"})
 		got := validateStackDeclaration(item, "github.com", "other/repo", "staging", "main", nil)
 		if got.Present || got.Unknown || got.Problem != "" {
 			t.Fatalf("fork PR in an unrelated repository was drawn into stack validation: %+v", got)
@@ -794,14 +794,14 @@ func TestStatusQueriesReadRefOwners(t *testing.T) {
 	if err := json.Unmarshal([]byte(`{"__typename":"PullRequest","headRefName":"b","headRepository":{"nameWithOwner":"someone/fork"},"baseRepository":{"nameWithOwner":"o/r"}}`), &item); err != nil {
 		t.Fatal(err)
 	}
-	facts := stackFactsFromItem(&item)
+	facts := stackFactsFromItem(normalizeGitHubItem(&item))
 	if facts.HeadRepository != "someone/fork" || facts.BaseRepository != "o/r" {
 		t.Errorf("subject ref owners were not decoded: %+v", facts)
 	}
 	if err := json.Unmarshal([]byte(`{"__typename":"PullRequest","headRefName":"b","headRepository":null}`), &item); err != nil {
 		t.Fatal(err)
 	}
-	if facts := stackFactsFromItem(&item); facts.HeadRepository != "" {
+	if facts := stackFactsFromItem(normalizeGitHubItem(&item)); facts.HeadRepository != "" {
 		t.Errorf("a deleted fork decoded as %q, want no owner", facts.HeadRepository)
 	}
 }
@@ -814,32 +814,32 @@ func TestStackFeatureEvidenceThatCannotBeEstablished(t *testing.T) {
 	e1, e2, e3 := registry.Entries[0], registry.Entries[1], registry.Entries[2]
 	prerequisite := stackTestItem("", e1).StatusPRs[700]
 	valid1 := stackTestMergedPR(701, "staging", e1.Branch, stackFeaturePRBody(e1, "staging"), jan2)
-	cases := map[string]func(prs map[int]ghStatusPR){
-		"predecessor not read": func(prs map[int]ghStatusPR) { delete(prs, 702) },
-		"predecessor closed without merging": func(prs map[int]ghStatusPR) {
+	cases := map[string]func(prs map[int]workflowChange){
+		"predecessor not read": func(prs map[int]workflowChange) { delete(prs, 702) },
+		"predecessor closed without merging": func(prs map[int]workflowChange) {
 			pr := prs[702]
 			pr.State = "CLOSED"
 			prs[702] = pr
 		},
-		"merged predecessor without a merge time": func(prs map[int]ghStatusPR) {
+		"merged predecessor without a merge time": func(prs map[int]workflowChange) {
 			pr := stackTestMergedPR(702, "staging", e2.Branch, stackFeaturePRBody(e2, "staging"), jan2)
 			pr.MergedAt = nil
 			prs[702] = pr
 		},
-		"equal merge times": func(prs map[int]ghStatusPR) {
+		"equal merge times": func(prs map[int]workflowChange) {
 			prs[702] = stackTestMergedPR(702, "staging", e2.Branch, stackFeaturePRBody(e2, "staging"), jan2)
 		},
-		"merge time equal to the prerequisite change": func(prs map[int]ghStatusPR) {
+		"merge time equal to the prerequisite change": func(prs map[int]workflowChange) {
 			at := *prerequisite.MergedAt
 			pr := prs[701]
 			pr.MergedAt = &at
 			prs[701] = pr
 		},
-		"prerequisite change not read": func(prs map[int]ghStatusPR) { delete(prs, 700) },
+		"prerequisite change not read": func(prs map[int]workflowChange) { delete(prs, 700) },
 	}
 	for name, change := range cases {
 		t.Run(name, func(t *testing.T) {
-			prs := map[int]ghStatusPR{700: prerequisite, 701: valid1,
+			prs := map[int]workflowChange{700: prerequisite, 701: valid1,
 				702: stackTestOpenPR(702, "staging", e2.Branch, stackFeaturePRBody(e2, "staging"))}
 			change(prs)
 			for _, target := range []string{"staging", e1.Branch, e2.Branch} {
@@ -908,27 +908,27 @@ func TestValidateStackCorrectionRequiresIssueCorrectionAndApproval(t *testing.T)
 	artifact := "method: garage-artifact-v1\n    object_format: sha1\n    stage: working-tree\n    integration_ref: " +
 		strings.Repeat("a", 40) + "\n    base: " + strings.Repeat("b", 40) + "\n    tree: " +
 		strings.Repeat("c", 40) + "\n    changeset: sha256:" + strings.Repeat("d", 64) + "\n    paths: 1\n"
-	correction := ghComment{URL: correctionURL, AuthorAssociation: "COLLABORATOR",
+	correction := workflowComment{URL: correctionURL, AuthorAssociation: "COLLABORATOR",
 		Body: markerCorrection + "\n\n```yaml\ngarage_evidence: 1\nrecord: correction\nissue: 302\ncheckable:\n  artifact:\n    " + artifact + "asserted:\n  status: ready-for-re-review\n```\n"}
-	review := ghComment{URL: reviewURL, AuthorAssociation: "MEMBER",
+	review := workflowComment{URL: reviewURL, AuthorAssociation: "MEMBER",
 		Body: markerReview + "\n\n```yaml\ngarage_evidence: 1\nrecord: review\nissue: 302\nresponds_to: \"" + correctionURL + "\"\ncheckable:\n  artifact:\n    " + artifact + "  matches_responds_to: true\nasserted:\n  answers: {acceptance_criteria_met: true, new_regression: false, works: true}\n  verdict: approved\n```\n"}
-	issue := ghClosingIssue{Number: 302, Comments: ghComments{Nodes: []ghComment{correction, review}}}
-	if problem := validateStackCorrection([]ghClosingIssue{issue}, 302, correctionURL, reviewURL); problem != "" {
+	issue := workflowIssue{Number: 302, Comments: workflowComments{Nodes: []workflowComment{correction, review}}}
+	if problem := validateStackCorrection([]workflowIssue{issue}, 302, correctionURL, reviewURL); problem != "" {
 		t.Fatalf("valid correction evidence rejected: %s", problem)
 	}
-	if problem := validateStackCorrection([]ghClosingIssue{issue}, 302, correctionURL, "https://github.com/o/r/issues/302#issuecomment/12"); problem == "" {
+	if problem := validateStackCorrection([]workflowIssue{issue}, 302, correctionURL, "https://github.com/o/r/issues/302#issuecomment/12"); problem == "" {
 		t.Fatal("missing disposition accepted")
 	}
-	if problem := validateStackCorrection([]ghClosingIssue{issue}, 301, correctionURL, reviewURL); problem == "" {
+	if problem := validateStackCorrection([]workflowIssue{issue}, 301, correctionURL, reviewURL); problem == "" {
 		t.Fatal("correction evidence from a different stack entry was accepted")
 	}
 	mismatchedIssue := issue
-	mismatchedIssue.Comments.Nodes = append([]ghComment(nil), issue.Comments.Nodes...)
+	mismatchedIssue.Comments.Nodes = append([]workflowComment(nil), issue.Comments.Nodes...)
 	mismatchedIssue.Comments.Nodes[1].Body = strings.Replace(
 		mismatchedIssue.Comments.Nodes[1].Body,
 		"changeset: sha256:"+strings.Repeat("d", 64),
 		"changeset: sha256:"+strings.Repeat("e", 64), 1)
-	if problem := validateStackCorrection([]ghClosingIssue{mismatchedIssue}, 302, correctionURL, reviewURL); problem == "" {
+	if problem := validateStackCorrection([]workflowIssue{mismatchedIssue}, 302, correctionURL, reviewURL); problem == "" {
 		t.Fatal("a review of a different correction artifact was accepted")
 	}
 
@@ -937,12 +937,12 @@ func TestValidateStackCorrectionRequiresIssueCorrectionAndApproval(t *testing.T)
 		"correction_record: \""+correctionURL+"\"\nagent2_disposition: \""+reviewURL+"\"\n"), entry)
 	item.BaseRefName = entry.Branch
 	item.HeadRefName = "maintenance/stack-192/302-correction"
-	if got := validateStackDeclaration(item, "github.com", "bdonaldharris/builder-garage", "staging", "main", []ghClosingIssue{issue}); !got.Valid {
+	if got := validateStackDeclaration(item, "github.com", "bdonaldharris/builder-garage", "staging", "main", []workflowIssue{issue}); !got.Valid {
 		t.Fatalf("valid correction maintenance was rejected: %+v", got)
 	}
 	item.Body = stackMaintenanceBody(entry.Issue, "correction", entry.Branch, 0, entry.Branch,
 		"correction_record: \""+correctionURL+"\"\nagent2_disposition: \"https://github.com/o/r/issues/302#issuecomment-12\"\n")
-	if got := validateStackDeclaration(item, "github.com", "bdonaldharris/builder-garage", "staging", "main", []ghClosingIssue{issue}); got.Valid {
+	if got := validateStackDeclaration(item, "github.com", "bdonaldharris/builder-garage", "staging", "main", []workflowIssue{issue}); got.Valid {
 		t.Fatalf("correction maintenance without applicable approval was accepted: %+v", got)
 	}
 }
@@ -970,9 +970,9 @@ func TestStackDeclarationReadsOnlyRequiredReferences(t *testing.T) {
 			t.Errorf("full predecessor chain %v does not include PR #%d", got, want)
 		}
 	}
-	ordinary := &ghItem{Typename: "PullRequest", Body: stackFeatureWithoutDeclarationBody(entry.Issue)}
+	ordinary := &workflowItem{Kind: workflowChangeKind, Body: stackFeatureWithoutDeclarationBody(entry.Issue)}
 	ordinary.StackRegistryFetched = true
-	ordinary.StackRegistryComments = []ghComment{stackRegistryComment(stackTestRegistry("bdonaldharris/builder-garage"))}
+	ordinary.StackRegistryComments = []workflowComment{stackRegistryComment(stackTestRegistry("bdonaldharris/builder-garage"))}
 	got = statusReferencesToFetch(ordinary, "github.com", "bdonaldharris/builder-garage", "staging", "main")
 	for _, want := range []int{entry.Issue, 700, 701} {
 		if !containsInt(got, want) {
@@ -1078,7 +1078,7 @@ func TestStatusValidStackKeepsImplementationGatesAndRetargetingInvalidatesEquiva
 	registry := stackTestRegistry("o/r")
 	entry := registry.Entries[1]
 	item := stackTestItem(stackDependencyBody(entry.Issue, entry), entry)
-	item.BodyIssues = []ghClosingIssue{{Number: entry.Issue}}
+	item.BodyIssues = []workflowIssue{{Number: entry.Issue}}
 	text := renderItem(t, item, stagingConfig(), 2)
 	assertContains(t, text,
 		"stack dependency declaration matches registry entry",
@@ -1090,7 +1090,7 @@ func TestStatusValidStackKeepsImplementationGatesAndRetargetingInvalidatesEquiva
 	head := strings.Repeat("c", 40)
 	item.BaseRefOid = strings.Repeat("b", 40)
 	record := workflowRecord{
-		Comment: ghComment{URL: "https://github.com/o/r/pull/900#issuecomment/1"},
+		Comment: workflowComment{URL: "https://github.com/o/r/pull/900#issuecomment/1"},
 		Kind:    recordEvidence,
 		Counted: true,
 		Block: &evidenceBlock{
@@ -1113,7 +1113,7 @@ func TestStatusValidStackKeepsImplementationGatesAndRetargetingInvalidatesEquiva
 	}
 	item.BaseRefOid = strings.Repeat("a", 40)
 	approval := workflowRecord{
-		Comment: ghComment{URL: "https://github.com/o/r/issues/302#issuecomment/2"},
+		Comment: workflowComment{URL: "https://github.com/o/r/issues/302#issuecomment/2"},
 		Kind:    recordEvidence,
 		Counted: true,
 		Block: &evidenceBlock{

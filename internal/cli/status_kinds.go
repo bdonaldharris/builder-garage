@@ -130,7 +130,7 @@ type designationBlock struct {
 // its author's association counts, its block is well formed, and its issue
 // and release branch match. No record, or a latest "withdrawn", means the
 // issue is not designated.
-func hotfixDesignation(comments []ghComment, issue int, releaseBranch string) (bool, string) {
+func hotfixDesignation(comments []workflowComment, issue int, releaseBranch string) (bool, string) {
 	designated, url := false, ""
 	for _, c := range comments {
 		if !contains(countedAssociations, c.AuthorAssociation) {
@@ -193,7 +193,7 @@ func (k prKind) relaxed() bool {
 // and its base and head. integration is the configured E1; release is the
 // configured release branch (E11), or "" when none is configured. governing
 // holds the governing issues that were read, for the hotfix designation.
-func classifyPullRequest(it *ghItem, integration, release string, governing []ghClosingIssue) prKind {
+func classifyPullRequest(it *workflowItem, integration, release string, governing []workflowIssue) prKind {
 	base, head := it.BaseRefName, it.HeadRefName
 	declared := declaredKind(it.Body)
 	if declared != "" {
@@ -278,7 +278,7 @@ func topologyProblem(kind, base, head, integration, release string) string {
 
 // designationProblem returns why a hotfix's governing issues are not all
 // hotfix-designated, or "".
-func designationProblem(governing []ghClosingIssue, release string) string {
+func designationProblem(governing []workflowIssue, release string) string {
 	if len(governing) == 0 {
 		return "a hotfix needs a hotfix-designated governing issue, and none was read"
 	}
@@ -296,13 +296,13 @@ func designationProblem(governing []ghClosingIssue, release string) string {
 // the default branch, where closing keywords create no link, or when the
 // pull request closes no issue. Numbers beyond maxGoverningIssues are noted
 // on the item and not fetched.
-func bodyIssuesToFetch(it *ghItem) []int {
+func bodyIssuesToFetch(it *workflowItem) []int {
 	if !it.isPullRequest() {
 		return nil
 	}
 	closing := map[int]bool{}
-	if it.ClosingIssuesReferences != nil {
-		for _, issue := range it.ClosingIssuesReferences.Nodes {
+	if it.ClosingIssues != nil {
+		for _, issue := range it.ClosingIssues.Nodes {
 			closing[issue.Number] = true
 		}
 	}

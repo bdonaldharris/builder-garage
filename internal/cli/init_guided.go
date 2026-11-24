@@ -889,6 +889,10 @@ func describeConfiguration(cfg projectConfig) []summaryLine {
 		lines = append(lines, summaryLine{label: s.label, value: value, name: s.options[0].name})
 	}
 
+	if pc.Forge != nil {
+		f := effectiveForge(*pc.Forge)
+		add("project.forge", f.Provider+" "+f.Endpoint+"/"+f.Project+"; API "+f.APIBaseURL+"; cross-project targets "+strconv.FormatBool(f.AllowCrossProjectTargets))
+	}
 	if pc.IntegrationBranch != nil {
 		add("project.integration_branch", *pc.IntegrationBranch)
 	} else {

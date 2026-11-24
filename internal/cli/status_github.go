@@ -243,21 +243,6 @@ type ghClosingIssue struct {
 	} `json:"timelineItems"`
 }
 
-type ghStatusPR struct {
-	Number      int
-	URL         string
-	State       string
-	Merged      bool
-	MergedAt    *time.Time
-	Body        string
-	BaseRefName string
-	HeadRefName string
-	// The repositories that own the base and head refs, as "owner/name".
-	// Empty when GitHub did not return one, for example a deleted fork.
-	BaseRepository string
-	HeadRepository string
-}
-
 // ghRepositoryName is the repository that owns one of a pull request's refs.
 // A branch name alone does not identify a branch: a fork may hold a branch
 // with the same name.
@@ -344,18 +329,11 @@ type ghItem struct {
 	} `json:"closingIssuesReferences"`
 
 	// Set by status, not decoded from the item: the repository's default
-	// branch, and the governing issues the follow-up read fetched.
-	DefaultBranch         string             `json:"-"`
-	RepositoryHost        string             `json:"-"`
-	BodyIssues            []ghClosingIssue   `json:"-"`
-	BodyIssueNotes        []string           `json:"-"`
-	RepositoryIdentity    string             `json:"-"`
-	StackRegistryFetched  bool               `json:"-"`
-	StackRegistryComments []ghComment        `json:"-"`
-	StatusPRs             map[int]ghStatusPR `json:"-"`
+	// branch and the stack-registry read from the same primary response.
+	DefaultBranch         string      `json:"-"`
+	StackRegistryFetched  bool        `json:"-"`
+	StackRegistryComments []ghComment `json:"-"`
 }
-
-func (it *ghItem) isPullRequest() bool { return it.Typename == "PullRequest" }
 
 type ghResponse struct {
 	Data *struct {
@@ -379,7 +357,7 @@ type ghResponse struct {
 
 // fetchStatusItem makes the invocation's primary GitHub read. A registry-only
 // error is retained as unknown membership; other read failures are errors.
-func fetchStatusItem(ctx context.Context, gh ghRunner, repo ghRepository, number int) (*ghItem, error) {
+func fetchStatusItem(ctx context.Context, gh ghRunner, repo ghRepository, number int) (*workflowItem, error) {
 	ctx, cancel := context.WithTimeout(ctx, statusGHTimeout)
 	defer cancel()
 
@@ -428,12 +406,12 @@ func fetchStatusItem(ctx context.Context, gh ghRunner, repo ghRepository, number
 			item.StackRegistryComments = resp.Data.Repository.StackRegistry.Comments.Nodes
 		}
 	}
-	return item, nil
+	return normalizeGitHubItem(item), nil
 }
 
 // fetchStatusReferences makes the follow-up read for governing issue comments
 // and the registered predecessor pull-request chain.
-func fetchStatusReferences(ctx context.Context, gh ghRunner, repo ghRepository, numbers []int, expectedPRs map[int]bool) ([]ghClosingIssue, map[int]ghStatusPR, []string, error) {
+func fetchStatusReferences(ctx context.Context, gh ghRunner, repo ghRepository, numbers []int, expectedPRs map[int]bool) ([]workflowIssue, map[int]workflowChange, []string, error) {
 	ctx, cancel := context.WithTimeout(ctx, statusGHTimeout)
 	defer cancel()
 
@@ -488,9 +466,9 @@ func fetchStatusReferences(ctx context.Context, gh ghRunner, repo ghRepository, 
 	if resp.Data == nil || resp.Data.Repository == nil {
 		return nil, nil, nil, ghUnavailable{"GitHub returned no repository data"}
 	}
-	var issues []ghClosingIssue
-	prs := make(map[int]ghStatusPR)
-	mentioned := make(map[int]ghStatusPR)
+	var issues []workflowIssue
+	prs := make(map[int]workflowChange)
+	mentioned := make(map[int]workflowChange)
 	var notes []string
 	for i, n := range numbers {
 		got := resp.Data.Repository[fmt.Sprintf("i%d", i)]
@@ -498,7 +476,7 @@ func fetchStatusReferences(ctx context.Context, gh ghRunner, repo ghRepository, 
 		case got == nil:
 			notes = append(notes, fmt.Sprintf("#%d names no issue in this repository", n))
 		case got.Typename != "Issue":
-			prs[n] = ghStatusPR{
+			prs[n] = workflowChange{
 				Number: got.Number, URL: got.URL, State: got.State, Merged: got.Merged,
 				MergedAt: got.MergedAt, Body: got.Body, BaseRefName: got.BaseRefName, HeadRefName: got.HeadRefName,
 				BaseRepository: got.BaseRepository.name(), HeadRepository: got.HeadRepository.name(),
@@ -507,9 +485,9 @@ func fetchStatusReferences(ctx context.Context, gh ghRunner, repo ghRepository, 
 				notes = append(notes, fmt.Sprintf("#%d is a pull request, not an issue", n))
 			}
 		default:
-			issue := ghClosingIssue{
-				Number: got.Number, URL: got.URL, State: got.State, Comments: got.Comments,
-				TimelineItems: got.TimelineItems,
+			issue := workflowIssue{
+				Number: got.Number, URL: got.URL, State: got.State, Comments: normalizeGitHubComments(got.Comments),
+				References: normalizeGitHubReferences(got.TimelineItems),
 			}
 			issues = append(issues, issue)
 			if got.TimelineItems != nil {
@@ -517,7 +495,7 @@ func fetchStatusReferences(ctx context.Context, gh ghRunner, repo ghRepository, 
 					if ref.Source == nil || ref.Source.Typename != "PullRequest" || ref.Source.Number < 1 || ref.IsCrossRepository {
 						continue
 					}
-					mentioned[ref.Source.Number] = ghStatusPR{
+					mentioned[ref.Source.Number] = workflowChange{
 						Number: ref.Source.Number, URL: ref.Source.URL, State: ref.Source.State,
 						Merged: ref.Source.Merged, MergedAt: ref.Source.MergedAt, Body: ref.Source.Body,
 						BaseRefName: ref.Source.BaseRefName, HeadRefName: ref.Source.HeadRefName,

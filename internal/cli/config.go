@@ -18,7 +18,8 @@ import (
 // The project configuration schema. Version 1 recorded only the schema
 // version. Version 2 adds the "project" section, which holds a project's
 // choices at the extension points declared in docs/extension-points.md, and
-// the "tooling" section, documented in docs/tooling-configuration.md.
+// the "tooling" section, documented in docs/tooling-configuration.md. Version 3
+// adds opt-in forge identity. Version 2 without forge remains supported.
 
 // projectConfig is the content of .garage/config.yaml. Optional settings are
 // pointers so that an omitted setting, to which the canonical default applies,
@@ -31,6 +32,7 @@ type projectConfig struct {
 
 // projectChoices holds the extension points E1 to E11.
 type projectChoices struct {
+	Forge                *forgeConfig       `yaml:"forge,omitempty"`
 	IntegrationBranch    *string            `yaml:"integration_branch,omitempty"`     // E1
 	PRReviewTriggers     *[]namedCondition  `yaml:"pr_review_triggers,omitempty"`     // E2
 	AutomatedReviewer    *automatedReviewer `yaml:"automated_reviewer,omitempty"`     // E3
@@ -217,18 +219,27 @@ func validateConfig(cfg projectConfig) configProblems {
 	add := func(format string, args ...any) { p = append(p, fmt.Sprintf(format, args...)) }
 
 	switch cfg.SchemaVersion {
-	case configSchemaVersion:
+	case 2, configSchemaVersion:
 	case 1:
 		add("schema_version is 1, which records no project choices; run \"garage init\" to upgrade it to %d", configSchemaVersion)
 		return p
 	default:
-		add("schema_version must be %d, not %d", configSchemaVersion, cfg.SchemaVersion)
+		add("schema_version must be 2 or %d, not %d", configSchemaVersion, cfg.SchemaVersion)
 		return p
 	}
 
 	pc := cfg.Project
 	if pc == nil {
 		pc = &projectChoices{}
+	}
+
+	if pc.Forge != nil {
+		if cfg.SchemaVersion < 3 {
+			add("project.forge requires schema_version 3")
+		}
+		if err := validateForge(*pc.Forge); err != nil {
+			add("project.forge: %v", err)
+		}
 	}
 
 	if pc.IntegrationBranch != nil {

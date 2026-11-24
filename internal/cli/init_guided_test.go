@@ -213,14 +213,14 @@ project:
 		if err != nil {
 			t.Fatalf("unexpected error: %v", err)
 		}
-		if result.Action != initUpdated || len(ask.answers) != 0 {
+		if result.Action != initUpgraded || len(ask.answers) != 0 {
 			t.Fatalf("action = %v, unused answers %q", result.Action, ask.answers)
 		}
 		all := ask.transcript()
 		if strings.Contains(all, "Integration branch\nWhich") || strings.Contains(all, "Small corrections\nMay") {
 			t.Error("an upgrade asked about an optional choice")
 		}
-		if !strings.Contains(all, "will add to .garage/config.yaml: change acceptor") {
+		if !strings.Contains(all, "from schema version 2 to 3, adding: change acceptor") {
 			t.Errorf("the confirmation does not say what will be added:\n%s", all)
 		}
 		cfg := mustLoadValid(t, dir)

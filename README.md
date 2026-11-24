@@ -95,12 +95,14 @@ garage history list --format jsonl   # one JSON object per line, for scripts
 
 ### Workflow status
 
-`garage status 48` shows the workflow status of issue or pull request #48 in the repository's GitHub repository, including closed and merged ones:
+`garage status 48` shows the workflow status of issue or pull request #48 in the repository's GitHub repository, including closed and merged ones. Legacy `garage status '#48'` remains supported; explicit forms are `garage status issue 48`, `garage status pr 48`, and canonical HTTPS issue/PR URLs. An explicit kind must match the actual artifact, and URL host/project checks apply before access. [Schema-v3 forge configuration](docs/configuration.md#forge-identity-schema-3) optionally selects identity; existing schema-v2 GitHub projects continue unchanged. GitLab configuration is preparatory: its observation adapter and complete support are not available in this slice.
+
+Status behavior:
 
 - **GitHub is the authority.** Status reads GitHub through the [`gh`](https://cli.github.com/) command, in one read-only query, plus at most one follow-up query when a pull request's governing issues must be read separately (below; [#137 decision](https://github.com/bdonaldharris/builder-garage/issues/137#issuecomment-6992337101)). It writes nothing. Garage never stores a token. It never polls or waits, and it never assigns, invokes, or advances an agent. The next eligible action it shows is information only.
 - **Evidence, labeled.** Each line names its source and basis. A fact read from GitHub, or a comparison of recorded values, is *checked*. A verdict or a claim of separate execution contexts is *asserted*. A pull request head's [artifact identity](docs/review-evidence.md) is recomputed only when the commit is already local. Nothing is fetched. In a partial clone, where git fetches missing objects on demand, status does not recompute and says so.
 - **Whose records count.** A workflow record counts only when its author's GitHub association is owner, member, or collaborator. A record edited after posting is flagged. Human acceptance is evidenced only by an approving GitHub review. These rules are recorded in the [#40 decision](https://github.com/bdonaldharris/builder-garage/issues/40#issuecomment-6853390215).
-- **Degrades clearly.** Without `gh`, or without `gh` authentication, status says that GitHub was not consulted, reports no workflow state, and exits with an error. Local history is shown as a separate annotation, and is never used for any gate.
+- **Degrades clearly.** Without `gh`, or without `gh` authentication, status says that GitHub was not consulted, reports no workflow state, and exits with an error. Local history is shown as a separate annotation for origin-project targets, and is never used for any gate. Cross-project status omits origin-project history, including when the provider is unavailable. An existing configuration that cannot be read safely stops status before provider access; an absent configuration retains legacy GitHub discovery.
 
 #### Governing issues and pull-request kinds
 

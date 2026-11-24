@@ -49,6 +49,12 @@ Manuals are guidance that a project adopts explicitly. They are not configuratio
 
 The repository now contains the initial Go CLI source, tests, build commands, and pull-request validation alongside its documentation. The Workbench, Crew, Inspection, Shipping, and Manuals directories remain documentation of conceptual boundaries, not implemented packages or runtime components.
 
+## Provider boundary
+
+The #197 provider-core slice keeps configuration and status ownership in `internal/cli`. `status_model.go` defines transport-independent workflow targets and evidence facts. The shared CLI/web operation consumes the small `statusProvider` read interface; `status_github_adapter.go` owns the GitHub query budget and explicit normalization of the GraphQL DTOs in `status_github.go`. Report, evidence, kind, and stack evaluation consume normalized facts, without GitHub transport structs or JSON decoding. The existing GitHub evidence rules and read-only query guard remain intact.
+
+Optional schema-v3 `project.forge` selects authoritative provider identity and requires matching origin. Schema-v2 GitHub projects keep their existing behavior without migration. The GitLab transport is deliberately unavailable until #198; configuration never silently sends a GitLab project through GitHub. This boundary adds no workflow authority, GitLab production infrastructure, or claim of complete GitLab support.
+
 ## Deliberately undecided
 
 The following remain deliberately undecided:

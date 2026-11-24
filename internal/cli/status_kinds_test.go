@@ -52,8 +52,8 @@ func TestDeclaredKind(t *testing.T) {
 	}
 }
 
-func designationComment(issue int, designation, release, association string, at int) ghComment {
-	return ghComment{
+func designationComment(issue int, designation, release, association string, at int) workflowComment {
+	return workflowComment{
 		URL: fmt.Sprintf("https://example.invalid/c%d", at),
 		Body: fmt.Sprintf("%s\n\n```yaml\ngarage_designation: 1\ndesignation: %s\nissue: %d\nrelease_branch: %s\nasserted:\n  authority: workflow_owner\n```\n\nReason: a released defect\n",
 			markerHotfixDesignation, designation, issue, release),
@@ -64,17 +64,17 @@ func designationComment(issue int, designation, release, association string, at 
 
 func TestHotfixDesignation(t *testing.T) {
 	for name, c := range map[string]struct {
-		comments []ghComment
+		comments []workflowComment
 		want     bool
 	}{
-		"designated":             {[]ghComment{designationComment(5, "hotfix", "main", "OWNER", 1)}, true},
-		"withdrawn later":        {[]ghComment{designationComment(5, "hotfix", "main", "OWNER", 1), designationComment(5, "withdrawn", "main", "OWNER", 2)}, false},
-		"designated again":       {[]ghComment{designationComment(5, "withdrawn", "main", "OWNER", 1), designationComment(5, "hotfix", "main", "OWNER", 2)}, true},
-		"another issue":          {[]ghComment{designationComment(6, "hotfix", "main", "OWNER", 1)}, false},
-		"another release branch": {[]ghComment{designationComment(5, "hotfix", "production", "OWNER", 1)}, false},
-		"unassociated author":    {[]ghComment{designationComment(5, "hotfix", "main", "NONE", 1)}, false},
-		"no record":              {[]ghComment{{Body: "hotfix please", AuthorAssociation: "OWNER"}}, false},
-		"malformed block": {[]ghComment{{Body: markerHotfixDesignation + "\n\n```yaml\ngarage_designation: 1\nunknown: x\n```\n",
+		"designated":             {[]workflowComment{designationComment(5, "hotfix", "main", "OWNER", 1)}, true},
+		"withdrawn later":        {[]workflowComment{designationComment(5, "hotfix", "main", "OWNER", 1), designationComment(5, "withdrawn", "main", "OWNER", 2)}, false},
+		"designated again":       {[]workflowComment{designationComment(5, "withdrawn", "main", "OWNER", 1), designationComment(5, "hotfix", "main", "OWNER", 2)}, true},
+		"another issue":          {[]workflowComment{designationComment(6, "hotfix", "main", "OWNER", 1)}, false},
+		"another release branch": {[]workflowComment{designationComment(5, "hotfix", "production", "OWNER", 1)}, false},
+		"unassociated author":    {[]workflowComment{designationComment(5, "hotfix", "main", "NONE", 1)}, false},
+		"no record":              {[]workflowComment{{Body: "hotfix please", AuthorAssociation: "OWNER"}}, false},
+		"malformed block": {[]workflowComment{{Body: markerHotfixDesignation + "\n\n```yaml\ngarage_designation: 1\nunknown: x\n```\n",
 			AuthorAssociation: "OWNER"}}, false},
 	} {
 		t.Run(name, func(t *testing.T) {
@@ -86,14 +86,14 @@ func TestHotfixDesignation(t *testing.T) {
 }
 
 func TestClassifyPullRequest(t *testing.T) {
-	designated := []ghClosingIssue{{Number: 5, Comments: ghComments{Nodes: []ghComment{designationComment(5, "hotfix", "main", "OWNER", 1)}}}}
-	undesignated := []ghClosingIssue{{Number: 5}}
-	pr := func(base, head, kind string) *ghItem {
+	designated := []workflowIssue{{Number: 5, Comments: workflowComments{Nodes: []workflowComment{designationComment(5, "hotfix", "main", "OWNER", 1)}}}}
+	undesignated := []workflowIssue{{Number: 5}}
+	pr := func(base, head, kind string) *workflowItem {
 		body := "## Summary\n\nx\n"
 		if kind != "" {
 			body = "## Pull request kind\n\n" + kind + "\n\n" + body
 		}
-		return &ghItem{Typename: "PullRequest", BaseRefName: base, HeadRefName: head, Body: body}
+		return &workflowItem{Kind: workflowChangeKind, BaseRefName: base, HeadRefName: head, Body: body}
 	}
 	type want struct {
 		kind              string
@@ -102,9 +102,9 @@ func TestClassifyPullRequest(t *testing.T) {
 		problemContaining string
 	}
 	for name, c := range map[string]struct {
-		item      *ghItem
+		item      *workflowItem
 		release   string
-		governing []ghClosingIssue
+		governing []workflowIssue
 		want      want
 	}{
 		// Declared and valid.
@@ -169,7 +169,7 @@ func stagingConfig() *projectConfig {
 	return cfg
 }
 
-func renderItem(t *testing.T, item *ghItem, cfg *projectConfig, reads int) string {
+func renderItem(t *testing.T, item *workflowItem, cfg *projectConfig, reads int) string {
 	t.Helper()
 	var out bytes.Buffer
 	if err := buildStatusReport(statusInputs{Item: item, Config: cfg, Recompute: notLocal,
@@ -199,8 +199,8 @@ func TestStatusGovernsFromTheGoverningIssueSection(t *testing.T) {
 	body.DefaultBranch = "main"
 	body.BaseRefName = "staging"
 	body.HeadRefName = "feat/33-config-aware"
-	body.BodyIssues = body.ClosingIssuesReferences.Nodes
-	body.ClosingIssuesReferences = nil
+	body.BodyIssues = body.ClosingIssues.Nodes
+	body.ClosingIssues = nil
 	text := renderItem(t, body, stagingConfig(), 2)
 	if got := section(text, "Gates for the current head"); got != want {
 		t.Errorf("gates differ.\nfrom the Governing issue section:\n%s\nfrom a closing reference:\n%s", got, want)
@@ -262,7 +262,7 @@ func TestStatusRelaxesOnlyADeclaredValidPromotion(t *testing.T) {
 
 func TestStatusReportsTruncatedClosingReferences(t *testing.T) {
 	item := loadFixtureItem(t, fixtureBytes(t, "pr46"))
-	item.ClosingIssuesReferences.TotalCount = 7
+	item.ClosingIssues.TotalCount = 7
 	text := renderItem(t, item, testConfig(), 1)
 	assertContains(t, text, "the pull request closes 7 issues; only the first 1 were read")
 }
@@ -270,17 +270,14 @@ func TestStatusReportsTruncatedClosingReferences(t *testing.T) {
 func TestStatusIssueFindsPullRequestsNamingItInTheirGoverningSection(t *testing.T) {
 	item := loadFixtureItem(t, fixtureBytes(t, "is33"))
 	item.State = "OPEN"
-	item.ClosedByPullRequestsReferences = nil
-	ref := func(number int, cross bool, body string) ghCrossReference {
-		r := ghCrossReference{IsCrossRepository: cross}
-		r.Source = &ghCrossReferenceSource{Typename: "PullRequest", Number: number,
+	item.ClosedByChanges = nil
+	ref := func(number int, cross bool, body string) workflowReference {
+		r := workflowReference{IsCrossRepository: cross}
+		r.Source = &workflowReferenceSource{Kind: workflowChangeKind, Number: number,
 			URL: fmt.Sprintf("https://example.invalid/pull/%d", number), State: "OPEN", Body: body}
 		return r
 	}
-	item.TimelineItems = &struct {
-		TotalCount int                `json:"totalCount"`
-		Nodes      []ghCrossReference `json:"nodes"`
-	}{TotalCount: 60, Nodes: []ghCrossReference{
+	item.References = &workflowReferences{TotalCount: 60, Nodes: []workflowReference{
 		ref(70, false, "## Summary\n\nSee #33\n"),          // a mention outside the section
 		ref(71, true, "## Governing issue\n\nRefs #33\n"),  // another repository
 		ref(72, false, "## Governing issue\n\nRefs #33\n"), // this one
@@ -299,29 +296,23 @@ func TestStatusIssueFindsPullRequestsNamingItInTheirGoverningSection(t *testing.
 }
 
 func TestBodyIssuesToFetch(t *testing.T) {
-	closes := func(numbers ...int) *struct {
-		TotalCount int              `json:"totalCount"`
-		Nodes      []ghClosingIssue `json:"nodes"`
-	} {
-		c := &struct {
-			TotalCount int              `json:"totalCount"`
-			Nodes      []ghClosingIssue `json:"nodes"`
-		}{TotalCount: len(numbers)}
+	closes := func(numbers ...int) *workflowIssues {
+		c := &workflowIssues{TotalCount: len(numbers)}
 		for _, n := range numbers {
-			c.Nodes = append(c.Nodes, ghClosingIssue{Number: n})
+			c.Nodes = append(c.Nodes, workflowIssue{Number: n})
 		}
 		return c
 	}
 	body := "## Governing issue\n\nCloses #1 Refs #2\n"
 	for name, c := range map[string]struct {
-		item *ghItem
+		item *workflowItem
 		want []int
 	}{
-		"into the default branch, closing":         {&ghItem{Typename: "PullRequest", Body: body, BaseRefName: "main", DefaultBranch: "main", ClosingIssuesReferences: closes(1)}, nil},
-		"into the default branch, closing nothing": {&ghItem{Typename: "PullRequest", Body: body, BaseRefName: "main", DefaultBranch: "main"}, []int{1, 2}},
-		"into staging":                      {&ghItem{Typename: "PullRequest", Body: body, BaseRefName: "staging", DefaultBranch: "main"}, []int{1, 2}},
-		"into staging, one already closing": {&ghItem{Typename: "PullRequest", Body: body, BaseRefName: "staging", DefaultBranch: "main", ClosingIssuesReferences: closes(1)}, []int{2}},
-		"an issue":                          {&ghItem{Typename: "Issue", Body: body}, nil},
+		"into the default branch, closing":         {&workflowItem{Kind: workflowChangeKind, Body: body, BaseRefName: "main", DefaultBranch: "main", ClosingIssues: closes(1)}, nil},
+		"into the default branch, closing nothing": {&workflowItem{Kind: workflowChangeKind, Body: body, BaseRefName: "main", DefaultBranch: "main"}, []int{1, 2}},
+		"into staging":                      {&workflowItem{Kind: workflowChangeKind, Body: body, BaseRefName: "staging", DefaultBranch: "main"}, []int{1, 2}},
+		"into staging, one already closing": {&workflowItem{Kind: workflowChangeKind, Body: body, BaseRefName: "staging", DefaultBranch: "main", ClosingIssues: closes(1)}, []int{2}},
+		"an issue":                          {&workflowItem{Kind: workflowIssueKind, Body: body}, nil},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if got := bodyIssuesToFetch(c.item); !slices.Equal(got, c.want) {
@@ -329,7 +320,7 @@ func TestBodyIssuesToFetch(t *testing.T) {
 			}
 		})
 	}
-	many := &ghItem{Typename: "PullRequest", BaseRefName: "staging", DefaultBranch: "main",
+	many := &workflowItem{Kind: workflowChangeKind, BaseRefName: "staging", DefaultBranch: "main",
 		Body: "## Governing issue\n\n#1 #2 #3 #4 #5 #6 #7\n"}
 	if got := bodyIssuesToFetch(many); len(got) != maxGoverningIssues || len(many.BodyIssueNotes) != 1 ||
 		!strings.Contains(many.BodyIssueNotes[0], "#6 and any later ones were not read") {

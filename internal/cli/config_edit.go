@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -89,6 +90,9 @@ func changeConfiguration(projectDir string, change configChange, ask prompter, y
 	}
 	if problems := validateConfig(candidate); problems != nil {
 		return stop("the result would not be a valid configuration:\n%s", formatProblems(problems))
+	}
+	if err := checkForgeOrigin(context.Background(), projectDir, runGit, candidate); err != nil {
+		return stop("%v", err)
 	}
 	if reflect.DeepEqual(before, candidate) {
 		_, err := fmt.Fprintf(out, "Nothing to change; %s already has that value.\n", configRel)
@@ -294,6 +298,9 @@ func formatProblems(problems configProblems) string {
 // setting or item is deleted with its comments, which are returned.
 func editDocument(doc *yaml.Node, before, after projectConfig) ([]string, error) {
 	root := doc.Content[0]
+	if before.SchemaVersion != after.SchemaVersion {
+		nodeAt(root, []string{"schema_version"}).Value = strconv.Itoa(after.SchemaVersion)
+	}
 	var removed []string
 	for _, s := range configSettings {
 		old, now := s.get(&before), s.get(&after)

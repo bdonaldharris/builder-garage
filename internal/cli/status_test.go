@@ -46,7 +46,7 @@ func fixtureGH(t *testing.T, data []byte) ghRunner {
 	}
 }
 
-func loadFixtureItem(t *testing.T, data []byte) *ghItem {
+func loadFixtureItem(t *testing.T, data []byte) *workflowItem {
 	t.Helper()
 	item, err := fetchStatusItem(context.Background(), fixtureGH(t, data),
 		ghRepository{Host: "github.com", Owner: "o", Name: "r"}, 1)
@@ -665,11 +665,11 @@ func TestRunStatusDoesNotRecomputeInAPartialClone(t *testing.T) {
 }
 
 func TestMergeStatusReferenceIssuesSeparatesRegistry(t *testing.T) {
-	registry := ghComment{URL: "registry"}
-	item := &ghItem{StackRegistryFetched: true, StackRegistryComments: []ghComment{registry}}
-	issues := []ghClosingIssue{
-		{Number: stackProgramIssue, Comments: ghComments{Nodes: []ghComment{{URL: "issue-192"}}}},
-		{Number: 302, Comments: ghComments{Nodes: []ghComment{{URL: "issue-302"}}}},
+	registry := workflowComment{URL: "registry"}
+	item := &workflowItem{StackRegistryFetched: true, StackRegistryComments: []workflowComment{registry}}
+	issues := []workflowIssue{
+		{Number: stackProgramIssue, Comments: workflowComments{Nodes: []workflowComment{{URL: "issue-192"}}}},
+		{Number: 302, Comments: workflowComments{Nodes: []workflowComment{{URL: "issue-302"}}}},
 	}
 
 	mergeStatusReferenceIssues(item, issues, map[int]bool{302: true})
@@ -680,7 +680,7 @@ func TestMergeStatusReferenceIssuesSeparatesRegistry(t *testing.T) {
 		t.Fatalf("body governing issues = %+v, want only issue 302", item.BodyIssues)
 	}
 
-	item = &ghItem{StackRegistryFetched: true, StackRegistryComments: []ghComment{registry}}
+	item = &workflowItem{StackRegistryFetched: true, StackRegistryComments: []workflowComment{registry}}
 	mergeStatusReferenceIssues(item, issues, map[int]bool{stackProgramIssue: true})
 	if len(item.BodyIssues) != 1 || item.BodyIssues[0].Number != stackProgramIssue {
 		t.Fatalf("named #192 issue was not preserved: %+v", item.BodyIssues)

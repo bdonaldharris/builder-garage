@@ -134,8 +134,8 @@ func decodeStrictYAML(raw string, value any) error {
 	return nil
 }
 
-func latestStackRegistry(comments []ghComment) stackRegistryRecord {
-	var latest *ghComment
+func latestStackRegistry(comments []workflowComment) stackRegistryRecord {
+	var latest *workflowComment
 	for i := range comments {
 		comment := &comments[i]
 		if !contains(countedAssociations, comment.AuthorAssociation) {
@@ -227,7 +227,7 @@ func validStackBranch(branch string) bool {
 		!strings.Contains(branch, "@{")
 }
 
-func statusReferencesToFetch(it *ghItem, host, repository, integration, release string) []int {
+func statusReferencesToFetch(it *workflowItem, host, repository, integration, release string) []int {
 	numbers := append([]int(nil), bodyIssuesToFetch(it)...)
 	numbers = append(numbers, stackPRReferencesToFetch(it, host, repository, integration, release)...)
 	seen := make(map[int]bool, len(numbers))
@@ -242,7 +242,7 @@ func statusReferencesToFetch(it *ghItem, host, repository, integration, release 
 	return result
 }
 
-func stackPRReferencesToFetch(it *ghItem, host, repository, integration, release string) []int {
+func stackPRReferencesToFetch(it *workflowItem, host, repository, integration, release string) []int {
 	if !it.isPullRequest() || host != authorizedStackHost || repository != authorizedStackRepository {
 		return nil
 	}
@@ -261,7 +261,7 @@ func stackPRReferencesToFetch(it *ghItem, host, repository, integration, release
 	return numbers
 }
 
-func validateStackDeclaration(it *ghItem, host, repository, integration, release string, governing []ghClosingIssue) stackValidation {
+func validateStackDeclaration(it *workflowItem, host, repository, integration, release string, governing []workflowIssue) stackValidation {
 	_, dependencyPresent, dependencyErr := parseStackDependency(it.Body)
 	maintenance, maintenancePresent, maintenanceErr := parseStackMaintenance(it.Body)
 	result := stackValidation{Present: dependencyPresent || maintenancePresent, Maintenance: maintenancePresent}
@@ -425,7 +425,7 @@ func stackRegistryEntries(registry *stackRegistry) map[int]stackRegistryEntry {
 	return entries
 }
 
-func stackRegistryForStatus(it *ghItem, host, repository, integration, release string) (*stackRegistry, string, string) {
+func stackRegistryForStatus(it *workflowItem, host, repository, integration, release string) (*stackRegistry, string, string) {
 	if !it.StackRegistryFetched {
 		return nil, "", "the Workflow Owner registry on issue #192 was not read"
 	}
@@ -439,7 +439,7 @@ func stackRegistryForStatus(it *ghItem, host, repository, integration, release s
 	return record.Registry, record.URL, ""
 }
 
-func stackEntryForStatus(it *ghItem, registry *stackRegistry) (stackRegistryEntry, bool) {
+func stackEntryForStatus(it *workflowItem, registry *stackRegistry) (stackRegistryEntry, bool) {
 	entries := stackRegistryEntries(registry)
 	if maintenance, present, err := parseStackMaintenance(it.Body); present && err == nil && maintenance != nil {
 		entry, ok := entries[maintenance.EntryIssue]
@@ -473,7 +473,7 @@ type stackFeatureFacts struct {
 	HeadRepository string
 }
 
-func stackFactsFromItem(it *ghItem) stackFeatureFacts {
+func stackFactsFromItem(it *workflowItem) stackFeatureFacts {
 	return stackFeatureFacts{
 		Read: true, Number: it.Number, State: it.State, Merged: it.Merged, MergedAt: it.MergedAt,
 		Body: it.Body, BaseRefName: it.BaseRefName, HeadRefName: it.HeadRefName,
@@ -481,7 +481,7 @@ func stackFactsFromItem(it *ghItem) stackFeatureFacts {
 	}
 }
 
-func stackFactsFromStatusPR(prs map[int]ghStatusPR, number int) stackFeatureFacts {
+func stackFactsFromStatusPR(prs map[int]workflowChange, number int) stackFeatureFacts {
 	pr, ok := prs[number]
 	if !ok || pr.Number != number {
 		return stackFeatureFacts{Number: number}
@@ -538,7 +538,7 @@ type stackChain struct {
 
 // newStackChain reads the registered predecessor PRs. The registry names the
 // feature PR of every entry except the last, as its dependent's prerequisite.
-func newStackChain(prs map[int]ghStatusPR, registry *stackRegistry, integration string) stackChain {
+func newStackChain(prs map[int]workflowChange, registry *stackRegistry, integration string) stackChain {
 	chain := stackChain{
 		registry: registry, integration: integration,
 		prerequisite: stackFactsFromStatusPR(prs, registry.PrerequisiteChangePR),
@@ -717,7 +717,7 @@ func hasOnlyGoverningIssue(body string, issue int) bool {
 	return len(numbers) == 1 && numbers[0] == issue
 }
 
-func validateStackCorrection(governing []ghClosingIssue, issueNumber int, correctionURL, dispositionURL string) string {
+func validateStackCorrection(governing []workflowIssue, issueNumber int, correctionURL, dispositionURL string) string {
 	if correctionURL == "" || dispositionURL == "" {
 		return "a correction maintenance PR must link its issue correction record and Agent #2 disposition"
 	}
