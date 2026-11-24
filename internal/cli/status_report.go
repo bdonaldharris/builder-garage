@@ -69,7 +69,7 @@ func (r *statusReport) render(w io.Writer) error {
 // statusInputs is everything a report is built from. Local history is
 // passed separately and never reaches the evaluation.
 type statusInputs struct {
-	Item          *ghItem
+	Item          *workflowItem
 	Config        *projectConfig // nil when the configuration is not valid
 	ConfigProblem string
 	// Recompute recomputes a commit-stage changeset from local objects only.
@@ -152,11 +152,11 @@ func readCount(reads int) string {
 // governingIssues returns the issues whose records govern a pull request:
 // those it closes, then those its "## Governing issue" section names that
 // the follow-up read fetched.
-func governingIssues(it *ghItem) []ghClosingIssue {
-	var issues []ghClosingIssue
+func governingIssues(it *workflowItem) []workflowIssue {
+	var issues []workflowIssue
 	seen := map[int]bool{}
-	if it.ClosingIssuesReferences != nil {
-		for _, issue := range it.ClosingIssuesReferences.Nodes {
+	if it.ClosingIssues != nil {
+		for _, issue := range it.ClosingIssues.Nodes {
 			seen[issue.Number] = true
 			issues = append(issues, issue)
 		}
@@ -187,7 +187,7 @@ func configuredBranches(in statusInputs) (string, string, bool) {
 
 // pullRequestKind classifies the pull request, or returns the zero kind,
 // which relaxes nothing, when there is no valid configuration.
-func pullRequestKind(in statusInputs, governing []ghClosingIssue) prKind {
+func pullRequestKind(in statusInputs, governing []workflowIssue) prKind {
 	integration, release, ok := configuredBranches(in)
 	if !ok {
 		return prKind{}
@@ -216,7 +216,7 @@ func addKindLine(s *statusSection, in statusInputs) {
 	}
 }
 
-func location(it *ghItem) string {
+func location(it *workflowItem) string {
 	if it.isPullRequest() {
 		return fmt.Sprintf("PR #%d", it.Number)
 	}
@@ -224,9 +224,9 @@ func location(it *ghItem) string {
 }
 
 // addRecordsSection lists every workflow record on one issue or pull request.
-func addRecordsSection(r *statusReport, heading string, comments ghComments, records []workflowRecord) {
+func addRecordsSection(r *statusReport, heading string, comments workflowComments, records []workflowRecord) {
 	s := r.section(heading)
-	if comments.PageInfo.HasPreviousPage {
+	if comments.Truncated {
 		s.add(labelChecked, "only the latest %d of %d comments were read; earlier records are not shown or evaluated",
 			len(comments.Nodes), comments.TotalCount)
 	}
@@ -369,9 +369,9 @@ func buildIssueReport(r *statusReport, in statusInputs) {
 		closed = ", closed at " + it.ClosedAt.UTC().Format(time.RFC3339)
 	}
 	s.add(labelChecked, "issue is %s%s", strings.ToLower(it.State), closed)
-	var linked []ghLinkedPR
-	if it.ClosedByPullRequestsReferences != nil {
-		linked = it.ClosedByPullRequestsReferences.Nodes
+	var linked []workflowLinkedChange
+	if it.ClosedByChanges != nil {
+		linked = it.ClosedByChanges
 	}
 	for _, pr := range linked {
 		s.add(labelChecked, "linked pull request #%d is %s: %s", pr.Number, strings.ToLower(pr.State), pr.URL)
@@ -379,17 +379,17 @@ func buildIssueReport(r *statusReport, in statusInputs) {
 	// Pull requests into a branch other than the default create no closing
 	// link; one that names this issue in its Governing issue section is found
 	// among the pull requests that mention it.
-	if t := it.TimelineItems; t != nil {
+	if t := it.References; t != nil {
 		if t.TotalCount > len(t.Nodes) {
 			s.add(labelChecked, "only the latest %d of %d cross-references to this issue were read for Governing issue sections", len(t.Nodes), t.TotalCount)
 		}
 		for _, ref := range t.Nodes {
 			src := ref.Source
-			if ref.IsCrossRepository || src == nil || src.Typename != "PullRequest" || linkedContains(linked, src.Number) ||
+			if ref.IsCrossRepository || src == nil || src.Kind != workflowChangeKind || linkedContains(linked, src.Number) ||
 				!slices.Contains(governingIssueNumbers(src.Body), it.Number) {
 				continue
 			}
-			linked = append(linked, ghLinkedPR{Number: src.Number, URL: src.URL, State: src.State, MergedAt: src.MergedAt})
+			linked = append(linked, workflowLinkedChange{Number: src.Number, URL: src.URL, State: src.State, MergedAt: src.MergedAt})
 			s.add(labelChecked, "pull request #%d names this issue in its Governing issue section and is %s: %s",
 				src.Number, strings.ToLower(src.State), src.URL)
 		}
@@ -412,7 +412,7 @@ func buildIssueReport(r *statusReport, in statusInputs) {
 	}
 }
 
-func linkedContains(linked []ghLinkedPR, number int) bool {
+func linkedContains(linked []workflowLinkedChange, number int) bool {
 	for _, pr := range linked {
 		if pr.Number == number {
 			return true
@@ -465,7 +465,7 @@ func buildPRReport(r *statusReport, in statusInputs) {
 			s.add(labelChecked, "stack declaration is not eligible: %s", in.stack.Problem)
 		}
 	}
-	if c := it.ClosingIssuesReferences; c != nil && c.TotalCount > len(c.Nodes) {
+	if c := it.ClosingIssues; c != nil && c.TotalCount > len(c.Nodes) {
 		s.add(labelChecked, "the pull request closes %d issues; only the first %d were read, and the others' records are not shown or evaluated",
 			c.TotalCount, len(c.Nodes))
 	}
@@ -731,20 +731,20 @@ func evaluateEquivalence(g *statusSection, prRecords []workflowRecord, approvals
 // evaluateAutomatedFindings reports minimum PR-review trigger 2. Automated
 // findings are detected as reviews by bot accounts that left review
 // comments.
-func evaluateAutomatedFindings(g *statusSection, it *ghItem, head string) bool {
+func evaluateAutomatedFindings(g *statusSection, it *workflowItem, head string) bool {
 	onHead := 0
 	if it.Reviews != nil {
-		for _, rv := range it.Reviews.Nodes {
-			if rv.Author == nil || rv.Author.Typename != "Bot" || rv.Comments.TotalCount == 0 || rv.Commit == nil {
+		for _, rv := range it.Reviews {
+			if rv.Author == nil || !rv.Author.Bot || rv.CommentCount == 0 || rv.Commit == nil {
 				continue
 			}
 			if rv.Commit.Oid == head {
-				onHead += rv.Comments.TotalCount
+				onHead += rv.CommentCount
 				g.add(labelChecked, "automated review by %s reported %d finding(s) on the head: %s",
-					rv.Author.Login, rv.Comments.TotalCount, rv.URL)
+					rv.Author.Login, rv.CommentCount, rv.URL)
 			} else {
 				g.add(labelChecked, "automated review by %s reported %d finding(s) on earlier commit %s: %s",
-					rv.Author.Login, rv.Comments.TotalCount, shortSHA(rv.Commit.Oid), rv.URL)
+					rv.Author.Login, rv.CommentCount, shortSHA(rv.Commit.Oid), rv.URL)
 			}
 		}
 	}
@@ -813,31 +813,31 @@ func evaluatePRReview(g *statusSection, prRecords []workflowRecord, approvals []
 	return false, "Agent #1 posts the Agent #2 PR Review Request for the current head (integration-pr-review)"
 }
 
-func evaluateChecks(g *statusSection, it *ghItem, head string) bool {
-	if it.Commits == nil || len(it.Commits.Nodes) == 0 || it.Commits.Nodes[0].Commit.Oid != head {
+func evaluateChecks(g *statusSection, it *workflowItem, head string) bool {
+	if it.Checks == nil || it.Checks.Commit != head {
 		g.add(labelChecked, "the check state of the head was not available")
 		return false
 	}
-	rollup := it.Commits.Nodes[0].Commit.StatusCheckRollup
-	if rollup == nil {
+	if !it.Checks.Available {
 		g.add(labelChecked, "no checks are reported for the head")
 		return false
 	}
+	rollup := it.Checks
 	g.add(labelChecked, "checks on the head: %s", strings.ToLower(rollup.State))
 	return rollup.State == "SUCCESS"
 }
 
 // evaluateHumanAcceptance reports the change acceptor's approval. Only an
 // approving GitHub review is evidence of it (#40 decision, item 4).
-func evaluateHumanAcceptance(g *statusSection, in statusInputs, it *ghItem, head string) bool {
+func evaluateHumanAcceptance(g *statusSection, in statusInputs, it *workflowItem, head string) bool {
 	acceptor := "the change acceptor"
 	if in.Config != nil {
 		acceptor = fmt.Sprintf("the change acceptor (%s)", in.Config.Project.Authorities.ChangeAcceptor.Role)
 	}
 	found := false
 	if it.Reviews != nil {
-		for _, rv := range it.Reviews.Nodes {
-			if rv.State != "APPROVED" || rv.Author == nil || rv.Author.Typename == "Bot" ||
+		for _, rv := range it.Reviews {
+			if rv.State != "APPROVED" || rv.Author == nil || rv.Author.Bot ||
 				!contains(countedAssociations, rv.AuthorAssociation) {
 				continue
 			}

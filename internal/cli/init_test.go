@@ -176,7 +176,7 @@ func TestInitCreatesValidConfiguration(t *testing.T) {
 	for _, want := range []string{
 		"Initialized Builder Garage",
 		"created " + filepath.Join(garageDirName, configFileName),
-		"schema version 2",
+		"schema version 3",
 		"garage config validate",
 	} {
 		if !strings.Contains(stdout, want) {
@@ -515,15 +515,15 @@ func TestInitUpgradesSchemaVersion1(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	if !strings.Contains(stdout, "from schema version 1 to 2") {
+	if !strings.Contains(stdout, "from schema version 1 to 3") {
 		t.Errorf("stdout = %q, want the migration reported", stdout)
 	}
 	content := readFile(t, configPathIn(dir))
 	if !strings.HasPrefix(content, "# Builder Garage project configuration.\n") {
 		t.Errorf("the existing header comment was not kept:\n%s", content)
 	}
-	if cfg := mustLoadValid(t, dir); cfg.SchemaVersion != 2 {
-		t.Errorf("schema version = %d, want 2", cfg.SchemaVersion)
+	if cfg := mustLoadValid(t, dir); cfg.SchemaVersion != 3 {
+		t.Errorf("schema version = %d, want 3", cfg.SchemaVersion)
 	}
 }
 
@@ -544,7 +544,7 @@ func TestInitStopsOnInvalidOrAmbiguousConfiguration(t *testing.T) {
 		"invalid YAML":         "schema_version: [1\n",
 		"empty file":           "",
 		"unknown key":          "schema_version: 2\ncustom: keep-me\n",
-		"unsupported version":  "schema_version: 3\n",
+		"unsupported version":  "schema_version: 4\n",
 		"version 1 with extra": "schema_version: 1\nproject:\n  integration_branch: main\n",
 		"invalid value":        "schema_version: 2\nproject:\n  integration_branch: \"bad branch\"\n",
 		"not a mapping":        "- schema_version\n",
@@ -913,6 +913,10 @@ func TestCommittedConfigurationIsGeneratedByTheDocumentedCommand(t *testing.T) {
 		t.Fatalf("documented flags differ from builderGarageFlags:\n%q\n%q", documented, builderGarageFlags)
 	}
 	committed := withLF(readFile(t, filepath.Join("..", "..", garageDirName, configFileName)))
+	// Existing v2 projects need no migration. Compare the same choices at
+	// the current generated schema, while validating the actual file below.
+	committed = strings.Replace(committed, "schema version 2.", "schema version 3.", 1)
+	committed = strings.Replace(committed, "schema_version: 2", "schema_version: 3", 1)
 
 	dir := t.TempDir()
 	if _, err := initProject(dir, desiredFrom(t, documented...), nil); err != nil {

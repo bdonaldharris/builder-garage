@@ -108,7 +108,7 @@ func (b *evidenceBlock) status() string {
 
 // workflowRecord is one workflow-state comment on an issue or pull request.
 type workflowRecord struct {
-	Comment  ghComment
+	Comment  workflowComment
 	Location string // "issue #33" or "PR #46"
 	Marker   string
 	Kind     recordKind
@@ -135,7 +135,7 @@ func (r *workflowRecord) isEvidence(recordType string) bool {
 
 // parseWorkflowRecords returns the workflow records among comments, in their
 // original order. Comments without a workflow marker are not records.
-func parseWorkflowRecords(comments []ghComment, location string) []workflowRecord {
+func parseWorkflowRecords(comments []workflowComment, location string) []workflowRecord {
 	var records []workflowRecord
 	for _, c := range comments {
 		marker, rest, ok := workflowMarker(c.Body)

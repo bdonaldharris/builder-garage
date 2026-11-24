@@ -1,6 +1,6 @@
 # Project Configuration
 
-**Schema version:** 2
+**Schema version:** 3 (version 2 without `project.forge` remains supported)
 **Status:** Canonical. Defined under [#35](https://github.com/bdonaldharris/builder-garage/issues/35), following the [#35 maintainer decision](https://github.com/bdonaldharris/builder-garage/issues/35#issuecomment-6842152164) and the [#33/#35 decision](https://github.com/bdonaldharris/builder-garage/issues/35#issuecomment-6839187808).
 
 A project's Builder Garage configuration lives in one file, `.garage/config.yaml`, at the project root. It is the sole canonical source of the project's configured choices. It is tracked with the project and changes through the project's normal review process.
@@ -9,10 +9,42 @@ A project's Builder Garage configuration lives in one file, `.garage/config.yaml
 
 The file has two sections:
 
-- **`project`** holds the project's values at the extension points that the [extension-point registry](extension-points.md) declares. Nothing else in the responsibility model is configurable, and no value can weaken the [responsibility floor](responsibility-floor.md).
+- **`project`** holds optional forge identity and the project's values at the extension points that the [extension-point registry](extension-points.md) declares. Nothing else in the responsibility model is configurable, and no value can weaken the [responsibility floor](responsibility-floor.md).
 - **`tooling`** holds Garage tooling settings, documented in [Tooling configuration](tooling-configuration.md). Tooling settings are outside the registry and grant no workflow authority.
 
 The canonical [skills](../skills/) read this file, as described in [How the skills read the configuration](#how-the-skills-read-the-configuration).
+
+## Forge identity (schema 3)
+
+The optional `project.forge` block follows the [approved provider contract](https://github.com/bdonaldharris/builder-garage/issues/192#issuecomment-7085045513):
+
+```yaml
+schema_version: 3
+project:
+  # Keep the project's existing discovery and authority settings here.
+  forge:
+    provider: gitlab
+    endpoint: https://gitlab.example.com
+    project: group/subgroup/project
+    api_base_url: https://gitlab.example.com/api/v4
+    allow_cross_project_targets: false
+```
+
+This is a configuration fragment, not a complete project configuration. `provider` (`github` or `gitlab`) and a canonical `project` path are required when the block is present. GitHub uses `owner/repo`; GitLab preserves subgroup paths. Omit `.git`, leading/trailing slashes, and URL escaping. GitLab project paths are compared exactly; GitHub paths are compared without case sensitivity.
+
+`endpoint` defaults to `https://github.com` or `https://gitlab.com` and must be an HTTPS origin without a path, query, fragment, or credentials. For GitLab, `api_base_url` defaults to `<endpoint>/api/v4` and must identify that same host's HTTPS `/api/v4` endpoint. Omit it for GitHub. Cross-project targets default to false; enabling them permits another target project on the configured host, never an origin/config mismatch.
+
+Configuration is authoritative. `garage config validate`, `init`, configuration edits, and status reject an explicit configuration whose `origin` identifies another host/project. HTTPS, SSH, and scp-like origin forms are recognized. Remote discovery never overrides this block. The existing private-history key normalization is unchanged. No credential or TLS-exception setting is supported; authentication remains outside this file.
+
+Use the existing required setup flags plus `--forge-provider`, `--forge-project`, and optionally `--forge-endpoint`, `--forge-api-base-url`, and `--forge-allow-cross-project-targets` with `garage init`. Supply the complete desired forge block together: init adds it atomically and refuses changes to an already-configured block. For example, to add explicit GitHub identity to an already valid configuration with matching origin:
+
+```sh
+garage init --forge-provider github --forge-project owner/repo
+```
+
+The five flag names also identify configuration settings in `garage config show/get/set`. Existing blocks can be edited through the normal confirmed config commands or by hand. Unsetting `forge-provider` removes the entire optional block. Unrelated edits and upgrades preserve forge fields and YAML comments.
+
+Without a forge block, existing schema-v2 GitHub configuration and remote-derived identity behavior remain unchanged; schema 3 also permits omission. `init` creates schema 3 files. This foundational slice accepts GitLab configuration but provides no GitLab API observation or writes yet: status reports that observation is unavailable and never falls back to GitHub. It does not establish publicly available GitLab support or deployment compatibility. Those require the remaining #192 stack and complete verification.
 
 ## The `project` section
 
@@ -53,7 +85,7 @@ An omitted key means the canonical default applies. A key that is present is the
 - **An existing file** is upgraded in place:
   - every existing value and comment is kept;
   - only missing or newly required settings are added;
-  - a schema version 1 file, which records only `schema_version: 1`, is migrated to version 2;
+  - schema version 1 (only `schema_version: 1`) and valid version 2 files are upgraded to version 3 when `init` is explicitly run; version 2 files need no migration to continue existing GitHub use;
   - the file is replaced atomically, through a temporary file in the same directory;
   - immediately before the replacement, `init` checks that the file is still the one it read, with the same content. If it changed while `init` was running, for example while waiting for an answer, `init` stops without writing and asks to be run again, so a concurrent change is never overwritten.
 - **No overwrite.** A flag that conflicts with an already configured value is an error. Change configured values with the [configuration commands](#reading-and-changing-settings-garage-config) or by editing the file, through the project's normal review process, not with `init`. There is no `--force`.
@@ -99,7 +131,7 @@ Six commands read and change one setting at a time ([#64 decision](https://githu
 - **Required settings.** `discovery`, `workflow-owner`, `change-acceptor`, and `product-intent-acceptor` cannot be unset; set a new value instead.
 - **One write pipeline.** Every change follows `init`'s path:
   1. take a snapshot of the file and decode it strictly;
-  2. refuse an invalid file, or one at another schema version, which `garage init` upgrades;
+  2. refuse an invalid file; valid schema-v2 files remain editable, and `garage init` can upgrade them;
   3. apply the change to the complete configuration and validate the result;
   4. edit the YAML, and check that the result decodes to exactly the validated configuration;
   5. confirm;

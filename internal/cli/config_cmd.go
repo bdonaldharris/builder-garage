@@ -400,6 +400,9 @@ that agents worked independently.`,
 			if err != nil {
 				return err
 			}
+			if err := checkForgeOrigin(cmd.Context(), projectDir, runGit, cfg); err != nil {
+				return err
+			}
 			return writeConfigSummary(cmd.OutOrStdout(), cfg)
 		},
 	}
@@ -428,6 +431,14 @@ func writeConfigSummary(w io.Writer, cfg projectConfig) error {
 	var b strings.Builder
 	fmt.Fprintf(&b, "%s is valid (schema version %d).\n\n",
 		filepath.Join(garageDirName, configFileName), cfg.SchemaVersion)
+	if pc.Forge != nil {
+		f := effectiveForge(*pc.Forge)
+		fmt.Fprintf(&b, "Forge: %s %s/%s\n", f.Provider, f.Endpoint, f.Project)
+		if f.APIBaseURL != "" {
+			fmt.Fprintf(&b, "GitLab API: %s\n", f.APIBaseURL)
+		}
+		fmt.Fprintf(&b, "Cross-project targets: %t\n\n", f.AllowCrossProjectTargets)
+	}
 	b.WriteString("Extension points:\n")
 	row := func(id, name, value string) { fmt.Fprintf(&b, "  %-4s %-28s %s\n", id, name, value) }
 

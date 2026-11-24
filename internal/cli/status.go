@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"net/url"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
@@ -43,10 +45,18 @@ func defaultStatusEnv() (statusEnv, error) {
 
 func newStatusCommand() *cobra.Command {
 	return &cobra.Command{
-		Use:   "status NUMBER",
+		Use:   "status [NUMBER | issue NUMBER | pr NUMBER | HTTPS-URL]",
 		Short: "Show the workflow status of one issue or pull request, read from GitHub",
 		Long: `Show the workflow status of one issue or pull request in this repository's
 GitHub repository, including closed and merged ones.
+
+Accepts legacy NUMBER and #NUMBER, explicit issue NUMBER or pr NUMBER, and
+canonical HTTPS /OWNER/REPO/issues/NUMBER or /OWNER/REPO/pull/NUMBER URLs.
+Explicit kinds must match the actual resource. URLs must match the selected
+forge host and project; another project requires cross-project targets enabled.
+Schema-v3 project.forge explicitly selects provider/project; origin must match.
+GitLab configuration is accepted, but its observation adapter is not yet
+implemented. No GitHub fallback is used for GitLab.
 
 GitHub records are the only authority for workflow state. Status reads them
 through the gh command, in one query, plus at most one follow-up query when a
@@ -77,10 +87,13 @@ GitHub review.
 If gh is missing or not authenticated, status says that GitHub was not
 consulted, reports no workflow state or eligibility, and exits with an error.`,
 		Example: `  garage status 48
-  garage status #33`,
-		Args: cobra.ExactArgs(1),
+  garage status #33
+  garage status issue 33
+  garage status pr 48
+  garage status https://github.com/owner/repo/pull/48`,
+		Args: cobra.RangeArgs(1, 2),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			number, err := parseStatusTarget(args[0])
+			target, err := parseWorkflowTarget(args)
 			if err != nil {
 				return err
 			}
@@ -88,7 +101,13 @@ consulted, reports no workflow state or eligibility, and exits with an error.`,
 			if err != nil {
 				return err
 			}
-			return runStatus(cmd.Context(), number, env, cmd.OutOrStdout())
+			report, err := statusReportForTarget(cmd.Context(), target, env)
+			if report != nil {
+				if renderErr := report.render(cmd.OutOrStdout()); renderErr != nil {
+					return renderErr
+				}
+			}
+			return err
 		},
 	}
 }
@@ -114,7 +133,7 @@ func runStatus(ctx context.Context, number int, env statusEnv, w io.Writer) erro
 	return err
 }
 
-func mergeStatusReferenceIssues(item *ghItem, issues []ghClosingIssue, governing map[int]bool) {
+func mergeStatusReferenceIssues(item *workflowItem, issues []workflowIssue, governing map[int]bool) {
 	for _, issue := range issues {
 		if governing[issue.Number] {
 			item.BodyIssues = append(item.BodyIssues, issue)
@@ -125,6 +144,11 @@ func mergeStatusReferenceIssues(item *ghItem, issues []ghClosingIssue, governing
 // statusReportFor is the shared typed status operation. Command and web
 // adapters render its report independently; it never parses rendered output.
 func statusReportFor(ctx context.Context, number int, env statusEnv) (*statusReport, error) {
+	return statusReportForTarget(ctx, workflowTarget{Number: number}, env)
+}
+
+func statusReportForTarget(ctx context.Context, target workflowTarget, env statusEnv) (*statusReport, error) {
+	number := target.Number
 	if ctx == nil {
 		ctx = context.Background()
 	}
@@ -135,48 +159,67 @@ func statusReportFor(ctx context.Context, number int, env statusEnv) (*statusRep
 
 	var cfg *projectConfig
 	configProblem := ""
-	if loaded, err := loadValidConfig(repo.TopLevel); err == nil {
-		cfg = &loaded
+	// Read once so provider selection uses the exact configuration inspected.
+	// Only genuine absence permits legacy discovery. A refused/unreadable
+	// existing file cannot establish that explicit forge identity is absent.
+	data, readErr := readConfigFile(configPathInRepository(repo.TopLevel))
+	if readErr != nil {
+		configProblem = oneLine(readErr.Error())
+		if !errors.Is(readErr, errNoConfig) {
+			return nil, fmt.Errorf("cannot select a forge: %w", readErr)
+		}
 	} else {
-		configProblem = oneLine(err.Error())
+		loaded, decodeErr := decodeConfig(data)
+		if decodeErr != nil {
+			return nil, fmt.Errorf("cannot select a forge: %w", decodeErr)
+		}
+		if problems := validateConfig(loaded); problems != nil {
+			configProblem = oneLine(problems.Error())
+			if proj(&loaded).Forge != nil {
+				return nil, fmt.Errorf("cannot select a forge: %s", configProblem)
+			}
+		} else {
+			cfg = &loaded
+		}
 	}
-
-	var item *ghItem
+	if cfg != nil {
+		if err := checkForgeOrigin(ctx, repo.TopLevel, env.Git, *cfg); err != nil {
+			return nil, err
+		}
+		if f := proj(cfg).Forge; f != nil && f.Provider == "gitlab" {
+			return nil, errors.New("GitLab status is not available in this version; no provider was consulted")
+		}
+	}
 	ghRepo, err := githubRepository(ctx, repo.TopLevel, env.Git)
+	var item *workflowItem
+	reads := 1
+	includeOriginHistory := target.Project == ""
 	if err == nil {
-		item, err = fetchStatusItem(ctx, env.GH, ghRepo, number)
+		if cfg != nil && cfg.Project.Forge != nil {
+			f := effectiveForge(*cfg.Project.Forge)
+			u, _ := url.Parse(f.Endpoint)
+			parts := strings.Split(f.Project, "/")
+			ghRepo = ghRepository{Host: u.Host, Owner: parts[0], Name: parts[1]}
+		}
+		if target.Host != "" && !strings.EqualFold(canonicalHTTPSHost(target.Host), canonicalHTTPSHost(ghRepo.Host)) {
+			return nil, errors.New("target URL does not match the configured forge host")
+		}
+		includeOriginHistory = target.Project == "" || strings.EqualFold(target.Project, ghRepo.Owner+"/"+ghRepo.Name)
+		if !includeOriginHistory {
+			if cfg == nil || proj(cfg).Forge == nil || !cfg.Project.Forge.AllowCrossProjectTargets {
+				return nil, errors.New("cross-project targets are not enabled")
+			}
+			parts := strings.Split(target.Project, "/")
+			ghRepo.Owner, ghRepo.Name = parts[0], parts[1]
+		}
+		var provider statusProvider = githubStatusAdapter{Runner: env.GH, Repository: ghRepo}
+		item, reads, err = provider.Read(ctx, target, cfg)
+		if err == nil && target.Kind != "" && target.Kind != item.Kind {
+			return nil, errors.New("the target kind does not match the authoritative GitHub resource")
+		}
 	}
 	if errors.Is(err, errStatusNotFound) {
 		return nil, fmt.Errorf("%s/%s #%d: %w", ghRepo.Owner, ghRepo.Name, number, errStatusNotFound)
-	}
-	reads := 1
-	if err == nil {
-		integration, release := "", ""
-		if cfg != nil {
-			integration, release, _ = configuredBranches(statusInputs{Config: cfg})
-		}
-		stackPRs := stackPRReferencesToFetch(item, ghRepo.Host, ghRepo.Owner+"/"+ghRepo.Name, integration, release)
-		if numbers := statusReferencesToFetch(item, ghRepo.Host, ghRepo.Owner+"/"+ghRepo.Name, integration, release); len(numbers) > 0 {
-			reads = 2
-			expectedPRs := make(map[int]bool)
-			for _, number := range stackPRs {
-				expectedPRs[number] = true
-			}
-			issues, prs, notes, fetchErr := fetchStatusReferences(ctx, env.GH, ghRepo, numbers, expectedPRs)
-			if fetchErr != nil {
-				item.BodyIssueNotes = append(item.BodyIssueNotes,
-					"the related issues and pull requests needed for status could not be read: "+fetchErr.Error())
-			}
-			item.StatusPRs = prs
-			governing := make(map[int]bool)
-			for _, number := range governingIssueNumbers(item.Body) {
-				governing[number] = true
-			}
-			item.BodyIssueNotes = append(item.BodyIssueNotes, notes...)
-			mergeStatusReferenceIssues(item, issues, governing)
-		}
-		item.RepositoryIdentity = ghRepo.Owner + "/" + ghRepo.Name
-		item.RepositoryHost = ghRepo.Host
 	}
 
 	var report *statusReport
@@ -188,7 +231,7 @@ func statusReportFor(ctx context.Context, number int, env statusEnv) (*statusRep
 			"No workflow state and no eligible action are reported. GitHub records are the only",
 			"authority for them, and local history never stands in for GitHub.",
 		}}
-		addConfigSection(report, statusInputs{Item: &ghItem{}, Config: cfg, ConfigProblem: configProblem})
+		addConfigSection(report, statusInputs{Item: &workflowItem{}, Config: cfg, ConfigProblem: configProblem})
 	} else {
 		report = buildStatusReport(statusInputs{
 			Item:          item,
@@ -206,7 +249,11 @@ func statusReportFor(ctx context.Context, number int, env statusEnv) (*statusRep
 	if item != nil && item.isPullRequest() {
 		kind = "pr"
 	}
-	addLocalHistory(report, env, repo, kind, number, item == nil)
+	// The cache belongs to origin, not every project with the same number.
+	// Omit it for a foreign target even if that provider read was unavailable.
+	if includeOriginHistory {
+		addLocalHistory(report, env, repo, kind, number, item == nil)
+	}
 
 	if item == nil {
 		return report, errGitHubNotConsulted
@@ -310,4 +357,8 @@ func recomputeCommitChangeset(ctx context.Context, git gitRunner, dir, integrati
 	}
 	sum := sha256.Sum256(raw)
 	return "sha256:" + hex.EncodeToString(sum[:]), ""
+}
+
+func configPathInRepository(dir string) string {
+	return filepath.Join(dir, garageDirName, configFileName)
 }

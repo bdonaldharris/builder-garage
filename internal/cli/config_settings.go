@@ -105,6 +105,12 @@ func present[T any](v *T) any {
 
 var configSettings = []configSetting{
 	{
+		path: []string{"project", "forge"}, label: "Forge provider and project",
+		get:     func(c *projectConfig) any { return present(proj(c).Forge) },
+		set:     func(d, s *projectConfig) { f := *proj(s).Forge; projectOf(d).Forge = &f },
+		options: forgeOptions(),
+	},
+	{
 		path:  []string{"project", "integration_branch"},
 		label: "Integration branch",
 		get:   func(c *projectConfig) any { return present(proj(c).IntegrationBranch) },
@@ -696,4 +702,81 @@ func parseSkillTargetOrHarness(v string) (skillTarget, error) {
 		return skillTarget{}, fmt.Errorf("harness must be one of %s", strings.Join(supportedHarnesses, ", "))
 	}
 	return parseSkillTarget(harness + "@" + confirmed.Version + "@" + confirmed.On)
+}
+
+// The forge block is one setting for atomic init merges. Individual options
+// allow edits after creation; removing the provider removes the complete block.
+func forgeOptions() []configOption {
+	var options []configOption
+	for _, spec := range []struct{ name, field, about string }{
+		{"forge-provider", "provider", "explicit provider: github or gitlab"},
+		{"forge-endpoint", "endpoint", "HTTPS forge origin"},
+		{"forge-project", "project", "canonical project path, including GitLab subgroups"},
+		{"forge-api-base-url", "api_base_url", "GitLab REST v4 HTTPS API base"},
+		{"forge-allow-cross-project-targets", "allow_cross_project_targets", "allow cross-project targets: true or false"},
+	} {
+		spec := spec
+		value := func(f *forgeConfig) *string {
+			switch spec.field {
+			case "provider":
+				return &f.Provider
+			case "endpoint":
+				return &f.Endpoint
+			case "project":
+				return &f.Project
+			default:
+				return &f.APIBaseURL
+			}
+		}
+		options = append(options, configOption{
+			name: spec.name, kind: optionValue, format: "VALUE", about: spec.about, def: "not configured",
+			fields: []string{"project.forge." + spec.field},
+			get: func(c *projectConfig) []string {
+				f := proj(c).Forge
+				if f == nil {
+					return nil
+				}
+				if spec.field == "allow_cross_project_targets" {
+					return []string{strconv.FormatBool(f.AllowCrossProjectTargets)}
+				}
+				v := *value(f)
+				if v == "" {
+					return nil
+				}
+				return []string{v}
+			},
+			set: func(c *projectConfig, v string) error {
+				pc := projectOf(c)
+				if pc.Forge == nil {
+					pc.Forge = &forgeConfig{}
+				}
+				if spec.field == "allow_cross_project_targets" {
+					b, err := strconv.ParseBool(v)
+					if err != nil {
+						return errors.New("want true or false")
+					}
+					pc.Forge.AllowCrossProjectTargets = b
+				} else {
+					*value(pc.Forge) = v
+				}
+				c.SchemaVersion = configSchemaVersion
+				return nil
+			},
+			unset: func(c *projectConfig) {
+				if proj(c).Forge == nil {
+					return
+				}
+				if spec.field == "provider" {
+					projectOf(c).Forge = nil
+					return
+				}
+				if spec.field == "allow_cross_project_targets" {
+					c.Project.Forge.AllowCrossProjectTargets = false
+				} else {
+					*value(c.Project.Forge) = ""
+				}
+			},
+		})
+	}
+	return options
 }
