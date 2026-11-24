@@ -133,6 +133,13 @@ func (r *workflowRecord) isEvidence(recordType string) bool {
 	return r.Counted && r.Kind == recordEvidence && r.Block.Record == recordType
 }
 
+func workflowCommentEligible(c workflowComment) bool {
+	if c.Provider == "gitlab" {
+		return c.Eligible != nil && *c.Eligible
+	}
+	return contains(countedAssociations, c.AuthorAssociation)
+}
+
 // parseWorkflowRecords returns the workflow records among comments, in their
 // original order. Comments without a workflow marker are not records.
 func parseWorkflowRecords(comments []workflowComment, location string) []workflowRecord {
@@ -146,7 +153,7 @@ func parseWorkflowRecords(comments []workflowComment, location string) []workflo
 			Comment:  c,
 			Location: location,
 			Marker:   marker,
-			Counted:  contains(countedAssociations, c.AuthorAssociation),
+			Counted:  workflowCommentEligible(c),
 		}
 		if marker == markerReviewRequest {
 			rec.Kind = recordRequest

@@ -44,7 +44,7 @@ garage init --forge-provider github --forge-project owner/repo
 
 The five flag names also identify configuration settings in `garage config show/get/set`. Existing blocks can be edited through the normal confirmed config commands or by hand. Unsetting `forge-provider` removes the entire optional block. Unrelated edits and upgrades preserve forge fields and YAML comments.
 
-Without a forge block, existing schema-v2 GitHub configuration and remote-derived identity behavior remain unchanged; schema 3 also permits omission. `init` creates schema 3 files. This foundational slice accepts GitLab configuration but provides no GitLab API observation or writes yet: status reports that observation is unavailable and never falls back to GitHub. It does not establish publicly available GitLab support or deployment compatibility. Those require the remaining #192 stack and complete verification.
+Without a forge block, existing schema-v2 GitHub configuration and remote-derived identity behavior remain unchanged; schema 3 also permits omission. `init` creates schema 3 files. The GitLab observation adapter reads authenticated issue/MR workflow facts through `glab`; it never falls back to GitHub. It performs no GitLab writes. Native approval facts are observed separately from Agent #2 review and qualified human acceptance, whose configuration support is a later tranche. It does not establish publicly available GitLab support or deployment compatibility. Those require the remaining #192 stack and complete verification. See [GitLab workflow observation](gitlab-observation.md) for target grammar, runtime setup, resource limits and validation boundaries.
 
 ## The `project` section
 

@@ -1,0 +1,25 @@
+{
+  "id": 205,
+  "iid": 5,
+  "project_id": 7,
+  "title": "MR five",
+  "description": "## Governing issue\n\nRefs #6\n\n## Pull request kind\n\nimplementation\n\n## Environment / Deployment Requirements\n\nNone\n",
+  "web_url": "https://gitlab.example/group/sub/project/-/merge_requests/5",
+  "state": "opened",
+  "confidential": false,
+  "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+  "diff_refs": {
+    "head_sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "base_sha": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+  },
+  "source_branch": "feature/topic",
+  "target_branch": "stack/base",
+  "source_project_id": 7,
+  "target_project_id": 7,
+  "head_pipeline": {
+    "id": 30,
+    "sha": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+    "status": "success"
+  },
+  "detailed_merge_status": "mergeable"
+}

@@ -95,7 +95,7 @@ garage history list --format jsonl   # one JSON object per line, for scripts
 
 ### Workflow status
 
-`garage status 48` shows the workflow status of issue or pull request #48 in the repository's GitHub repository, including closed and merged ones. Legacy `garage status '#48'` remains supported; explicit forms are `garage status issue 48`, `garage status pr 48`, and canonical HTTPS issue/PR URLs. An explicit kind must match the actual artifact, and URL host/project checks apply before access. [Schema-v3 forge configuration](docs/configuration.md#forge-identity-schema-3) optionally selects identity; existing schema-v2 GitHub projects continue unchanged. GitLab configuration is preparatory: its observation adapter and complete support are not available in this slice.
+`garage status 48` shows the workflow status of issue or pull request #48 in the repository's GitHub repository, including closed and merged ones. Legacy `garage status '#48'` remains supported; explicit forms are `garage status issue 48`, `garage status pr 48`, and canonical HTTPS issue/PR URLs. An explicit kind must match the actual artifact, and URL host/project checks apply before access. [Schema-v3 forge configuration](docs/configuration.md#forge-identity-schema-3) optionally selects identity; existing schema-v2 GitHub projects continue unchanged. Configured GitLab projects use `garage status issue IID`, `garage status mr IID`, or canonical HTTPS GitLab issue/MR URLs through authenticated `glab`. Bare GitLab numbers are refused because issue/MR IIDs can collide. This observation slice does not establish complete public GitLab support; the #192 integration/release hold and later write/CI/release/compatibility tranches remain.
 
 Status behavior:
 

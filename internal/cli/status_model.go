@@ -9,6 +9,7 @@ import (
 // An empty kind is the legacy GitHub issue-or-change number lookup.
 type workflowTarget struct {
 	Kind    string
+	Args    []string // Unparsed CLI/web input; parsed only after provider selection.
 	Number  int
 	Project string
 	Host    string
@@ -30,6 +31,10 @@ type workflowActor struct {
 	Bot   bool
 }
 type workflowComment struct {
+	Provider    string
+	Eligible    *bool // nil retains GitHub association rules; GitLab requires checked membership.
+	Eligibility string
+
 	URL, Body         string
 	CreatedAt         time.Time
 	LastEditedAt      *time.Time
@@ -56,6 +61,8 @@ type workflowReview struct {
 	CommentCount           int
 }
 type workflowIssue struct {
+	Project string
+
 	Number     int
 	URL, State string
 	Comments   workflowComments
@@ -107,7 +114,29 @@ type workflowChecks struct {
 	Commit, State string
 	Available     bool
 }
+
+// workflowObservation carries normalized capability/completeness facts, never
+// provider REST/GraphQL payloads. Native policy facts are distinct from review.
+type workflowFact struct {
+	Name, Value, Problem string
+	Available            bool
+}
+type workflowObservation struct {
+	Facts                       []workflowFact
+	References                  []workflowTarget
+	Governing                   []workflowIssue
+	GoverningTargets            []workflowTarget // Required identities, including unsuccessful reads.
+	GoverningComplete           bool
+	Complete                    bool
+	DiscussionsResolved         *bool
+	PipelineRequired            *bool
+	ResolvedDiscussionsRequired *bool
+}
+
 type workflowItem struct {
+	Provider    string
+	Observation *workflowObservation
+
 	Kind                           string
 	Number                         int
 	Title, URL, State              string

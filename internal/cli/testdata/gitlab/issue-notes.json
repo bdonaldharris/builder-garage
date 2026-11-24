@@ -1,0 +1,28 @@
+[
+  {
+    "id": 11,
+    "body": "[AGENT #1 \u2014 IMPLEMENTATION]\n\n```yaml\ngarage_evidence: 1\nrecord: implementation\nissue: 6\ncheckable:\n  artifact:\n    method: garage-artifact-v1\n    object_format: sha1\n    stage: working-tree\n    integration_ref: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n    base: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n    tree: cccccccccccccccccccccccccccccccccccccccc\n    changeset: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n    paths: 1\nasserted:\n  status: ready-for-review\n  validation_run: true\n```\n",
+    "author": {
+      "id": 1,
+      "username": "builder",
+      "bot": false
+    },
+    "created_at": "2026-11-24T12:11:00Z",
+    "updated_at": "2026-11-24T12:11:00Z",
+    "system": false,
+    "resolvable": false
+  },
+  {
+    "id": 12,
+    "body": "[AGENT #2 \u2014 INDEPENDENT REVIEW]\n\n```yaml\ngarage_evidence: 1\nrecord: review\nissue: 6\nresponds_to: https://gitlab.example/group/sub/project/-/issues/6#note_11\ncheckable:\n  artifact:\n    method: garage-artifact-v1\n    object_format: sha1\n    stage: working-tree\n    integration_ref: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n    base: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n    tree: cccccccccccccccccccccccccccccccccccccccc\n    changeset: sha256:dddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddddd\n    paths: 1\nasserted:\n  execution_context: separate-from-implementation\n  inspected: complete-artifact\n  answers: {acceptance_criteria_met: true, new_regression: false, works: true}\n  verdict: approved\n```\n",
+    "author": {
+      "id": 1,
+      "username": "builder",
+      "bot": false
+    },
+    "created_at": "2026-11-24T12:12:00Z",
+    "updated_at": "2026-11-24T12:12:00Z",
+    "system": false,
+    "resolvable": false
+  }
+]

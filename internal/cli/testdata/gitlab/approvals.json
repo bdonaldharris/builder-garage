@@ -1,0 +1,12 @@
+{
+  "approvals_required": 1,
+  "approvals_left": 0,
+  "approved_by": [
+    {
+      "user": {
+        "id": 2,
+        "username": "maintainer"
+      }
+    }
+  ]
+}

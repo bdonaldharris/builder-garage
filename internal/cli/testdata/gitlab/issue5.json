@@ -1,0 +1,10 @@
+{
+  "id": 105,
+  "iid": 5,
+  "project_id": 7,
+  "title": "Issue five",
+  "description": "Related !5 and #6",
+  "web_url": "https://gitlab.example/group/sub/project/-/issues/5",
+  "state": "opened",
+  "confidential": true
+}
